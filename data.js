@@ -203,7 +203,7 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   // ---- Core / Concepts ----
-  { id:"c-intro", tier:"foundations", mini:true, short:"Lit",
+  { id:"c-intro", tier:"foundations", short:"Lit",
     title:"AI Literacy", sub:"what AI is & its history",
     title_fa:"مبانی هوش مصنوعی", sub_fa:"هوش مصنوعی چیست و تاریخچه آن",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
@@ -212,7 +212,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"c-flu", tier:"foundations", mini:true, short:"Flu",
+  { id:"c-flu", tier:"foundations", short:"Flu",
     title:"AI Fluency", sub:"prompts, tools & workflows",
     title_fa:"مهارت هوش مصنوعی", sub_fa:"پرامپت‌نویسی، ابزارها و گردش‌های کاری",
     blurb:"How to use AI tools effectively: prompting strategies, working with LLMs, integrating AI into real workflows, and evaluating outputs critically.",
