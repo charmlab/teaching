@@ -134,8 +134,9 @@ function renderHero() {
       }).join("")
     : `<span class="chip planned">None &mdash; start here</span>`;
   const S = STRINGS[lang];
+  const tierDisplay = (lang === "fa" ? TIER_LABEL_FA : TIER_LABEL)[mod.tier] || mod.tier;
   document.getElementById("hero").innerHTML = `
-    <div class="crumb"><a href="index.html">The AI Learning Map</a> / ${mod.tier}</div>
+    <div class="crumb"><a href="index.html">The AI Learning Map</a> / ${tierDisplay}</div>
     <h1>${title}</h1>
     <div>${mod.aud.map(a => `<span class="chip aud">${S.audience[a] || AUD_LABEL[a]}</span>`).join("")}</div>
     <p class="blurb">${mod.blurb}</p>

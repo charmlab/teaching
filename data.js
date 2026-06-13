@@ -2,9 +2,7 @@
    Shared data for The AI Learning Map (teaching.amirhkarimi.com)
    ============================================================ */
 
-/* Google Analytics 4 — same property as amirhkarimi.com.
-   For a separate teaching property, create a new GA4 data stream
-   and swap the ID here. */
+/* Google Analytics 4 */
 const GA_ID = "G-PLH5YY7PQS";
 window.dataLayer = window.dataLayer || [];
 function gtag(){ dataLayer.push(arguments); }
@@ -36,11 +34,33 @@ function getLang() {
 }
 function setLang(l) { localStorage.setItem("alm-lang", l); }
 
+/* ---------- Audience ---------- */
+const AUD_LABEL   = { student: "Student",   executive: "Executive",        public: "Public"         };
+const AUD_TAGLINE = { student: "build AI",  executive: "lead with AI",     public: "use AI"         };
+const AUD_TAGLINE_FA = { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" };
+
+/* ---------- Tier display names ---------- */
+const TIER_LABEL = {
+  foundations: "Foundations",
+  core:        "Concepts",
+  applied:     "Applications",
+  advanced:    "Specializations",
+};
+const TIER_LABEL_FA = {
+  foundations: "مبانی",
+  core:        "مفاهیم",
+  applied:     "کاربردها",
+  advanced:    "تخصصی",
+};
+
+/* ---------- i18n string tables ---------- */
 const STRINGS = {
   en: {
     find_level: "Find your level · تعیین سطح",
     lang_btn: "فا",
-    audience: { student: "Student", executive: "Executive" },
+    audience: { student: "Student", executive: "Executive", public: "Public" },
+    tagline:  { student: "build AI", executive: "lead with AI", public: "use AI" },
+    tier_label: TIER_LABEL,
     views: { map: "Skill tree", path: "Your path" },
     map_title: "The AI Learning Map",
     map_subtitle: "One coherent path from mathematical foundations to production AI systems — at the right depth for who you are. Each module, three ways in:",
@@ -55,6 +75,7 @@ const STRINGS = {
     path_hints: {
       student:   "The full technical path. Foundations are assumed; brush up as needed.",
       executive: "The 6-week executive program — 3-hour sessions: interactive lectures + hands-on notebooks. Build something every week.",
+      public:    "Start here. No technical background required — just curiosity about AI.",
     },
     ref_note: "Reference module — no original content here. Learn this from the excellent resources below.",
     back_to_map: "← back to the map",
@@ -69,7 +90,6 @@ const STRINGS = {
     listen_gen_pdf_sub: "Compiled from module content",
     listen_own_pdf: "Upload your PDF",
     listen_own_pdf_sub: "Use your own lecture notes",
-    listen_gen_unavail: "Not built yet — run `make listen MODULE=",
     listen_open_pdf: "Open PDF",
     listen_view_pdf: "Viewing:",
     footer: "Sequence may evolve based on feedback and emerging technology.",
@@ -77,21 +97,24 @@ const STRINGS = {
   fa: {
     find_level: "تعیین سطح",
     lang_btn: "EN",
-    audience: { student: "دانشجو", executive: "مدیر اجرایی" },
+    audience: { student: "دانشجو", executive: "مدیر اجرایی", public: "عموم" },
+    tagline:  { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" },
+    tier_label: TIER_LABEL_FA,
     views: { map: "درخت مهارت", path: "مسیر شما" },
     map_title: "نقشه یادگیری هوش مصنوعی",
-    map_subtitle: "یک مسیر منسجم از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب. هر ماژول، سه روش:",
+    map_subtitle: "یک مسیر منسجم از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب برای شما. هر ماژول، سه روش:",
     ing: {
       listen: { name: "گوش ده",  tag: "برای مفاهیم",
         desc: "جلسات درس را تماشا کنید یا گوش دهید." },
-      play:   { name: "بازی",          tag: "برای شهود",
+      play:   { name: "بازی",    tag: "برای شهود",
         desc: "یادداشت‌های تعاملی — بخوانید، سپس با الگوریتم‌ها بازی کنید." },
-      build:  { name: "بساز",          tag: "برای تسلط",
+      build:  { name: "بساز",    tag: "برای تسلط",
         desc: "خودتان پیاده‌سازی کنید در یک نوت‌بوک راهنما." },
     },
     path_hints: {
       student:   "مسیر کامل فنی. مبانی فرض شده‌اند؛ در صورت لزوم مرور کنید.",
       executive: "برنامه شش هفته‌ای — جلسات سه ساعته. هر هفته یک پروژه بسازید.",
+      public:    "از اینجا شروع کنید. پیش‌زمینه فنی لازم نیست — فقط کنجکاوی درباره AI.",
     },
     ref_note: "ماژول مرجع — محتوای اصلی ندارد. از منابع عالی زیر یاد بگیرید.",
     back_to_map: "→ بازگشت به نقشه",
@@ -106,31 +129,29 @@ const STRINGS = {
     listen_gen_pdf_sub: "ساخته شده از محتوای ماژول",
     listen_own_pdf: "آپلود PDF خودتان",
     listen_own_pdf_sub: "از جزوات درسی خود استفاده کنید",
-    listen_gen_unavail: "هنوز ساخته نشده — اجرا کنید: make listen MODULE=",
     listen_open_pdf: "باز کردن PDF",
     listen_view_pdf: "در حال نمایش:",
-    footer: "ترتیب براساس بازخورد تغییر میکند.",
+    footer: "ترتیب براساس بازخورد تغییر می‌کند.",
   }
 };
 
 const ING_META = {
   listen: { icon: "\u{1F3A7}", name: "Listen", tag: "for concepts",
     desc: "Watch or listen to the lecture — slides, video, or podcast." },
-  play:   { icon: "\u{1F3AE}", name: "Play", tag: "for intuition",
+  play:   { icon: "\u{1F3AE}", name: "Play",   tag: "for intuition",
     desc: "Interactive course notes — read, then poke at the algorithms and watch them respond." },
-  build:  { icon: "\u{1F528}", name: "Build", tag: "for mastery",
+  build:  { icon: "\u{1F528}", name: "Build",  tag: "for mastery",
     desc: "Implement it yourself in a guided notebook, with feedback." },
 };
-
-const AUD_LABEL = { student: "Student", executive: "Executive" };
 
 const MODULES = [
   // ---- Foundations ----
   { id:"f-la", tier:"foundations",
     title:"Linear Algebra", sub:"vectors → SVD",
     title_fa:"جبر خطی", sub_fa:"بردارها تا SVD",
-    ref:true, aud:["student","executive"], prereqs:[],
     blurb:"Vectors, matrices, eigendecomposition, SVD and low-rank approximation — the language every model is written in.",
+    blurb_fa:"بردارها، ماتریس‌ها، تجزیه مقدار ویژه، SVD — زبانی که هر مدل در آن نوشته می‌شود.",
+    ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"3Blue1Brown — Essence of Linear Algebra", type:"video", url:"https://www.3blue1brown.com/topics/linear-algebra" },
     ],
@@ -139,8 +160,9 @@ const MODULES = [
   { id:"f-calc", tier:"foundations",
     title:"Calculus", sub:"gradients & chain rule",
     title_fa:"حساب دیفرانسیل", sub_fa:"گرادیان و قانون زنجیره",
-    ref:true, aud:["student","executive"], prereqs:[],
     blurb:"Multivariable differentiation, gradients, and the chain rule — everything backprop quietly assumes you know.",
+    blurb_fa:"مشتق چندمتغیره، گرادیان‌ها و قانون زنجیره — هر آنچه پس‌انتشار پنهانی فرض می‌کند می‌دانید.",
+    ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"3Blue1Brown — Essence of Calculus", type:"video", url:"https://www.3blue1brown.com/topics/calculus" },
     ],
@@ -149,8 +171,9 @@ const MODULES = [
   { id:"f-prob", tier:"foundations",
     title:"Probability & Statistics", sub:"uncertainty & inference",
     title_fa:"احتمال و آمار", sub_fa:"عدم قطعیت و استنتاج",
-    ref:true, aud:["student","executive"], prereqs:[],
     blurb:"Distributions, expectation, estimation, and statistical inference — why ML claims anything at all about unseen data.",
+    blurb_fa:"توزیع‌ها، امید ریاضی، تخمین و استنتاج آماری — چرا یادگیری ماشین درباره داده‌های ندیده ادعایی می‌کند.",
+    ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"Khan Academy — Statistics & Probability", type:"website", url:"https://www.khanacademy.org/math/statistics-probability" },
       { title:"Seeing Theory — visual introduction to probability", type:"website", url:"https://seeing-theory.brown.edu" },
@@ -160,8 +183,9 @@ const MODULES = [
   { id:"f-opt", tier:"foundations",
     title:"Optimization", sub:"gradient descent & friends",
     title_fa:"بهینه‌سازی", sub_fa:"گرادیان کاهشی",
-    ref:true, aud:["student","executive"], prereqs:[],
     blurb:"Loss landscapes, convexity, gradient descent, and constrained optimization — how learning actually happens.",
+    blurb_fa:"فضای تابع خسارت، تحدب، گرادیان کاهشی و بهینه‌سازی مقیدشده — یادگیری در واقع چگونه اتفاق می‌افتد.",
+    ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"Khan Academy — Multivariable Calculus (optimization units)", type:"website", url:"https://www.khanacademy.org/math/multivariable-calculus" },
     ],
@@ -170,8 +194,9 @@ const MODULES = [
   { id:"f-prog", tier:"foundations",
     title:"Programming", sub:"Python, NumPy, Git",
     title_fa:"برنامه‌نویسی", sub_fa:"پایتون و NumPy",
-    ref:true, aud:["student","executive"], prereqs:[],
     blurb:"Python, NumPy/pandas, data munging, visualization, Git and the terminal — the workshop where everything gets built.",
+    blurb_fa:"پایتون، NumPy/pandas، پردازش داده، تصویرسازی، Git — کارگاهی که همه چیز در آن ساخته می‌شود.",
+    ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"Programming with Mosh — Python for Beginners", type:"video", url:"https://www.youtube.com/watch?v=_uQrJ0TkZlc" },
       { title:"Harvard CS50P — Introduction to Programming with Python", type:"website", url:"https://cs50.harvard.edu/python/" },
@@ -179,20 +204,22 @@ const MODULES = [
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  // ---- Core ----
+  // ---- Core / Concepts ----
   { id:"c-intro", tier:"core", mini:true,
-    title:"Intro to ML", sub:"the what & why",
-    title_fa:"مقدمه یادگیری ماشین", sub_fa:"چیستی و چرایی",
-    aud:["student","executive"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
-    blurb:"What machine learning actually is, where it sits in the broader AI landscape, when to use it (and when not to), and the common thread across all the methods ahead.",
+    title:"Intro to AI", sub:"what it is & why it matters",
+    title_fa:"مقدمه هوش مصنوعی", sub_fa:"چیستی و چرایی",
+    blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
+    blurb_fa:"هوش مصنوعی و یادگیری ماشین واقعاً چه هستند، کجا در چشم‌انداز گسترده‌تر جای می‌گیرند، چه زمانی باید از آن‌ها استفاده کرد، و وجه مشترک تمام روش‌های پیش رو.",
+    aud:["student","executive","public"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-ml", tier:"core",
     title:"Classical ML", sub:"KNN → ensembles → SVMs",
     title_fa:"یادگیری ماشین کلاسیک", sub_fa:"KNN تا SVM",
-    aud:["student","executive"], prereqs:["c-intro"],
     blurb:"Supervised learning end-to-end: KNN, decision trees, ensembles, linear regression, linear classification, logistic regression and SVMs. The running thread: linear models and linear separability — and where they break.",
+    blurb_fa:"یادگیری با نظارت از ابتدا تا انتها: KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، طبقه‌بندی خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
+    aud:["student","executive"], prereqs:["c-intro"],
     resources:[
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
@@ -201,28 +228,31 @@ const MODULES = [
   { id:"c-nn", tier:"core",
     title:"Neural Networks", sub:"beyond linear separability",
     title_fa:"شبکه‌های عصبی", sub_fa:"فراتر از جداسازی خطی",
-    aud:["student","executive"], prereqs:["c-ml"],
     blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent. The answer to “what if the data isn’t linearly separable?”",
+    blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی. پاسخ به: «اگر داده‌ها به طور خطی جدا نشوند چه؟»",
+    aud:["student","executive"], prereqs:["c-ml"],
     resources:[
       { title:"3Blue1Brown — Neural Networks", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  // ---- Applied ----
+  // ---- Applied / Applications ----
   { id:"a-vision", tier:"applied",
     title:"Computer Vision", sub:"CNNs & transfer learning",
     title_fa:"بینایی ماشین", sub_fa:"CNN و انتقال یادگیری",
-    aud:["student","executive"], prereqs:["c-nn"],
     blurb:"CNNs and feature hierarchies, convolution / pooling / normalization, transfer learning, data augmentation, evaluation.",
+    blurb_fa:"CNN‌ها و سلسله مراتب ویژگی، کانولوشن / پولینگ / نرمال‌سازی، انتقال یادگیری، بهبود داده، ارزیابی.",
+    aud:["student","executive"], prereqs:["c-nn"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   { id:"a-nlp", tier:"applied",
     title:"Language Models", sub:"embeddings → transformers",
     title_fa:"مدل‌های زبانی", sub_fa:"تعبیه‌ها تا ترانسفورمر",
-    aud:["student","executive"], prereqs:["c-nn"],
     blurb:"Sequence models, embeddings, attention, transformers, pretraining and fine-tuning, decoding. From n-grams to LLMs.",
+    blurb_fa:"مدل‌های دنباله، تعبیه‌ها، توجه، ترانسفورمرها، پیش‌آموزش و تنظیم دقیق، رمزگشایی. از n-gram تا LLM.",
+    aud:["student","executive"], prereqs:["c-nn"],
     resources:[
       { title:"Jay Alammar — The Illustrated Transformer", type:"website", url:"https://jalammar.github.io/illustrated-transformer/" },
       { title:"3Blue1Brown — Neural Networks (attention & transformers chapters)", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
@@ -233,75 +263,79 @@ const MODULES = [
   { id:"a-agents", tier:"applied",
     title:"AI Agents", sub:"reasoning, tools, memory",
     title_fa:"عامل‌های هوش مصنوعی", sub_fa:"استدلال، ابزار، حافظه",
-    aud:["executive"], prereqs:["a-nlp"],
     blurb:"Agents and reasoning, planning and memory, tool / function calling, workflows and orchestration, multi-agent concepts.",
+    blurb_fa:"عامل‌ها و استدلال، برنامه‌ریزی و حافظه، فراخوانی ابزار/تابع، گردش‌های کاری و هماهنگی، مفاهیم چند عاملی.",
+    aud:["executive"], prereqs:["a-nlp"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   { id:"a-systems", tier:"applied",
     title:"AI Systems & MLOps", sub:"models → production",
     title_fa:"سیستم‌های هوش مصنوعی", sub_fa:"مدل‌ها تا تولید",
-    aud:["executive"], prereqs:["a-agents","a-vision"],
     blurb:"From models to systems: retrieval and RAG, APIs and services, end-to-end evaluation, reliability and observability.",
+    blurb_fa:"از مدل‌ها به سیستم‌ها: بازیابی و RAG، API‌ها و سرویس‌ها، ارزیابی انتها به انتها، قابلیت اطمینان و مشاهده‌پذیری.",
+    aud:["executive"], prereqs:["a-agents","a-vision"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  // ---- Advanced ----
+  // ---- Advanced / Specializations ----
   { id:"x-prob", tier:"advanced",
     title:"Probabilistic & Causal AI", sub:"Bayes, uncertainty, causality",
     title_fa:"هوش مصنوعی احتمالی", sub_fa:"بیز، عدم قطعیت، علیت",
+    blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
+    blurb_fa:"یادگیری احتمالی، مدل‌سازی بیزی، کمی‌سازی عدم قطعیت و استدلال علّی.",
     aud:["student"], prereqs:["c-ml"],
-    blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning — growing into a full module.",
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-unsup", tier:"advanced",
     title:"Unsupervised Learning", sub:"PCA, clustering, embeddings",
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی",
-    aud:["student"], prereqs:["c-ml"],
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
+    blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
+    aud:["student"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-rl", tier:"advanced",
     title:"Reinforcement Learning", sub:"primer → module",
     title_fa:"یادگیری تقویتی", sub_fa:"مقدمه",
-    aud:["student"], prereqs:["c-nn"],
     blurb:"From a brief primer to a full module: MDPs, value functions, policy gradients.",
+    blurb_fa:"از مقدمه‌ای کوتاه تا یک ماژول کامل: MDP، توابع ارزش، گرادیان سیاست.",
+    aud:["student"], prereqs:["c-nn"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-rai", tier:"advanced",
     title:"Responsible AI", sub:"governance, risk, compliance",
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"حاکمیت و ریسک",
-    aud:["executive"], prereqs:["a-systems"],
     blurb:"Lead AI responsibly: governance, risk and compliance, responsible-AI principles, privacy, security and policy, industry cases.",
+    blurb_fa:"رهبری مسئولانه هوش مصنوعی: حاکمیت، ریسک و انطباق، اصول AI مسئولانه، حریم خصوصی، امنیت و سیاست.",
+    aud:["executive"], prereqs:["a-systems"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
 
 const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 
-/* One shared layout for all tracks.
-   x = horizontal position (% of canvas width, card center)
-   y = vertical level (0 = bottom row, larger = higher up)  */
+/* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
 const LAYOUT = {
-  "f-la":     { x: 10, y: 0 },
-  "f-calc":   { x: 30, y: 0 },
-  "f-prob":   { x: 50, y: 0 },
-  "f-opt":    { x: 70, y: 0 },
-  "f-prog":   { x: 90, y: 0 },
-  "c-intro":  { x: 50, y: 0.62 },  // mini gateway between foundations and core
-  "c-ml":     { x: 30, y: 1.25 },
-  "c-nn":     { x: 52, y: 2.1 },
-  "x-unsup":  { x: 10, y: 2.65 },
-  "a-vision": { x: 30, y: 3.05 },
-  "a-nlp":    { x: 62, y: 3.05 },
-  "x-prob":   { x: 12, y: 3.65 },
-  "a-agents": { x: 82, y: 3.8 },
-  "x-rl":     { x: 36, y: 4.1 },
-  "a-systems":{ x: 62, y: 4.55 },
-  "x-rai":    { x: 82, y: 5.25 },
+  "f-la":      { x: 10, y: 0 },
+  "f-calc":    { x: 30, y: 0 },
+  "f-prob":    { x: 50, y: 0 },
+  "f-opt":     { x: 70, y: 0 },
+  "f-prog":    { x: 90, y: 0 },
+  "c-intro":   { x: 50, y: 0.62 },
+  "c-ml":      { x: 30, y: 1.25 },
+  "c-nn":      { x: 52, y: 2.1  },
+  "x-unsup":   { x: 10, y: 2.65 },
+  "a-vision":  { x: 30, y: 3.05 },
+  "a-nlp":     { x: 62, y: 3.05 },
+  "x-prob":    { x: 12, y: 3.65 },
+  "a-agents":  { x: 82, y: 3.8  },
+  "x-rl":      { x: 36, y: 4.1  },
+  "a-systems": { x: 62, y: 4.55 },
+  "x-rai":     { x: 82, y: 5.25 },
 };
 
 const EDGES = (() => {
@@ -340,12 +374,18 @@ const PATHS = {
       { id:"x-rai",     where:"Bonus", bonus:true },
     ],
   },
+  public: {
+    hint: "Start here. No technical background required — just curiosity about AI.",
+    steps: [
+      { id:"c-intro", where:"Start here" },
+    ],
+  },
 };
 
 function getAudience() {
   const a = localStorage.getItem("alm-audience");
   if (a === "practitioner") return "executive"; // migrate old value
-  return (a === "student" || a === "executive") ? a : "student";
+  return (a === "student" || a === "executive" || a === "public") ? a : "student";
 }
 function setAudience(a) { localStorage.setItem("alm-audience", a); }
 

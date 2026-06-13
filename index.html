@@ -4,17 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The AI Learning Map &middot; Amir-Hossein Karimi</title>
-<link href="https://fonts.googleapis.com/css?family=Raleway:400,300,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <style>
   /* ---------- Hero ---------- */
-  header.hero { padding: 52px 0 20px; text-align: center; }
-  .working-title {
-    display: inline-block; font-size: 10.5px; letter-spacing: 2px;
-    text-transform: uppercase; color: var(--muted);
-    border: 1px dashed #ccc; border-radius: var(--radius-pill);
-    padding: 3px 12px; margin-bottom: 16px;
-  }
+  header.hero { padding: 48px 0 16px; text-align: center; }
   h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 600; letter-spacing: -1px; line-height: 1.15; }
   .subtitle { max-width: 600px; margin: 14px auto 0; color: var(--muted); font-size: 16px; font-weight: 300; }
   .ingredients-strip { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
@@ -24,8 +18,8 @@
   }
 
   /* ---------- Controls ---------- */
-  .controls { padding: 18px 0 6px; }
-  .controls-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .controls { padding: 18px 0 10px; }
+  .controls-inner { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
   .pills { display: flex; gap: 6px; flex-wrap: wrap; }
   .pill {
     border: 1px solid #ccc; background: #fff; border-radius: var(--radius-pill);
@@ -34,32 +28,43 @@
   }
   .pill:hover { border-color: var(--accent-primary); color: var(--accent-dark); }
   .pill.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+  /* Public audience pill — distinct blue-indigo */
+  #audience-pills .pill[data-aud="public"].active { background: #5a72c0; border-color: #5a72c0; }
+  #audience-pills .pill[data-aud="public"]:hover { border-color: #5a72c0; color: #5a72c0; }
 
   /* ---------- Skill tree canvas ---------- */
   #map-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   #map { position: relative; min-width: 720px; margin: 14px auto 0; }
   #edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   #edges path { transition: stroke .45s ease, stroke-opacity .45s ease; }
-  #edges path.off { stroke-opacity: 0.15; }
+  #edges path.off { stroke-opacity: 0.1; }
+  /* tier swimlane labels in the canvas */
+  .swimlane-label {
+    position: absolute; left: 4px; font-size: 9px; font-weight: 600; letter-spacing: 1.8px;
+    text-transform: uppercase; opacity: 0.45; pointer-events: none; white-space: nowrap;
+    transform: translateY(-50%);
+  }
+  .swimlane-label.foundations { color: var(--accent-secondary); }
+  .swimlane-label.core        { color: var(--accent-dark); }
+  .swimlane-label.applied     { color: #c08030; }
+  .swimlane-label.advanced    { color: #9b6bb5; }
+
   .node {
     position: absolute; width: 168px; height: 64px;
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card);
+    border: 1px solid var(--line); border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    text-align: center; cursor: pointer; padding: 6px 12px;
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    cursor: pointer; padding: 6px 12px 6px 8px;
     transition: opacity .45s ease, filter .45s ease, transform .15s ease, box-shadow .15s ease;
     z-index: 2;
   }
-  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); border-color: var(--accent-primary); }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
+  .node:hover { border-color: rgba(0,0,0,0.18); }
   .node .t { font-weight: 600; font-size: 13.5px; line-height: 1.25; }
   .node .s { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 400; }
-  .node[data-tier="foundations"] { border-bottom: 3px solid var(--accent-secondary); }
-  .node[data-tier="core"]        { border-bottom: 3px solid var(--accent-primary); }
-  .node[data-tier="applied"]     { border-bottom: 3px solid #b8842b; }
-  .node[data-tier="advanced"]    { border-bottom: 3px solid #c0626a; }
-  .node.inactive { opacity: 0.28; filter: grayscale(1); box-shadow: none; }
-  .node.inactive:hover { opacity: 0.8; filter: grayscale(0.3); }
-  .node.pulse { animation: pulse 1.2s ease 3; border-color: var(--accent-primary); }
+  .node.inactive { opacity: 0.22; filter: grayscale(1); box-shadow: none; }
+  .node.inactive:hover { opacity: 0.75; filter: grayscale(0.4); }
+  .node.pulse { animation: pulse 1.2s ease 3; }
   @keyframes pulse {
     0%, 100% { box-shadow: var(--shadow-card); }
     50% { box-shadow: 0 0 0 10px rgba(51, 195, 240, 0.25); }
@@ -83,6 +88,7 @@
   }
   .step.alt .step-num { background: var(--accent-secondary); box-shadow: 0 3px 0 #2e7c7a; }
   .step.bonus .step-num { background: #b8842b; box-shadow: 0 3px 0 #8f6315; font-size: 19px; }
+  .step.public-step .step-num { background: #5a72c0; box-shadow: 0 3px 0 #3d55a0; }
   .step-card {
     flex: 1; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-card);
     padding: 13px 18px; cursor: pointer; transition: all .15s; box-shadow: var(--shadow-card);
@@ -121,7 +127,6 @@
 </nav>
 
 <header class="hero wrap">
-  <div class="working-title">working title &middot; teaching.amirhkarimi.com</div>
   <h1 id="hero-title">The AI Learning Map</h1>
   <p class="subtitle" id="hero-subtitle">One coherent path from mathematical foundations to production AI systems &mdash; at the right depth for who you are. Each module, three ways in:</p>
   <div class="ingredients-strip" id="ing-strip">
@@ -133,14 +138,24 @@
 
 <div class="controls wrap">
   <div class="controls-inner">
-    <div class="pills" id="audience-pills">
-      <button class="pill" data-aud="student">Student</button>
-      <button class="pill" data-aud="executive">Executive</button>
+    <div>
+      <div class="pills" id="audience-pills">
+        <button class="pill" data-aud="student">Student</button>
+        <button class="pill" data-aud="executive">Executive</button>
+        <button class="pill" data-aud="public">Public</button>
+      </div>
+      <div class="aud-tagline" id="aud-tagline">build AI</div>
     </div>
     <div class="pills" id="view-pills">
       <button class="pill active" data-view="map">Skill tree</button>
       <button class="pill" data-view="path">Your path</button>
     </div>
+  </div>
+  <div class="tier-legend" id="tier-legend">
+    <div class="tier-legend-item foundations"><div class="swatch"></div><span id="tl-foundations">Foundations</span></div>
+    <div class="tier-legend-item core">       <div class="swatch"></div><span id="tl-core">Concepts</span></div>
+    <div class="tier-legend-item applied">    <div class="swatch"></div><span id="tl-applied">Applications</span></div>
+    <div class="tier-legend-item advanced">   <div class="swatch"></div><span id="tl-advanced">Specializations</span></div>
   </div>
 </div>
 
@@ -167,16 +182,20 @@
 const CARD_W = 168, CARD_H = 64, MINI_W = 140, MINI_H = 50, UNIT_Y = 108, PAD = 18;
 let audience = getAudience();
 let view = "map";
+const map = document.getElementById("map");
+
+function nodeW(m) { return m.mini ? MINI_W : CARD_W; }
+function nodeH(m) { return m.mini ? MINI_H : CARD_H; }
 
 /* ---------- build / rebuild nodes (respects current language) ---------- */
 function buildNodes() {
   const lang = getLang();
-  map.querySelectorAll(".node").forEach(n => n.remove());
+  map.querySelectorAll(".node,.swimlane-label").forEach(n => n.remove());
+
   for (const m of MODULES) {
     if (!(m.id in LAYOUT)) continue;
     const el = document.createElement("div");
-    const isMini = m.mini;
-    el.className = "node" + (isMini ? " mini" : "");
+    el.className = "node" + (m.mini ? " mini" : "");
     el.dataset.id = m.id;
     el.dataset.tier = m.tier;
     const title = (lang === "fa" && m.title_fa) ? m.title_fa : m.title;
@@ -191,12 +210,11 @@ function mapHeight() {
   const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y));
   return maxY * UNIT_Y + CARD_H + 2 * PAD;
 }
-function nodeW(m) { return m.mini ? MINI_W : CARD_W; }
-function nodeH(m) { return m.mini ? MINI_H : CARD_H; }
 
 function positionNodes() {
   const W = map.clientWidth, H = mapHeight();
   map.style.height = H + "px";
+
   for (const id of Object.keys(LAYOUT)) {
     const el = map.querySelector(`.node[data-id="${id}"]`);
     if (!el) continue;
@@ -208,8 +226,29 @@ function positionNodes() {
     el.style.left = Math.max(4, Math.min((p.x / 100) * W - nw / 2, W - nw - 4)) + "px";
     el.style.top  = (H - PAD - nh - p.y * UNIT_Y) + "px";
   }
+
+  // Swimlane labels
+  map.querySelectorAll(".swimlane-label").forEach(n => n.remove());
+  const lang = getLang();
+  const TL = STRINGS[lang].tier_label;
+  const swimlanes = [
+    { tier:"foundations", y: 0      },
+    { tier:"core",        y: 1.3    },
+    { tier:"applied",     y: 3.4    },
+    { tier:"advanced",    y: 4.6    },
+  ];
+  for (const { tier, y } of swimlanes) {
+    const lbl = document.createElement("div");
+    lbl.className = `swimlane-label ${tier}`;
+    lbl.textContent = TL[tier] || tier;
+    const topPx = H - PAD - CARD_H / 2 - y * UNIT_Y;
+    lbl.style.top = topPx + "px";
+    map.appendChild(lbl);
+  }
+
   drawEdges();
 }
+
 function drawEdges() {
   const svg = document.getElementById("edges");
   const W = map.clientWidth, H = map.clientHeight;
@@ -226,7 +265,7 @@ function drawEdges() {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
     path.setAttribute("fill", "none");
-    path.setAttribute("stroke", "#c5ccd1");
+    path.setAttribute("stroke", "#cad0d5");
     path.setAttribute("stroke-width", "1.5");
     path.dataset.from = from; path.dataset.to = to;
     svg.appendChild(path);
@@ -234,7 +273,7 @@ function drawEdges() {
   applyAudience();
 }
 
-/* ---------- audience: same positions, (de)activate with animation ---------- */
+/* ---------- audience ---------- */
 function isActive(id) { return byId[id].aud.includes(audience); }
 function applyAudience() {
   for (const m of MODULES) {
@@ -244,13 +283,18 @@ function applyAudience() {
   document.querySelectorAll("#edges path").forEach(p =>
     p.classList.toggle("off", !isActive(p.dataset.from) || !isActive(p.dataset.to)));
 }
+
 function syncAudiencePills() {
-  const S = STRINGS[getLang()];
+  const lang = getLang();
+  const S = STRINGS[lang];
   document.querySelectorAll("#audience-pills .pill").forEach(p => {
     p.textContent = S.audience[p.dataset.aud] || p.dataset.aud;
     p.classList.toggle("active", p.dataset.aud === audience);
   });
+  // Update tagline
+  document.getElementById("aud-tagline").textContent = S.tagline[audience] || "";
 }
+
 document.getElementById("audience-pills").addEventListener("click", e => {
   const btn = e.target.closest(".pill"); if (!btn) return;
   audience = btn.dataset.aud;
@@ -266,10 +310,7 @@ document.getElementById("view-pills").addEventListener("click", e => {
   const btn = e.target.closest(".pill"); if (!btn) return;
   view = btn.dataset.view;
   track("view_toggle", { view });
-  const S = STRINGS[getLang()];
-  document.querySelectorAll("#view-pills .pill").forEach(p => {
-    p.classList.toggle("active", p === btn);
-  });
+  document.querySelectorAll("#view-pills .pill").forEach(p => p.classList.toggle("active", p === btn));
   document.getElementById("map-scroll").style.display = view === "map" ? "block" : "none";
   document.getElementById("path").style.display = view === "path" ? "block" : "none";
   if (view === "map") positionNodes(); else renderPath();
@@ -279,8 +320,8 @@ document.getElementById("view-pills").addEventListener("click", e => {
 function renderPath() {
   const lang = getLang();
   const S = STRINGS[lang];
-  const cfg = PATHS[audience];
-  document.getElementById("path-hint").textContent = S.path_hints[audience];
+  const cfg = PATHS[audience] || PATHS.student;
+  document.getElementById("path-hint").textContent = S.path_hints[audience] || cfg.hint;
   const wrap = document.getElementById("path-steps");
   wrap.innerHTML = "";
   cfg.steps.forEach((s, i) => {
@@ -288,7 +329,8 @@ function renderPath() {
     const title = (lang === "fa" && m.title_fa) ? m.title_fa : m.title;
     const sub   = (lang === "fa" && m.sub_fa)   ? m.sub_fa   : m.sub;
     const div = document.createElement("div");
-    div.className = "step" + (i % 2 ? " alt" : "") + (s.bonus ? " bonus" : "");
+    const isPublic = audience === "public";
+    div.className = "step" + (isPublic ? " public-step" : (i % 2 ? " alt" : "")) + (s.bonus ? " bonus" : "");
     div.innerHTML = `<div class="step-num">${s.bonus ? "★" : i + 1}</div>
       <div class="step-card">
         <div class="where">${s.where}</div>
@@ -300,31 +342,30 @@ function renderPath() {
   });
 }
 
-/* ---------- ingredient popup ---------- */
+/* ---------- popup ---------- */
 const RES_ICON = { video: "\u{1F3A5}", website: "\u{1F310}", pdf: "\u{1F4C4}", book: "\u{1F4D8}" };
 function openPopup(id) {
   const m = byId[id];
   const lang = getLang();
   const S = STRINGS[lang];
-  const title = (lang === "fa" && m.title_fa) ? m.title_fa : m.title;
+  const title  = (lang === "fa" && m.title_fa)  ? m.title_fa  : m.title;
+  const blurb  = (lang === "fa" && m.blurb_fa)  ? m.blurb_fa  : m.blurb;
   track("module_popup", { module_id: id, audience });
+
   let body;
   if (m.ref) {
     body = `
-      <p class="blurb">${m.blurb}</p>
+      <p class="blurb">${blurb}</p>
       <p class="blurb" style="font-style:italic">${S.ref_note}</p>
       ${m.resources.map(r => `
         <a class="ing-option" href="${r.url}" target="_blank" rel="noopener"
            onclick="track('resource_click',{module_id:'${m.id}',resource:'${r.url}'})">
           <span class="icon">${RES_ICON[r.type] || RES_ICON.website}</span>
-          <span>
-            <div class="h">${r.title}</div>
-            <div class="d">${r.url.replace(/^https?:\/\//, "")}</div>
-          </span>
+          <span><div class="h">${r.title}</div><div class="d">${r.url.replace(/^https?:\/\//, "")}</div></span>
         </a>`).join("")}`;
   } else {
     body = `
-      <p class="blurb">${m.blurb}</p>
+      <p class="blurb">${blurb}</p>
       ${Object.entries(S.ing).map(([k, meta]) => `
         <a class="ing-option" href="module.html?id=${m.id}&mode=${k}"
            onclick="track('ingredient_select',{module_id:'${m.id}',ingredient:'${k}'})">
@@ -335,7 +376,9 @@ function openPopup(id) {
           </span>
         </a>`).join("")}`;
   }
-  const audLabels = m.aud.map(a => `<span class="chip aud">${S.audience[a] || AUD_LABEL[a]}</span>`).join("");
+  const audLabels = m.aud.map(a =>
+    `<span class="chip aud${a === "public" ? " public" : ""}">${S.audience[a] || AUD_LABEL[a]}</span>`
+  ).join("");
   document.getElementById("popup").innerHTML = `
     <button class="close" onclick="closeOverlays()">&times;</button>
     <h2>${title}</h2>
@@ -350,11 +393,10 @@ document.querySelectorAll(".overlay").forEach(o =>
   o.addEventListener("click", e => { if (e.target === o) closeOverlays(); }));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeOverlays(); });
 
-/* ---------- language toggle ---------- */
+/* ---------- language ---------- */
 function applyLang() {
   const lang = getLang();
   const S = STRINGS[lang];
-  const isFA = lang === "fa";
   document.documentElement.lang = lang;
 
   document.getElementById("lang-btn").textContent = S.lang_btn;
@@ -362,9 +404,9 @@ function applyLang() {
   document.getElementById("hero-subtitle").textContent = S.map_subtitle;
 
   // Ingredients strip
-  const ingKeys = ["listen", "play", "build"];
-  const ingIcons = ["\u{1F3A7}", "\u{1F3AE}", "\u{1F528}"];
-  document.getElementById("ing-strip").innerHTML = ingKeys.map((k, i) =>
+  const ingKeys = ["listen","play","build"];
+  const ingIcons = ["\u{1F3A7}","\u{1F3AE}","\u{1F528}"];
+  document.getElementById("ing-strip").innerHTML = ingKeys.map((k,i) =>
     `<span>${ingIcons[i]} <b>${S.ing[k].name}</b> ${S.ing[k].tag}</span>`).join("");
 
   // View pills
@@ -372,9 +414,14 @@ function applyLang() {
     p.textContent = S.views[p.dataset.view] || p.textContent;
   });
 
-  syncAudiencePills();
+  // Tier legend
+  const TL = S.tier_label;
+  ["foundations","core","applied","advanced"].forEach(t => {
+    const el = document.getElementById("tl-" + t);
+    if (el) el.textContent = TL[t] || t;
+  });
 
-  // Rebuild nodes with new language
+  syncAudiencePills();
   buildNodes();
   if (view === "map") positionNodes();
   else renderPath();
@@ -388,9 +435,8 @@ document.getElementById("lang-btn").addEventListener("click", () => {
 });
 
 /* ---------- init ---------- */
-const map = document.getElementById("map");
 buildNodes();
-applyLang(); // sets language & syncs all pills
+applyLang();
 positionNodes();
 window.addEventListener("resize", () => { if (view === "map") positionNodes(); });
 </script>
