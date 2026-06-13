@@ -293,7 +293,7 @@ const MODULES = [
 
   // ---- Advanced / Specializations ----
   { id:"x-prob", tier:"concepts", short:"Pr",
-    title:"Probabilistic AI", sub:"Bayes, uncertainty & causality",
+    title:"Probabilistic & Causal AI", sub:"Bayes, uncertainty & causality",
     title_fa:"هوش مصنوعی احتمالی", sub_fa:"بیز، عدم قطعیت و علیت",
     blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
     blurb_fa:"یادگیری احتمالی، مدل‌سازی بیزی، کمی‌سازی عدم قطعیت و استدلال علّی.",
