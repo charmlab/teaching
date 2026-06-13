@@ -300,7 +300,7 @@ const MODULES = [
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
-    aud:["student"], prereqs:["c-ml"],
+    aud:["student"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -309,7 +309,7 @@ const MODULES = [
     title_fa:"یادگیری تقویتی", sub_fa:"باندیت‌ها، MDP، توابع ارزش، گرادیان سیاست",
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
-    aud:["student"], prereqs:["c-ml"],
+    aud:["student"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 

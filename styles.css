@@ -37,12 +37,21 @@ html[lang="fa"] body {
   direction: ltr; /* layout stays LTR; FA text flows naturally inline */
   /* font-family intentionally NOT overridden — Raleway stays for UI chrome */
 }
-/* Apply Harmattan only to content-bearing text in FA mode */
+/* Apply Harmattan to all content-bearing text in FA mode
+   (UI chrome — nav brand, pills, lang-btn — stays in Raleway) */
 html[lang="fa"] .modal,
 html[lang="fa"] .module-hero,
 html[lang="fa"] .step-card,
 html[lang="fa"] #popup,
-html[lang="fa"] #path {
+html[lang="fa"] #path,
+html[lang="fa"] section.flow,
+html[lang="fa"] .step-nav,
+html[lang="fa"] .next-prev,
+html[lang="fa"] .resource,
+html[lang="fa"] .placeholder,
+html[lang="fa"] .resources-empty,
+html[lang="fa"] .ingredients-strip,
+html[lang="fa"] .ing-option {
   direction: rtl;
   text-align: right;
   font-family: "Harmattan", "Tahoma", "Arial", sans-serif;
@@ -50,7 +59,13 @@ html[lang="fa"] #path {
 html[lang="fa"] .node .t,
 html[lang="fa"] .node .s,
 html[lang="fa"] .subtitle,
-html[lang="fa"] h1 {
+html[lang="fa"] h1,
+html[lang="fa"] h2,
+html[lang="fa"] .eyebrow,
+html[lang="fa"] .desc,
+html[lang="fa"] .blurb,
+html[lang="fa"] .crumb,
+html[lang="fa"] footer.site-footer {
   font-family: "Harmattan", "Tahoma", "Arial", sans-serif;
 }
 a { color: var(--accent-primary); text-decoration: none; }
