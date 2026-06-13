@@ -419,17 +419,40 @@ function renderNextPrev() {
     y: H - PADM - NH / 2 - LAYOUT[id].y * UY,
   });
 
-  // Edge lines
+  // Edge lines (skip junction nodes — draw direct line from math to junction to concepts)
   let lines = "";
   for (const [from, to] of EDGES) {
+    const mfrom = byId[from], mto = byId[to];
+    if (mfrom.junction || mto.junction) continue; // junctions handled separately
     const a = pos(from), b = pos(to);
     lines += `<line x1="${a.x}" y1="${a.y - NH/2}" x2="${b.x}" y2="${b.y + NH/2}" stroke="#c9ced2" stroke-width="1"/>`;
   }
+  // Draw junction edges as direct lines (fan-in from 5 maths, fan-out to 3 concepts)
+  for (const [from, to] of EDGES) {
+    const mfrom = byId[from], mto = byId[to];
+    if (!mfrom.junction && !mto.junction) continue;
+    if (!(from in LAYOUT) || !(to in LAYOUT)) continue;
+    const a = pos(from), b = pos(to);
+    const ay = mfrom.junction ? a.y : a.y - NH/2;
+    const by2 = mto.junction ? b.y : b.y + NH/2;
+    lines += `<line x1="${a.x}" y1="${ay}" x2="${b.x}" y2="${by2}" stroke="#c9ced2" stroke-width="1"/>`;
+  }
   svg.innerHTML = lines;
+
+  // Draw junction dots in minimap
+  for (const m of MODULES) {
+    if (!m.junction || !(m.id in LAYOUT)) continue;
+    const p = pos(m.id);
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", p.x); c.setAttribute("cy", p.y);
+    c.setAttribute("r", "3"); c.setAttribute("fill", "#a8b8c0");
+    svg.appendChild(c);
+  }
 
   // Rects + short labels
   const rects = [];
   for (const id of Object.keys(LAYOUT)) {
+    if (byId[id] && byId[id].junction) continue; // skip junction nodes
     const p = pos(id);
     const cur = id === mod.id;
     const isMini = byId[id].mini;

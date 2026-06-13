@@ -224,6 +224,7 @@ function buildNodes() {
 
   for (const m of MODULES) {
     if (!(m.id in LAYOUT)) continue;
+    if (m.junction) continue;  // junction nodes are rendered in the SVG, not as cards
     const el = document.createElement("div");
     el.className = "node" + (m.mini ? " mini" : "");
     el.dataset.id = m.id;
@@ -278,27 +279,61 @@ function positionNodes() {
   drawEdges();
 }
 
+/* Return the SVG connection point for a node (or junction dot) */
+function edgePoint(id, side) {
+  const m = byId[id];
+  if (m && m.junction && id in LAYOUT) {
+    const p = LAYOUT[id];
+    const W = map.clientWidth, H = map.clientHeight;
+    return { x: (p.x / 100) * W, y: H - PAD - CARD_H / 2 - p.y * UNIT_Y };
+  }
+  const el = map.querySelector(`.node[data-id="${id}"]`);
+  if (!el) return null;
+  const nw = nodeW(m), nh = nodeH(m);
+  return {
+    x: el.offsetLeft + nw / 2,
+    y: side === "top" ? el.offsetTop : el.offsetTop + nh,
+  };
+}
+
 function drawEdges() {
   const svg = document.getElementById("edges");
   const W = map.clientWidth, H = map.clientHeight;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.innerHTML = "";
+
   for (const [from, to] of EDGES) {
-    const a = map.querySelector(`.node[data-id="${from}"]`);
-    const b = map.querySelector(`.node[data-id="${to}"]`);
-    if (!a || !b) continue;
     const mfrom = byId[from], mto = byId[to];
-    const x1 = a.offsetLeft + nodeW(mfrom) / 2, y1 = a.offsetTop;
-    const x2 = b.offsetLeft + nodeW(mto)   / 2, y2 = b.offsetTop + nodeH(mto);
-    const my = (y1 + y2) / 2;
+    // from-node: connect from its top edge (upper side of lower card)
+    // to-node: connect to its bottom edge (lower side of upper card)
+    const pt1 = edgePoint(from, "top");
+    const pt2 = edgePoint(to, "bottom");
+    if (!pt1 || !pt2) continue;
+    const my = (pt1.y + pt2.y) / 2;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
+    path.setAttribute("d", `M ${pt1.x} ${pt1.y} C ${pt1.x} ${my}, ${pt2.x} ${my}, ${pt2.x} ${pt2.y}`);
     path.setAttribute("fill", "none");
     path.setAttribute("stroke", "#cad0d5");
     path.setAttribute("stroke-width", "1.5");
     path.dataset.from = from; path.dataset.to = to;
     svg.appendChild(path);
   }
+
+  // Draw junction dots on top of edges
+  for (const m of MODULES) {
+    if (!m.junction || !(m.id in LAYOUT)) continue;
+    const p = LAYOUT[m.id];
+    const cx = (p.x / 100) * W;
+    const cy = H - PAD - CARD_H / 2 - p.y * UNIT_Y;
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    circle.setAttribute("cx", cx); circle.setAttribute("cy", cy);
+    circle.setAttribute("r", "5");
+    circle.setAttribute("fill", "#a8b8c0");
+    circle.setAttribute("stroke", "white"); circle.setAttribute("stroke-width", "1.5");
+    circle.dataset.junc = m.id;
+    svg.appendChild(circle);
+  }
+
   applyAudience();
 }
 
@@ -315,6 +350,12 @@ function applyAudience() {
   }
   document.querySelectorAll("#edges path").forEach(p =>
     p.classList.toggle("off", !isActive(p.dataset.from) || !isActive(p.dataset.to)));
+  // Fade junction dots when no connected edge is active
+  document.querySelectorAll("#edges circle[data-junc]").forEach(c => {
+    const jId = c.dataset.junc;
+    const anyActive = EDGES.some(([f, t]) => (f === jId || t === jId) && isActive(f) && isActive(t));
+    c.style.opacity = anyActive ? "1" : "0.08";
+  });
 }
 
 function syncAudiencePills() {

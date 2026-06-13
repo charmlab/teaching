@@ -202,6 +202,12 @@ const MODULES = [
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
+  // ---- Junction node (renders as dot, not a card) ----
+  { id:"junc-f2c", junction:true, tier:"concepts", short:"·",
+    title:"", sub:"", title_fa:"", sub_fa:"", blurb:"", blurb_fa:"",
+    aud:["student"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
+    resources:[], ing:{} },
+
   // ---- Core / Concepts ----
   { id:"c-intro", tier:"foundations", short:"Lit",
     title:"AI Literacy", sub:"what AI is & its history",
@@ -226,7 +232,7 @@ const MODULES = [
     title_fa:"یادگیری با نظارت", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، رگرسیون، طبقه‌بندی",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
-    aud:["student","executive"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
+    aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
@@ -300,7 +306,7 @@ const MODULES = [
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
-    aud:["student"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
+    aud:["student"], prereqs:["junc-f2c"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -309,7 +315,7 @@ const MODULES = [
     title_fa:"یادگیری تقویتی", sub_fa:"باندیت‌ها، MDP، توابع ارزش، گرادیان سیاست",
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
-    aud:["student"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
+    aud:["student"], prereqs:["junc-f2c"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -340,6 +346,8 @@ const LAYOUT = {
   "c-intro":   { x: 18, y: 0    },  // AI Literacy
   "c-flu":     { x: 50, y: 0    },  // AI Fluency
   "x-rai":     { x: 82, y: 0    },  // Responsible AI
+  // ── Junction dot (between math row and concepts row 1) ──────
+  "junc-f2c":  { x: 50, y: 1.325 },
   // ── Foundations row 2 (math references) ─────────────────────
   "f-la":      { x: 10, y: 0.9  },
   "f-calc":    { x: 30, y: 0.9  },
