@@ -226,7 +226,7 @@ const MODULES = [
     title_fa:"یادگیری با نظارت", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، رگرسیون، طبقه‌بندی",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
-    aud:["student","executive"], prereqs:["c-intro"],
+    aud:["student","executive"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
     resources:[
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
@@ -300,7 +300,7 @@ const MODULES = [
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
-    aud:["student"], prereqs:["c-intro"],
+    aud:["student"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -309,7 +309,7 @@ const MODULES = [
     title_fa:"یادگیری تقویتی", sub_fa:"باندیت‌ها، MDP، توابع ارزش، گرادیان سیاست",
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
-    aud:["student"], prereqs:["c-intro"],
+    aud:["student"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
