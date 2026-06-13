@@ -1,6 +1,16 @@
 # raw lecture materials stay local — this repo is PUBLIC (GitHub Pages)
+# Ignore everything inside sources/ subdirectories, but keep the dirs tracked
+modules/*/sources/en/*
+!modules/*/sources/en/.gitkeep
+modules/*/sources/fa/*
+!modules/*/sources/fa/.gitkeep
+# Also ignore any files dropped directly in sources/ (legacy / accidental)
 modules/*/sources/*
 !modules/*/sources/.gitkeep
+!modules/*/sources/en
+!modules/*/sources/fa
+
+# extraction jobs (may contain course content summaries)
 modules/*/EXTRACTION_JOB.md
 
 # generated outputs (rebuild with make)

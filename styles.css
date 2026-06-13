@@ -95,3 +95,100 @@ footer.site-footer {
   border-top: 1px solid var(--line); padding: 24px 0 40px; text-align: center;
   color: var(--muted); font-size: 12.5px; margin-top: 48px;
 }
+
+/* ---------- Mini nodes (Intro to ML style) ---------- */
+.node.mini {
+  width: 140px; height: 50px;
+  border-style: dashed; border-color: #c0d4dc;
+  box-shadow: none; opacity: 0.88;
+}
+.node.mini .t { font-size: 12.5px; }
+.node.mini .s { font-size: 10px; }
+.node.mini:hover { box-shadow: var(--shadow-card); opacity: 1; }
+.node.mini.inactive { opacity: 0.18; }
+
+/* ---------- Language toggle in nav ---------- */
+.lang-btn {
+  border: 1px solid #ccc; background: #fff; border-radius: var(--radius-pill);
+  padding: 3px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+  cursor: pointer; color: var(--muted); transition: all .15s; font-family: inherit;
+}
+.lang-btn:hover { border-color: var(--accent-primary); color: var(--accent-dark); }
+
+/* ---------- PDF chooser (Listen section) ---------- */
+.pdf-chooser { margin-top: 16px; }
+.pdf-chooser .choose-label {
+  font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px; font-weight: 600;
+}
+.pdf-options { display: flex; gap: 10px; flex-wrap: wrap; }
+.pdf-opt {
+  flex: 1; min-width: 180px; border: 1px solid var(--line); border-radius: var(--radius-card);
+  padding: 13px 16px; cursor: pointer; transition: all .15s; position: relative;
+}
+.pdf-opt:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-card); }
+.pdf-opt.selected { border-color: var(--accent-primary); background: #f2fbfe; }
+.pdf-opt .opt-title { font-weight: 600; font-size: 13.5px; }
+.pdf-opt .opt-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pdf-opt .opt-action { margin-top: 10px; }
+.pdf-opt input[type="file"] { display: none; }
+.pdf-viewer {
+  margin-top: 12px; border: 1px solid var(--line); border-radius: var(--radius-card);
+  overflow: hidden; display: none;
+}
+.pdf-viewer .pdf-label {
+  padding: 7px 12px; font-size: 12px; color: var(--muted); background: #f8f8f8;
+  border-bottom: 1px solid var(--line); display: flex; justify-content: space-between;
+}
+.pdf-viewer iframe { width: 100%; height: 520px; border: none; display: block; }
+
+/* ---------- Quiz section ---------- */
+.quiz-q { margin-top: 22px; font-weight: 600; font-size: 14.5px; line-height: 1.4; }
+.quiz-q .marks { font-weight: 400; font-size: 12px; color: var(--muted); margin-left: 6px; }
+.quiz-opts { display: flex; flex-direction: column; gap: 7px; margin-top: 9px; }
+.quiz-opts button {
+  text-align: left; border: 1px solid var(--line); background: #fff;
+  border-radius: var(--radius-pill); padding: 9px 14px; font-size: 13.5px;
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.quiz-opts button:hover:not(.correct):not(.wrong) { border-color: var(--accent-primary); background: #f2fbfe; }
+.quiz-opts button.correct { border-color: #2e9e5b; background: #eef9f2; color: #1d7a45; }
+.quiz-opts button.wrong   { border-color: #c0626a; background: #fdf0f1; color: #963b43; }
+.quiz-open { margin-top: 22px; }
+.quiz-open .open-q { font-weight: 600; font-size: 14.5px; line-height: 1.4; }
+.quiz-open .open-hint {
+  margin-top: 8px; border: 1.5px dashed #d5d5d5; border-radius: var(--radius-card);
+  padding: 12px 14px; font-size: 13px; color: var(--muted); background: #fcfcfc;
+}
+.quiz-score { margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--accent-dark); }
+
+/* ---------- Mobile responsive ---------- */
+@media (max-width: 640px) {
+  .site-nav .inner { flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+  .site-nav .links { font-size: 12.5px; gap: 10px; }
+
+  .controls-inner { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+  .ingredients-strip span { font-size: 11.5px; padding: 4px 10px; }
+
+  .modal { padding: 20px 18px; }
+
+  /* Module page step-nav: scroll horizontally, no wrapping */
+  .step-nav { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .step-nav::-webkit-scrollbar { display: none; }
+  .step-nav a { white-space: nowrap; padding: 5px 10px; font-size: 12px; flex-shrink: 0; }
+  .step-nav a span.muted-tag { display: none; }
+
+  .next-prev { flex-direction: column; }
+  .next-prev .btn { text-align: center; }
+
+  .pdf-options { flex-direction: column; }
+  .pdf-viewer iframe { height: 380px; }
+
+  section.flow { padding: 26px 0 6px; }
+  .module-hero { padding: 28px 0 6px; }
+}
+
+@media (max-width: 420px) {
+  h1 { font-size: 26px; }
+}

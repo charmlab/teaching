@@ -90,7 +90,8 @@
   <div class="wrap inner">
     <span class="brand"><a href="index.html" style="color:var(--text)">Amir-Hossein Karimi &middot; <span class="teaching">Teaching</span></a></span>
     <span class="links">
-      <a href="index.html">&larr; back to the map</a>
+      <a href="index.html" id="back-link">&larr; back to the map</a>
+      <button class="lang-btn" id="lang-btn" title="Switch language / تغییر زبان">فا</button>
       <a href="https://amirhkarimi.com" target="_blank">amirhkarimi.com</a>
     </span>
   </div>
@@ -98,7 +99,7 @@
 
 <div id="minimap" title="Click a node to travel there">
   <svg id="minimap-svg"></svg>
-  <div class="label">you are here &mdash; click a node to travel</div>
+  <div class="label" id="minimap-label">you are here &mdash; click a node to travel</div>
 </div>
 
 <main class="wrap">
@@ -109,7 +110,7 @@
 </main>
 
 <footer class="site-footer">
-  <div class="wrap">Sequence may evolve based on feedback and emerging technology. &middot; &copy; 2026 Amir-Hossein Karimi</div>
+  <div class="wrap" id="footer-text">Sequence may evolve based on feedback and emerging technology. &middot; &copy; 2026 Amir-Hossein Karimi</div>
 </footer>
 
 <script src="data.js"></script>
@@ -120,95 +121,295 @@ const mode = params.get("mode");
 document.title = `${mod.title} · The AI Learning Map`;
 track("module_view", { module_id: mod.id, mode: mode || "(none)", reference: !!mod.ref });
 
+const RES_ICON = { video: "\u{1F3A5}", website: "\u{1F310}", pdf: "\u{1F4C4}", book: "\u{1F4D8}" };
+
 /* ---------- hero ---------- */
-const prereqChips = mod.prereqs.length
-  ? mod.prereqs.map(p => `<a class="chip aud" href="module.html?id=${p}">${byId[p].title}</a>`).join("")
-  : `<span class="chip planned">None &mdash; start here</span>`;
-document.getElementById("hero").innerHTML = `
-  <div class="crumb"><a href="index.html">The AI Learning Map</a> / ${mod.tier}</div>
-  <h1>${mod.title}</h1>
-  <div>${mod.aud.map(a => `<span class="chip aud">${AUD_LABEL[a]}</span>`).join("")}</div>
-  <p class="blurb">${mod.blurb}</p>
-  <p class="meta prereq-chips"><b>Builds on:</b> ${prereqChips}</p>`;
+function renderHero() {
+  const lang = getLang();
+  const title = (lang === "fa" && mod.title_fa) ? mod.title_fa : mod.title;
+  const prereqChips = mod.prereqs.length
+    ? mod.prereqs.map(p => {
+        const pt = (lang === "fa" && byId[p].title_fa) ? byId[p].title_fa : byId[p].title;
+        return `<a class="chip aud" href="module.html?id=${p}">${pt}</a>`;
+      }).join("")
+    : `<span class="chip planned">None &mdash; start here</span>`;
+  const S = STRINGS[lang];
+  document.getElementById("hero").innerHTML = `
+    <div class="crumb"><a href="index.html">The AI Learning Map</a> / ${mod.tier}</div>
+    <h1>${title}</h1>
+    <div>${mod.aud.map(a => `<span class="chip aud">${S.audience[a] || AUD_LABEL[a]}</span>`).join("")}</div>
+    <p class="blurb">${mod.blurb}</p>
+    <p class="meta prereq-chips"><b>Builds on:</b> ${prereqChips}</p>`;
+}
 
 /* ---------- step nav + sections ---------- */
-const SECTION_CONTENT = {
-  listen: {
-    placeholder: `<div class="big">\u{1F3A7}</div>
-      <p>Lecture recording and podcast version coming soon. Slides will be available here.</p>
-      <div class="actions">
-        <button class="btn" disabled>Watch lecture</button>
-        <button class="btn" disabled>Listen as podcast</button>
-        <button class="btn" disabled>Slides (PDF)</button>
-      </div>`,
-  },
-  play: {
-    placeholder: `<div class="big">\u{1F3AE}</div>
-      <p>Interactive course notes under construction &mdash; readable theory with live, manipulable visualizations of the algorithms (KaTeX + animations).</p>
-      <div class="actions"><button class="btn" disabled>Open interactive notes</button></div>`,
-  },
-  build: {
-    placeholder: `<div class="big">\u{1F528}</div>
-      <p>A guided Python notebook where you implement the ideas yourself and get feedback on your work.</p>
-      <div class="actions">
-        <button class="btn" disabled>Open notebook</button>
-        <button class="btn" disabled>Open in Colab</button>
-      </div>`,
-  },
-};
+const STEPS_EN = ["listen","play","build","quiz"];
+const STEP_ICONS = { listen:"\u{1F3A7}", play:"\u{1F3AE}", build:"\u{1F528}", quiz:"\u{2705}" };
 
-const keys = Object.keys(ING_META);
-document.getElementById("step-nav").innerHTML = keys.map((k, i) => `
-  <a href="#${k}" data-k="${k}"><span class="n">${i + 1}</span>${ING_META[k].name}
-    <span style="font-weight:400;color:var(--muted)">&middot; ${ING_META[k].tag.replace("for ", "")}</span></a>`).join("");
+function renderSections() {
+  const lang = getLang();
+  const S = STRINGS[lang];
 
-const RES_ICON = { video: "\u{1F3A5}", website: "\u{1F310}", pdf: "\u{1F4C4}", book: "\u{1F4D8}" };
-const resourcesHtml = mod.resources && mod.resources.length
-  ? mod.resources.map(r => `
-      <a class="resource" href="${r.url}" target="_blank" rel="noopener"
-         onclick="track('resource_click',{module_id:'${mod.id}',resource:'${r.url}'})">
-        <span class="icon">${RES_ICON[r.type] || RES_ICON.website}</span>
-        <span><div class="h">${r.title}</div><div class="u">${r.url.replace(/^https?:\/\//, "")}</div></span>
-      </a>`).join("")
-  : `<div class="resources-empty">Curated resources for this module are on their way.</div>`;
+  // Step nav
+  if (!mod.ref) {
+    document.getElementById("step-nav").innerHTML = STEPS_EN.map((k, i) => {
+      const ingData = S.ing[k];
+      const name = ingData ? ingData.name : (k === "quiz" ? (lang === "fa" ? "آزمون" : "Quiz") : k);
+      const tag  = ingData ? ingData.tag  : (k === "quiz" ? (lang === "fa" ? "خودآزمایی" : "self-check") : "");
+      return `<a href="#${k}" data-k="${k}">
+        <span class="n">${i + 1}</span>${name}
+        <span class="muted-tag" style="font-weight:400;color:var(--muted)">&middot; ${tag}</span>
+      </a>`;
+    }).join("");
+  }
 
-if (mod.ref) {
-  /* Reference module: no Listen/Play/Build — curated external resources only */
-  document.getElementById("step-nav").style.display = "none";
-  document.getElementById("sections").innerHTML = `
-    <section class="flow" id="resources">
-      <div class="eyebrow">Reference module</div>
-      <h2>\u{1F4DA} Learn it from the best</h2>
-      <p class="desc">No original content here for now &mdash; these excellent resources cover everything this map needs from ${mod.title}.</p>
-      ${resourcesHtml}
+  // Resources HTML
+  const resourcesHtml = mod.resources && mod.resources.length
+    ? mod.resources.map(r => `
+        <a class="resource" href="${r.url}" target="_blank" rel="noopener"
+           onclick="track('resource_click',{module_id:'${mod.id}',resource:'${r.url}'})">
+          <span class="icon">${RES_ICON[r.type] || RES_ICON.website}</span>
+          <span><div class="h">${r.title}</div><div class="u">${r.url.replace(/^https?:\/\//, "")}</div></span>
+        </a>`).join("")
+    : `<div class="resources-empty">${S.resources_empty}</div>`;
+
+  if (mod.ref) {
+    document.getElementById("step-nav").style.display = "none";
+    document.getElementById("sections").innerHTML = `
+      <section class="flow" id="resources">
+        <div class="eyebrow">Reference module</div>
+        <h2>${S.ref_resources_title}</h2>
+        <p class="desc">${S.ref_resources_sub} ${mod.title}.</p>
+        ${resourcesHtml}
+      </section>`;
+    return;
+  }
+
+  // --- Listen section with PDF chooser ---
+  const genPdfPath = `modules/${mod.id}/out/${mod.id}-${lang}.pdf`;
+  const listenHtml = `
+    <section class="flow" id="listen">
+      <div class="eyebrow">Step 1 &middot; ${S.ing.listen.tag}</div>
+      <h2>${STEP_ICONS.listen} ${S.ing.listen.name}</h2>
+      <p class="desc">${S.ing.listen.desc}</p>
+
+      <div class="pdf-chooser">
+        <div class="choose-label">${S.listen_choose}</div>
+        <div class="pdf-options">
+          <div class="pdf-opt" id="pdf-gen-opt">
+            <div class="opt-title">${S.listen_gen_pdf}</div>
+            <div class="opt-sub">${S.listen_gen_pdf_sub}</div>
+            <div class="opt-action">
+              <a class="btn" id="pdf-gen-link" href="${genPdfPath}" target="_blank"
+                 onclick="selectPDF('gen','${genPdfPath}','${S.listen_view_pdf} ${mod.title}'); return false;">
+                ${S.listen_open_pdf}
+              </a>
+            </div>
+          </div>
+          <div class="pdf-opt" id="pdf-upload-opt">
+            <div class="opt-title">${S.listen_own_pdf}</div>
+            <div class="opt-sub">${S.listen_own_pdf_sub}</div>
+            <div class="opt-action">
+              <label class="btn" for="pdf-upload-input" style="cursor:pointer">${S.listen_own_pdf} &hellip;</label>
+              <input type="file" id="pdf-upload-input" accept=".pdf">
+            </div>
+          </div>
+        </div>
+        <div class="pdf-viewer" id="pdf-viewer">
+          <div class="pdf-label">
+            <span id="pdf-label-text"></span>
+            <button style="border:none;background:none;cursor:pointer;color:var(--muted)" onclick="closePDF()">&times;</button>
+          </div>
+          <iframe id="pdf-iframe" src="" title="PDF viewer"></iframe>
+        </div>
+      </div>
+
+      <div class="placeholder" style="margin-top:16px">
+        <div class="big">${STEP_ICONS.listen}</div>
+        <p>Lecture recording and podcast version coming soon.</p>
+        <div class="actions">
+          <button class="btn" disabled>Watch lecture</button>
+          <button class="btn" disabled>Listen as podcast</button>
+        </div>
+      </div>
     </section>`;
-} else {
-  document.getElementById("sections").innerHTML = keys.map((k, i) => `
-    <section class="flow" id="${k}">
-      <div class="eyebrow">Step ${i + 1} &middot; ${ING_META[k].tag}</div>
-      <h2>${ING_META[k].icon} ${ING_META[k].name}</h2>
-      <p class="desc">${ING_META[k].desc}</p>
-      <div class="placeholder">${SECTION_CONTENT[k].placeholder}</div>
-    </section>`).join("") + `
+
+  // --- Play section ---
+  const playHtml = `
+    <section class="flow" id="play">
+      <div class="eyebrow">Step 2 &middot; ${S.ing.play.tag}</div>
+      <h2>${STEP_ICONS.play} ${S.ing.play.name}</h2>
+      <p class="desc">${S.ing.play.desc}</p>
+      <div class="placeholder">
+        <div class="big">${STEP_ICONS.play}</div>
+        <p>Interactive course notes under construction &mdash; readable theory with live, manipulable visualizations of the algorithms (KaTeX + animations).</p>
+        <div class="actions"><button class="btn" disabled>Open interactive notes</button></div>
+      </div>
+    </section>`;
+
+  // --- Build section ---
+  const buildHtml = `
+    <section class="flow" id="build">
+      <div class="eyebrow">Step 3 &middot; ${S.ing.build.tag}</div>
+      <h2>${STEP_ICONS.build} ${S.ing.build.name}</h2>
+      <p class="desc">${S.ing.build.desc}</p>
+      <div class="placeholder">
+        <div class="big">${STEP_ICONS.build}</div>
+        <p>A guided Python notebook where you implement the ideas yourself and get feedback on your work.</p>
+        <div class="actions">
+          <button class="btn" disabled>Open notebook</button>
+          <button class="btn" disabled>Open in Colab</button>
+        </div>
+      </div>
+    </section>`;
+
+  // --- Quiz section ---
+  const quizLabel = lang === "fa" ? "آزمون" : "Quiz";
+  const quizTag   = lang === "fa" ? "خودآزمایی" : "self-check";
+  const quizHtml  = buildQuizSection(lang);
+
+  // --- Resources section ---
+  const resourcesSection = `
     <section class="flow" id="resources">
       <div class="eyebrow">Optional &middot; go deeper</div>
-      <h2>\u{1F4DA} Learn more</h2>
-      <p class="desc">Hand-picked videos, websites, and readings from other excellent teachers.</p>
+      <h2>${S.resources_title}</h2>
+      <p class="desc">${S.resources_sub}</p>
       ${resourcesHtml}
+    </section>`;
+
+  document.getElementById("sections").innerHTML =
+    listenHtml + playHtml + buildHtml + quizHtml + resourcesSection;
+
+  // Wire up PDF upload handler
+  document.getElementById("pdf-upload-input").addEventListener("change", function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    selectPDF("upload", url, `${S.listen_view_pdf} ${file.name}`);
+    document.getElementById("pdf-upload-opt").classList.add("selected");
+    document.getElementById("pdf-gen-opt").classList.remove("selected");
+  });
+}
+
+/* ---------- PDF chooser logic ---------- */
+function selectPDF(source, url, label) {
+  const viewer = document.getElementById("pdf-viewer");
+  document.getElementById("pdf-iframe").src = url;
+  document.getElementById("pdf-label-text").textContent = label;
+  viewer.style.display = "block";
+  document.getElementById("pdf-gen-opt").classList.toggle("selected", source === "gen");
+  document.getElementById("pdf-upload-opt").classList.toggle("selected", source === "upload");
+  viewer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function closePDF() {
+  const viewer = document.getElementById("pdf-viewer");
+  viewer.style.display = "none";
+  document.getElementById("pdf-iframe").src = "";
+  document.querySelectorAll(".pdf-opt").forEach(o => o.classList.remove("selected"));
+}
+
+/* ---------- Quiz section builder ---------- */
+function buildQuizSection(lang) {
+  const quizLabel = lang === "fa" ? "آزمون" : "Quiz";
+  const quizTag   = lang === "fa" ? "خودآزمایی" : "self-check";
+  const quiz = mod.quiz || [];
+
+  let innerHtml;
+  if (quiz.length === 0) {
+    innerHtml = `
+      <div class="placeholder" style="margin-top:16px">
+        <div class="big">✅</div>
+        <p>${lang === "fa"
+          ? "سوالات آزمون برای این ماژول به زودی اضافه می‌شود."
+          : "Quiz questions for this module are on their way. Check back after the lecture."}</p>
+      </div>`;
+  } else {
+    const mcqs = quiz.filter(q => q.opts);
+    const open = quiz.filter(q => !q.opts);
+    innerHtml = mcqs.map((q, qi) => `
+      <div class="quiz-q" id="qq-${qi}">${q.q}${q.marks ? `<span class="marks">[${q.marks} mark${q.marks>1?"s":""}]</span>` : ""}
+      </div>
+      <div class="quiz-opts">${q.opts.map((opt, oi) =>
+        `<button onclick="pickOpt(${qi},${oi},${q.ans})">${opt}</button>`
+      ).join("")}</div>
+    `).join("") + open.map((q, qi) => `
+      <div class="quiz-open">
+        <div class="open-q">${q.q}${q.marks ? `<span class="marks">[${q.marks} mark${q.marks>1?"s":""}]</span>` : ""}</div>
+        <div class="open-hint">${lang === "fa" ? "پاسخ خود را اینجا بنویسید..." : "Work it out on paper, then check your notes."}</div>
+      </div>
+    `).join("");
+    if (mcqs.length) {
+      innerHtml += `<div style="margin-top:14px">
+        <button class="btn primary" onclick="checkQuiz(${mcqs.length})">
+          ${lang === "fa" ? "بررسی پاسخ‌ها" : "Check answers"}
+        </button>
+        <span class="quiz-score" id="quiz-score"></span>
+      </div>`;
+    }
+  }
+
+  return `
+    <section class="flow" id="quiz">
+      <div class="eyebrow">Step 4 &middot; ${quizTag}</div>
+      <h2>✅ ${quizLabel}</h2>
+      <p class="desc">${lang === "fa"
+        ? "چند سوال کوتاه برای بررسی درک شما از این ماژول."
+        : "A few short questions to test your understanding of this module."}</p>
+      ${innerHtml}
     </section>`;
 }
 
-/* ---------- next / prev within the audience path ---------- */
-const aud = mod.aud.includes(getAudience()) ? getAudience() : mod.aud[0];
-const steps = (PATHS[aud] || PATHS.student).steps.map(s => s.id);
-const idx = steps.indexOf(mod.id);
-const np = [];
-if (idx > 0) np.push(`<a class="btn" href="module.html?id=${steps[idx-1]}">&larr; ${byId[steps[idx-1]].title}</a>`);
-else np.push("<span></span>");
-if (idx >= 0 && idx < steps.length - 1) np.push(`<a class="btn primary" href="module.html?id=${steps[idx+1]}">${byId[steps[idx+1]].title} &rarr;</a>`);
-document.getElementById("next-prev").innerHTML = np.join("");
+/* Quiz MCQ interactions */
+const quizSelections = {};
+function pickOpt(qi, oi, correct) {
+  quizSelections[qi] = oi;
+  const container = document.querySelectorAll(".quiz-opts")[qi];
+  container.querySelectorAll("button").forEach((btn, i) => {
+    btn.classList.toggle("selected", i === oi);
+  });
+}
+function checkQuiz(total) {
+  let score = 0;
+  for (let qi = 0; qi < total; qi++) {
+    const quiz = mod.quiz.filter(q => q.opts);
+    const correct = quiz[qi].ans;
+    const chosen  = quizSelections[qi];
+    const container = document.querySelectorAll(".quiz-opts")[qi];
+    if (!container) continue;
+    container.querySelectorAll("button").forEach((btn, oi) => {
+      btn.classList.remove("correct","wrong");
+      if (oi === correct)              btn.classList.add("correct");
+      else if (oi === chosen && oi !== correct) btn.classList.add("wrong");
+    });
+    if (chosen === correct) score++;
+  }
+  const lang = getLang();
+  document.getElementById("quiz-score").textContent = lang === "fa"
+    ? `${score} از ${total} درست`
+    : `${score} / ${total} correct`;
+}
 
-/* ---------- mini skill tree (shared across tracks, clickable) ---------- */
+/* ---------- next / prev within the audience path ---------- */
+function renderNextPrev() {
+  const lang = getLang();
+  const aud = mod.aud.includes(getAudience()) ? getAudience() : mod.aud[0];
+  const steps = (PATHS[aud] || PATHS.student).steps.map(s => s.id);
+  const idx = steps.indexOf(mod.id);
+  const np = [];
+  if (idx > 0) {
+    const prev = byId[steps[idx-1]];
+    const prevTitle = (lang === "fa" && prev.title_fa) ? prev.title_fa : prev.title;
+    np.push(`<a class="btn" href="module.html?id=${prev.id}">&larr; ${prevTitle}</a>`);
+  } else np.push("<span></span>");
+  if (idx >= 0 && idx < steps.length - 1) {
+    const next = byId[steps[idx+1]];
+    const nextTitle = (lang === "fa" && next.title_fa) ? next.title_fa : next.title;
+    np.push(`<a class="btn primary" href="module.html?id=${next.id}">${nextTitle} &rarr;</a>`);
+  }
+  document.getElementById("next-prev").innerHTML = np.join("");
+}
+
+/* ---------- mini skill tree ---------- */
 (function renderMinimap() {
   const W = 200, NW = 30, NH = 11, UY = 22, PADM = 8;
   const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y));
@@ -229,12 +430,15 @@ document.getElementById("next-prev").innerHTML = np.join("");
   for (const id of Object.keys(LAYOUT)) {
     const p = pos(id);
     const cur = id === mod.id;
+    const isMini = byId[id].mini;
     const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    r.setAttribute("x", p.x - NW/2); r.setAttribute("y", p.y - NH/2);
-    r.setAttribute("width", NW); r.setAttribute("height", NH); r.setAttribute("rx", 3);
+    const nw = isMini ? 22 : NW;
+    r.setAttribute("x", p.x - nw/2); r.setAttribute("y", p.y - NH/2);
+    r.setAttribute("width", nw); r.setAttribute("height", NH); r.setAttribute("rx", 3);
     r.setAttribute("fill", cur ? "var(--accent-primary)" : "#fff");
-    r.setAttribute("stroke", cur ? "var(--accent-dark)" : "#bbb");
+    r.setAttribute("stroke", cur ? "var(--accent-dark)" : (isMini ? "#bbd" : "#bbb"));
     r.setAttribute("stroke-width", cur ? 1.5 : 1);
+    r.setAttribute("stroke-dasharray", isMini && !cur ? "2,2" : "none");
     r.dataset.id = id;
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
     title.textContent = byId[id].title;
@@ -244,7 +448,7 @@ document.getElementById("next-prev").innerHTML = np.join("");
   }
 })();
 
-/* travel animation: zoom into the tree, light up the minimum path, then go */
+/* travel animation */
 let traveling = false;
 function travelTo(target) {
   if (traveling) return;
@@ -263,20 +467,47 @@ function travelTo(target) {
   });
 }
 
-/* ---------- scroll to requested mode ---------- */
-const modeEl = mode && keys.includes(mode) ? document.getElementById(mode) : null;
-if (modeEl && modeEl.scrollIntoView) {
-  setTimeout(() => modeEl.scrollIntoView({ behavior: "smooth" }), 80);
+/* ---------- language toggle ---------- */
+function applyLang() {
+  const lang = getLang();
+  const S = STRINGS[lang];
+  document.documentElement.lang = lang;
+  document.getElementById("lang-btn").textContent = S.lang_btn;
+  document.getElementById("back-link").textContent = (lang === "fa" ? "→ بازگشت به نقشه" : "← back to the map");
+  document.getElementById("minimap-label").textContent = S.minimap_label;
+  renderHero();
+  renderSections();
+  renderNextPrev();
+
+  // Scroll to mode section
+  const modeEl = mode && STEPS_EN.includes(mode) ? document.getElementById(mode) : null;
+  if (modeEl && modeEl.scrollIntoView) {
+    setTimeout(() => modeEl.scrollIntoView({ behavior: "smooth" }), 80);
+  }
 }
-/* highlight current section in step nav */
-if (!mod.ref && typeof IntersectionObserver !== "undefined") {
+
+document.getElementById("lang-btn").addEventListener("click", () => {
+  const next = getLang() === "en" ? "fa" : "en";
+  setLang(next);
+  track("lang_toggle", { lang: next, module_id: mod.id });
+  applyLang();
+});
+
+/* ---------- scroll-highlight step nav ---------- */
+function initObserver() {
+  if (mod.ref || typeof IntersectionObserver === "undefined") return;
   const navLinks = document.querySelectorAll(".step-nav a");
+  const sections = [...STEPS_EN, "resources"];
   const obs = new IntersectionObserver(entries => {
     for (const e of entries) if (e.isIntersecting)
       navLinks.forEach(l => l.classList.toggle("current", l.dataset.k === e.target.id));
   }, { rootMargin: "-30% 0px -60% 0px" });
-  keys.forEach(k => obs.observe(document.getElementById(k)));
+  sections.forEach(k => { const el = document.getElementById(k); if (el) obs.observe(el); });
 }
+
+/* ---------- init ---------- */
+applyLang();
+initObserver();
 </script>
 </body>
 </html>

@@ -1,21 +1,25 @@
 # ============================================================
 # The AI Learning Map — content pipeline
 #
-#   1. Dump lecture PDFs / .tex / images into  modules/<id>/sources/
-#   2. make extract MODULE=<id>     → assembles the Claude extraction job
-#      (run it with Claude, save the result as modules/<id>/content.md)
-#   3. make listen  MODULE=<id> TIER=core|student|full   → PDF
-#      make play    MODULE=<id>                          → interactive notes (HTML)
-#      make build   MODULE=<id>                          → Jupyter notebook
-#      make all     MODULE=<id>                          → all three
+#   1. Dump lecture PDFs / .tex / images into  modules/<id>/sources/<lang>/
+#      (LANG defaults to 'en'; set LANG=fa for Farsi materials)
+#   2. make extract MODULE=<id> [LANG=en|fa]   → assembles the Claude extraction job
+#      (run it with Claude, save the result as modules/<id>/content.md or content-fa.md)
+#   3. make listen  MODULE=<id> [LANG=en|fa] [TIER=core|student|full]  → PDF
+#      make play    MODULE=<id>                                         → interactive notes (HTML)
+#      make build   MODULE=<id>                                         → Jupyter notebook
+#      make all     MODULE=<id> [LANG=en|fa]                           → all three
 #
 # Requirements (macOS):  brew install pandoc  &&  brew install --cask basictex
 # ============================================================
 
 MODULE ?= _example
 TIER   ?= full        # core = executives | student | full = + interested reader
+LANG   ?= en          # en = English | fa = Farsi/Persian
+
 DIR    := modules/$(MODULE)
-SRC    := $(DIR)/content.md
+SRCDIR := $(DIR)/sources/$(LANG)
+SRC    := $(DIR)/content$(if $(filter fa,$(LANG)),-fa,).md
 OUT    := $(DIR)/out
 
 PANDOC_FLAGS := --from markdown+fenced_divs --lua-filter=pipeline/filters/tiers.lua
@@ -24,42 +28,44 @@ PANDOC_FLAGS := --from markdown+fenced_divs --lua-filter=pipeline/filters/tiers.
 
 help:
 	@echo "Targets:"
-	@echo "  make extract MODULE=c-ml              assemble extraction job from sources/"
-	@echo "  make listen  MODULE=c-ml TIER=student PDF lecture notes (core|student|full)"
-	@echo "  make play    MODULE=c-ml              interactive HTML notes (tier toggle built in)"
-	@echo "  make build   MODULE=c-ml              Jupyter notebook from build blocks"
-	@echo "  make all     MODULE=c-ml              listen (all tiers) + play + build"
-	@echo "  make serve                            preview the site at http://localhost:8080"
+	@echo "  make extract MODULE=c-ml [LANG=fa]               assemble extraction job from sources/<lang>/"
+	@echo "  make listen  MODULE=c-ml [LANG=fa] [TIER=student] PDF lecture notes (core|student|full)"
+	@echo "  make play    MODULE=c-ml                          interactive HTML notes (tier toggle built in)"
+	@echo "  make build   MODULE=c-ml                          Jupyter notebook from build blocks"
+	@echo "  make all     MODULE=c-ml [LANG=fa]                listen (all tiers) + play + build"
+	@echo "  make serve                                         preview the site at http://localhost:8080"
 
 extract:
-	@mkdir -p $(DIR)/sources
-	@if [ -z "$$(ls -A $(DIR)/sources 2>/dev/null)" ]; then \
-	  echo "⚠  $(DIR)/sources/ is empty — dump your PDFs/.tex/.png there first"; exit 1; fi
-	@{ sed -e 's/MODULE TITLE/$(MODULE)/g' -e 's/MODULE-ID/$(MODULE)/g' pipeline/EXTRACT_PROMPT.md; \
-	   echo ""; echo "## Source files provided (contents of $(DIR)/sources/)"; \
-	   ls -1 $(DIR)/sources | sed 's/^/- /'; } > $(DIR)/EXTRACTION_JOB.md
+	@if [ ! -d "$(SRCDIR)" ]; then \
+	  echo "✗ $(SRCDIR)/ not found — create it and drop your PDFs/.tex/.png there"; exit 1; fi
+	@if [ -z "$$(ls -A $(SRCDIR) 2>/dev/null | grep -v '.gitkeep')" ]; then \
+	  echo "⚠  $(SRCDIR)/ is empty — dump your PDFs/.tex/.png there first"; exit 1; fi
+	@{ sed -e 's/MODULE TITLE/$(MODULE)/g' -e 's/MODULE-ID/$(MODULE)/g' \
+	       -e 's/LANG/$(LANG)/g' pipeline/EXTRACT_PROMPT.md; \
+	   echo ""; echo "## Source files provided (contents of $(SRCDIR)/)"; \
+	   ls -1 $(SRCDIR) | grep -v '.gitkeep' | sed 's/^/- /'; } > $(DIR)/EXTRACTION_JOB.md
 	@echo "✓ Wrote $(DIR)/EXTRACTION_JOB.md"
-	@echo "  → Open a Claude session, attach everything in $(DIR)/sources/ plus"
+	@echo "  → Open a Claude session, attach everything in $(SRCDIR)/ plus"
 	@echo "    pipeline/CONTENT_SPEC.md, paste the job, save the answer as $(SRC)"
 
 $(SRC):
-	@echo "✗ $(SRC) not found — run 'make extract MODULE=$(MODULE)' first"; exit 1
+	@echo "✗ $(SRC) not found — run 'make extract MODULE=$(MODULE) LANG=$(LANG)' first"; exit 1
 
 listen: $(SRC)
 	@mkdir -p $(OUT)
 	TIER=$(TIER) pandoc $(SRC) $(PANDOC_FLAGS) \
 	  --pdf-engine=xelatex -V geometry:margin=1in -V fontsize=11pt \
 	  -H pipeline/templates/listen-header.tex \
-	  -o $(OUT)/$(MODULE)-$(TIER).pdf
-	@echo "✓ $(OUT)/$(MODULE)-$(TIER).pdf"
+	  -o $(OUT)/$(MODULE)-$(LANG)-$(TIER).pdf
+	@echo "✓ $(OUT)/$(MODULE)-$(LANG)-$(TIER).pdf"
 
 play: $(SRC)
 	@mkdir -p $(OUT)
 	TIER=full pandoc $(SRC) $(PANDOC_FLAGS) \
 	  --standalone --katex --table-of-contents \
 	  --template=pipeline/templates/notes.html \
-	  -o $(OUT)/notes.html
-	@echo "✓ $(OUT)/notes.html"
+	  -o $(OUT)/notes-$(LANG).html
+	@echo "✓ $(OUT)/notes-$(LANG).html"
 
 build: $(SRC)
 	@mkdir -p $(OUT)
@@ -67,9 +73,9 @@ build: $(SRC)
 	@echo "✓ $(OUT)/$(MODULE).ipynb"
 
 all: play build
-	@$(MAKE) listen MODULE=$(MODULE) TIER=core
-	@$(MAKE) listen MODULE=$(MODULE) TIER=student
-	@$(MAKE) listen MODULE=$(MODULE) TIER=full
+	@$(MAKE) listen MODULE=$(MODULE) LANG=$(LANG) TIER=core
+	@$(MAKE) listen MODULE=$(MODULE) LANG=$(LANG) TIER=student
+	@$(MAKE) listen MODULE=$(MODULE) LANG=$(LANG) TIER=full
 
 serve:
 	@echo "Serving on http://localhost:8080 (Ctrl-C to stop)"

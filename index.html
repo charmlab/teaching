@@ -36,11 +36,11 @@
   .pill.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
 
   /* ---------- Skill tree canvas ---------- */
-  #map-scroll { overflow-x: auto; }
+  #map-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   #map { position: relative; min-width: 720px; margin: 14px auto 0; }
   #edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   #edges path { transition: stroke .45s ease, stroke-opacity .45s ease; }
-  #edges path.off { stroke-opacity: 0.25; }
+  #edges path.off { stroke-opacity: 0.15; }
   .node {
     position: absolute; width: 168px; height: 64px;
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card);
@@ -106,21 +106,6 @@
   .ing-option .h { font-weight: 600; font-size: 14.5px; }
   .ing-option .h em { font-style: normal; color: var(--accent-dark); font-weight: 400; font-size: 13px; }
   .ing-option .d { font-size: 12.5px; color: var(--muted); }
-
-  /* ---------- Quiz ---------- */
-  #quiz h2 { font-size: 20px; font-weight: 600; }
-  #quiz .fa { font-size: 13px; color: var(--muted); }
-  #quiz .q { margin-top: 18px; font-weight: 600; font-size: 14.5px; }
-  #quiz .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-  #quiz .opts button {
-    text-align: left; border: 1px solid var(--line); background: #fff;
-    border-radius: var(--radius-pill); padding: 9px 14px; font-size: 13.5px;
-    cursor: pointer; font-family: inherit; transition: all .15s;
-  }
-  #quiz .opts button:hover, #quiz .opts button.sel {
-    border-color: var(--accent-primary); background: #f2fbfe;
-  }
-  #quiz .result { margin-top: 18px; padding: 14px 16px; background: #f2fbfe; border-radius: var(--radius-card); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -129,7 +114,7 @@
   <div class="wrap inner">
     <span class="brand">Amir-Hossein Karimi &middot; <span class="teaching">Teaching</span></span>
     <span class="links">
-      <a href="#" id="quiz-link">Find your level &middot; &#x062A;&#x0639;&#x06CC;&#x06CC;&#x0646; &#x0633;&#x0637;&#x062D;</a>
+      <button class="lang-btn" id="lang-btn" title="Switch language / تغییر زبان">فا</button>
       <a href="https://amirhkarimi.com" target="_blank">amirhkarimi.com</a>
     </span>
   </div>
@@ -137,9 +122,9 @@
 
 <header class="hero wrap">
   <div class="working-title">working title &middot; teaching.amirhkarimi.com</div>
-  <h1>The AI Learning Map</h1>
-  <p class="subtitle">One coherent path from mathematical foundations to production AI systems &mdash; at the right depth for who you are. Each module, three ways in:</p>
-  <div class="ingredients-strip">
+  <h1 id="hero-title">The AI Learning Map</h1>
+  <p class="subtitle" id="hero-subtitle">One coherent path from mathematical foundations to production AI systems &mdash; at the right depth for who you are. Each module, three ways in:</p>
+  <div class="ingredients-strip" id="ing-strip">
     <span>&#127911; <b>Listen</b> for concepts</span>
     <span>&#127918; <b>Play</b> for intuition</span>
     <span>&#128296; <b>Build</b> for mastery</span>
@@ -173,44 +158,55 @@
   <div class="modal" id="popup"></div>
 </div>
 
-<div class="overlay" id="quiz-overlay">
-  <div class="modal" id="quiz"></div>
-</div>
-
 <footer class="site-footer">
-  <div class="wrap">Sequence may evolve based on feedback and emerging technology. &middot; &copy; 2026 Amir-Hossein Karimi</div>
+  <div class="wrap" id="footer-text">Sequence may evolve based on feedback and emerging technology. &middot; &copy; 2026 Amir-Hossein Karimi</div>
 </footer>
 
 <script src="data.js"></script>
 <script>
-const CARD_W = 168, CARD_H = 64, UNIT_Y = 104, PAD = 18;
+const CARD_W = 168, CARD_H = 64, MINI_W = 140, MINI_H = 50, UNIT_Y = 108, PAD = 18;
 let audience = getAudience();
 let view = "map";
 
-/* ---------- build nodes once (shared layout, fixed positions) ---------- */
-const map = document.getElementById("map");
-for (const m of MODULES) {
-  const el = document.createElement("div");
-  el.className = "node";
-  el.dataset.id = m.id;
-  el.dataset.tier = m.tier;
-  el.innerHTML = `<div class="t">${m.title}</div><div class="s">${m.sub}</div>`;
-  el.addEventListener("click", () => openPopup(m.id));
-  map.appendChild(el);
+/* ---------- build / rebuild nodes (respects current language) ---------- */
+function buildNodes() {
+  const lang = getLang();
+  map.querySelectorAll(".node").forEach(n => n.remove());
+  for (const m of MODULES) {
+    if (!(m.id in LAYOUT)) continue;
+    const el = document.createElement("div");
+    const isMini = m.mini;
+    el.className = "node" + (isMini ? " mini" : "");
+    el.dataset.id = m.id;
+    el.dataset.tier = m.tier;
+    const title = (lang === "fa" && m.title_fa) ? m.title_fa : m.title;
+    const sub   = (lang === "fa" && m.sub_fa)   ? m.sub_fa   : m.sub;
+    el.innerHTML = `<div class="t">${title}</div><div class="s">${sub}</div>`;
+    el.addEventListener("click", () => openPopup(m.id));
+    map.appendChild(el);
+  }
 }
 
 function mapHeight() {
   const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y));
   return maxY * UNIT_Y + CARD_H + 2 * PAD;
 }
+function nodeW(m) { return m.mini ? MINI_W : CARD_W; }
+function nodeH(m) { return m.mini ? MINI_H : CARD_H; }
+
 function positionNodes() {
   const W = map.clientWidth, H = mapHeight();
   map.style.height = H + "px";
   for (const id of Object.keys(LAYOUT)) {
     const el = map.querySelector(`.node[data-id="${id}"]`);
+    if (!el) continue;
+    const m = byId[id];
+    const nw = nodeW(m), nh = nodeH(m);
     const p = LAYOUT[id];
-    el.style.left = Math.max(4, Math.min((p.x / 100) * W - CARD_W / 2, W - CARD_W - 4)) + "px";
-    el.style.top = (H - PAD - CARD_H - p.y * UNIT_Y) + "px";
+    el.style.width  = nw + "px";
+    el.style.height = nh + "px";
+    el.style.left = Math.max(4, Math.min((p.x / 100) * W - nw / 2, W - nw - 4)) + "px";
+    el.style.top  = (H - PAD - nh - p.y * UNIT_Y) + "px";
   }
   drawEdges();
 }
@@ -222,8 +218,10 @@ function drawEdges() {
   for (const [from, to] of EDGES) {
     const a = map.querySelector(`.node[data-id="${from}"]`);
     const b = map.querySelector(`.node[data-id="${to}"]`);
-    const x1 = a.offsetLeft + CARD_W / 2, y1 = a.offsetTop;            // top of prereq
-    const x2 = b.offsetLeft + CARD_W / 2, y2 = b.offsetTop + CARD_H;   // bottom of dependent
+    if (!a || !b) continue;
+    const mfrom = byId[from], mto = byId[to];
+    const x1 = a.offsetLeft + nodeW(mfrom) / 2, y1 = a.offsetTop;
+    const x2 = b.offsetLeft + nodeW(mto)   / 2, y2 = b.offsetTop + nodeH(mto);
     const my = (y1 + y2) / 2;
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
@@ -240,14 +238,18 @@ function drawEdges() {
 function isActive(id) { return byId[id].aud.includes(audience); }
 function applyAudience() {
   for (const m of MODULES) {
-    map.querySelector(`.node[data-id="${m.id}"]`).classList.toggle("inactive", !isActive(m.id));
+    const el = map.querySelector(`.node[data-id="${m.id}"]`);
+    if (el) el.classList.toggle("inactive", !isActive(m.id));
   }
   document.querySelectorAll("#edges path").forEach(p =>
     p.classList.toggle("off", !isActive(p.dataset.from) || !isActive(p.dataset.to)));
 }
 function syncAudiencePills() {
-  document.querySelectorAll("#audience-pills .pill")
-    .forEach(p => p.classList.toggle("active", p.dataset.aud === audience));
+  const S = STRINGS[getLang()];
+  document.querySelectorAll("#audience-pills .pill").forEach(p => {
+    p.textContent = S.audience[p.dataset.aud] || p.dataset.aud;
+    p.classList.toggle("active", p.dataset.aud === audience);
+  });
 }
 document.getElementById("audience-pills").addEventListener("click", e => {
   const btn = e.target.closest(".pill"); if (!btn) return;
@@ -264,7 +266,10 @@ document.getElementById("view-pills").addEventListener("click", e => {
   const btn = e.target.closest(".pill"); if (!btn) return;
   view = btn.dataset.view;
   track("view_toggle", { view });
-  document.querySelectorAll("#view-pills .pill").forEach(p => p.classList.toggle("active", p === btn));
+  const S = STRINGS[getLang()];
+  document.querySelectorAll("#view-pills .pill").forEach(p => {
+    p.classList.toggle("active", p === btn);
+  });
   document.getElementById("map-scroll").style.display = view === "map" ? "block" : "none";
   document.getElementById("path").style.display = view === "path" ? "block" : "none";
   if (view === "map") positionNodes(); else renderPath();
@@ -272,19 +277,23 @@ document.getElementById("view-pills").addEventListener("click", e => {
 
 /* ---------- path view ---------- */
 function renderPath() {
+  const lang = getLang();
+  const S = STRINGS[lang];
   const cfg = PATHS[audience];
-  document.getElementById("path-hint").textContent = cfg.hint;
+  document.getElementById("path-hint").textContent = S.path_hints[audience];
   const wrap = document.getElementById("path-steps");
   wrap.innerHTML = "";
   cfg.steps.forEach((s, i) => {
     const m = byId[s.id];
+    const title = (lang === "fa" && m.title_fa) ? m.title_fa : m.title;
+    const sub   = (lang === "fa" && m.sub_fa)   ? m.sub_fa   : m.sub;
     const div = document.createElement("div");
     div.className = "step" + (i % 2 ? " alt" : "") + (s.bonus ? " bonus" : "");
     div.innerHTML = `<div class="step-num">${s.bonus ? "★" : i + 1}</div>
       <div class="step-card">
         <div class="where">${s.where}</div>
-        <div class="t">${m.title}</div>
-        <div class="d">${m.sub}</div>
+        <div class="t">${title}</div>
+        <div class="d">${sub}</div>
       </div>`;
     div.querySelector(".step-card").addEventListener("click", () => openPopup(m.id));
     wrap.appendChild(div);
@@ -295,13 +304,15 @@ function renderPath() {
 const RES_ICON = { video: "\u{1F3A5}", website: "\u{1F310}", pdf: "\u{1F4C4}", book: "\u{1F4D8}" };
 function openPopup(id) {
   const m = byId[id];
+  const lang = getLang();
+  const S = STRINGS[lang];
+  const title = (lang === "fa" && m.title_fa) ? m.title_fa : m.title;
   track("module_popup", { module_id: id, audience });
   let body;
   if (m.ref) {
-    /* Reference module: no Listen/Play/Build — point to the best teachers out there */
     body = `
       <p class="blurb">${m.blurb}</p>
-      <p class="blurb" style="font-style:italic">Reference module &mdash; no original content here for now. Learn this from the excellent resources below.</p>
+      <p class="blurb" style="font-style:italic">${S.ref_note}</p>
       ${m.resources.map(r => `
         <a class="ing-option" href="${r.url}" target="_blank" rel="noopener"
            onclick="track('resource_click',{module_id:'${m.id}',resource:'${r.url}'})">
@@ -314,20 +325,21 @@ function openPopup(id) {
   } else {
     body = `
       <p class="blurb">${m.blurb}</p>
-      ${Object.entries(ING_META).map(([k, meta]) => `
+      ${Object.entries(S.ing).map(([k, meta]) => `
         <a class="ing-option" href="module.html?id=${m.id}&mode=${k}"
            onclick="track('ingredient_select',{module_id:'${m.id}',ingredient:'${k}'})">
-          <span class="icon">${meta.icon}</span>
+          <span class="icon">${ING_META[k].icon}</span>
           <span>
             <div class="h">${meta.name} <em>&mdash; ${meta.tag}</em></div>
             <div class="d">${meta.desc}</div>
           </span>
         </a>`).join("")}`;
   }
+  const audLabels = m.aud.map(a => `<span class="chip aud">${S.audience[a] || AUD_LABEL[a]}</span>`).join("");
   document.getElementById("popup").innerHTML = `
     <button class="close" onclick="closeOverlays()">&times;</button>
-    <h2>${m.title}</h2>
-    ${m.aud.map(a => `<span class="chip aud">${AUD_LABEL[a]}</span>`).join("")}
+    <h2>${title}</h2>
+    ${audLabels}
     ${body}`;
   document.getElementById("popup-overlay").classList.add("open");
 }
@@ -338,72 +350,47 @@ document.querySelectorAll(".overlay").forEach(o =>
   o.addEventListener("click", e => { if (e.target === o) closeOverlays(); }));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeOverlays(); });
 
-/* ---------- placement quiz (تعیین سطح) ---------- */
-const QUIZ = [
-  { q: "What brings you here?", key: "goal",
-    opts: [["Course credit or deep technical understanding", "student"],
-           ["Applying AI at work / leading teams", "executive"]] },
-  { q: "Comfort with linear algebra & calculus?", key: "math",
-    opts: [["Comfortable — I can take gradients in my sleep", "ok"],
-           ["Rusty — a refresher would help", "rusty"]] },
-  { q: "Have you trained an ML model before?", key: "ml",
-    opts: [["Yes — I've fit models and evaluated them", "yes"],
-           ["Not really / only tutorials", "no"]] },
-];
-const quizAns = {};
-function renderQuiz() {
-  const el = document.getElementById("quiz");
-  const done = QUIZ.every(q => quizAns[q.key]);
-  let rec = null;
-  if (done) {
-    const aud = quizAns.goal;
-    const start = quizAns.math === "rusty" ? "f-la" : (quizAns.ml === "yes" ? "c-nn" : "c-ml");
-    rec = { aud, start };
-  }
-  el.innerHTML = `
-    <button class="close" onclick="closeOverlays()">&times;</button>
-    <h2>Find your level</h2>
-    <div class="fa">&#x062A;&#x0639;&#x06CC;&#x06CC;&#x0646; &#x0633;&#x0637;&#x062D; &mdash; three quick questions to place you on the map.</div>
-    ${QUIZ.map(q => `
-      <div class="q">${q.q}</div>
-      <div class="opts">${q.opts.map(([label, val]) => `
-        <button class="${quizAns[q.key] === val ? "sel" : ""}"
-          onclick="quizAns['${q.key}']='${val}'; renderQuiz()">${label}</button>`).join("")}
-      </div>`).join("")}
-    ${rec ? `
-      <div class="result">
-        We suggest the <b>${AUD_LABEL[rec.aud]}</b> path, starting at <b>${byId[rec.start].title}</b>.
-        <div style="margin-top:10px">
-          <button class="btn primary" onclick="applyQuiz('${rec.aud}','${rec.start}')">Show me</button>
-        </div>
-      </div>` : ""}`;
-}
-function applyQuiz(aud, start) {
-  closeOverlays();
-  track("quiz_complete", { audience: aud, start_module: start });
-  audience = aud; setAudience(aud);
+/* ---------- language toggle ---------- */
+function applyLang() {
+  const lang = getLang();
+  const S = STRINGS[lang];
+  const isFA = lang === "fa";
+  document.documentElement.lang = lang;
+
+  document.getElementById("lang-btn").textContent = S.lang_btn;
+  document.getElementById("hero-title").textContent = S.map_title;
+  document.getElementById("hero-subtitle").textContent = S.map_subtitle;
+
+  // Ingredients strip
+  const ingKeys = ["listen", "play", "build"];
+  const ingIcons = ["\u{1F3A7}", "\u{1F3AE}", "\u{1F528}"];
+  document.getElementById("ing-strip").innerHTML = ingKeys.map((k, i) =>
+    `<span>${ingIcons[i]} <b>${S.ing[k].name}</b> ${S.ing[k].tag}</span>`).join("");
+
+  // View pills
+  document.querySelectorAll("#view-pills .pill").forEach(p => {
+    p.textContent = S.views[p.dataset.view] || p.textContent;
+  });
+
   syncAudiencePills();
-  applyAudience();
-  renderPath();
-  setTimeout(() => {
-    const el = map.querySelector(`.node[data-id="${start}"]`);
-    el.classList.add("pulse");
-    if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => el.classList.remove("pulse"), 4000);
-  }, 400);
-}
-document.getElementById("quiz-link").addEventListener("click", e => {
-  e.preventDefault(); renderQuiz();
-  document.getElementById("quiz-overlay").classList.add("open");
-});
-if (!localStorage.getItem("alm-visited")) {
-  localStorage.setItem("alm-visited", "1");
-  renderQuiz();
-  document.getElementById("quiz-overlay").classList.add("open");
+
+  // Rebuild nodes with new language
+  buildNodes();
+  if (view === "map") positionNodes();
+  else renderPath();
 }
 
+document.getElementById("lang-btn").addEventListener("click", () => {
+  const next = getLang() === "en" ? "fa" : "en";
+  setLang(next);
+  track("lang_toggle", { lang: next });
+  applyLang();
+});
+
 /* ---------- init ---------- */
-syncAudiencePills();
+const map = document.getElementById("map");
+buildNodes();
+applyLang(); // sets language & syncs all pills
 positionNodes();
 window.addEventListener("resize", () => { if (view === "map") positionNodes(); });
 </script>
