@@ -144,8 +144,8 @@ footer.site-footer {
   box-shadow: 0 3px 10px rgba(51,195,240,0.15);
   opacity: 0.92;
 }
-.node.mini .t { font-size: 12.5px; }
-.node.mini .s { font-size: 10px; }
+.node.mini .t { font-size: 11px; }
+.node.mini .s { font-size: 9px; }
 .node.mini:hover { box-shadow: var(--shadow-card-hover); opacity: 1; }
 .node.mini.inactive { opacity: 0.18; }
 

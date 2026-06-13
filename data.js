@@ -203,18 +203,27 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   // ---- Core / Concepts ----
-  { id:"c-intro", tier:"concepts", mini:true, short:"AI",
-    title:"Intro to AI", sub:"what it is & why it matters",
-    title_fa:"مقدمه هوش مصنوعی", sub_fa:"چیستی و چرایی",
+  { id:"c-intro", tier:"concepts", mini:true, short:"Lit",
+    title:"AI Literacy", sub:"what AI is & its history",
+    title_fa:"مبانی هوش مصنوعی", sub_fa:"هوش مصنوعی چیست و تاریخچه آن",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
     blurb_fa:"هوش مصنوعی و یادگیری ماشین واقعاً چه هستند، کجا در چشم‌انداز گسترده‌تر جای می‌گیرند، چه زمانی باید از آن‌ها استفاده کرد، و وجه مشترک تمام روش‌های پیش رو.",
     aud:["student","executive","public"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
+  { id:"c-flu", tier:"concepts", mini:true, short:"Flu",
+    title:"AI Fluency", sub:"prompting, tools & workflows",
+    title_fa:"مهارت هوش مصنوعی", sub_fa:"پرامپت‌نویسی، ابزارها و گردش‌های کاری",
+    blurb:"How to use AI tools effectively: prompting strategies, working with LLMs, integrating AI into real workflows, and evaluating outputs critically.",
+    blurb_fa:"چگونه ابزارهای هوش مصنوعی را به طور موثر استفاده کنیم: استراتژی‌های پرامپت، کار با LLM‌ها، ادغام هوش مصنوعی در گردش‌های کاری واقعی و ارزیابی نتایج.",
+    aud:["student","executive","public"], prereqs:[],
+    resources:[],
+    ing:{listen:"planned", play:"planned", build:"planned"} },
+
   { id:"c-ml", tier:"concepts", short:"ML",
-    title:"Supervised Learning", sub:"regression, classification, ensembles",
-    title_fa:"یادگیری با نظارت", sub_fa:"رگرسیون، طبقه‌بندی، مجموعه‌ها",
+    title:"Supervised Learning", sub:"regression, classification, KNN, decision trees",
+    title_fa:"یادگیری با نظارت", sub_fa:"رگرسیون، طبقه‌بندی، KNN، درخت‌های تصمیم",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["c-intro"],
@@ -224,8 +233,8 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   { id:"c-nn", tier:"concepts", short:"DL",
-    title:"Deep Learning", sub:"neural nets, backprop, transformers",
-    title_fa:"یادگیری عمیق", sub_fa:"شبکه‌های عصبی، پس‌انتشار، ترانسفورمر",
+    title:"Deep Learning", sub:"neural nets, backprop, depth & scale",
+    title_fa:"یادگیری عمیق", sub_fa:"شبکه‌های عصبی، پس‌انتشار، عمق و مقیاس",
     blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent — then deeper: depth, regularization, and the transformer architecture.",
     blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
     aud:["student","executive"], prereqs:["c-ml"],
@@ -278,8 +287,8 @@ const MODULES = [
 
   // ---- Advanced / Specializations ----
   { id:"x-prob", tier:"concepts", short:"Pr",
-    title:"Probabilistic & Causal AI", sub:"Bayes, uncertainty, causality",
-    title_fa:"هوش مصنوعی احتمالی", sub_fa:"بیز، عدم قطعیت، علیت",
+    title:"Probabilistic AI", sub:"Bayes, uncertainty & causality",
+    title_fa:"هوش مصنوعی احتمالی", sub_fa:"بیز، عدم قطعیت و علیت",
     blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
     blurb_fa:"یادگیری احتمالی، مدل‌سازی بیزی، کمی‌سازی عدم قطعیت و استدلال علّی.",
     aud:["student"], prereqs:["c-ml"],
@@ -287,8 +296,8 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-unsup", tier:"concepts", short:"Un",
-    title:"Unsupervised Learning", sub:"PCA, clustering, embeddings",
-    title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی",
+    title:"Unsupervised Learning", sub:"PCA, clustering, Gaussian mixtures",
+    title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
     aud:["student"], prereqs:["c-intro"],
@@ -296,8 +305,8 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-rl", tier:"concepts", short:"RL",
-    title:"Reinforcement Learning", sub:"MDPs, value functions, policy gradient",
-    title_fa:"یادگیری تقویتی", sub_fa:"MDP، توابع ارزش، گرادیان سیاست",
+    title:"Reinforcement Learning", sub:"bandits, MDPs, value functions, policy gradient",
+    title_fa:"یادگیری تقویتی", sub_fa:"باندیت‌ها، MDP، توابع ارزش، گرادیان سیاست",
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
     aud:["student"], prereqs:["c-intro"],
@@ -309,7 +318,7 @@ const MODULES = [
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"حاکمیت و ریسک",
     blurb:"Lead AI responsibly: governance, risk and compliance, responsible-AI principles, privacy, security and policy, industry cases.",
     blurb_fa:"رهبری مسئولانه هوش مصنوعی: حاکمیت، ریسک و انطباق، اصول AI مسئولانه، حریم خصوصی، امنیت و سیاست.",
-    aud:["executive"], prereqs:["c-ml"],
+    aud:["executive"], prereqs:["c-ml", "c-flu"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
@@ -320,10 +329,10 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 /* Layout: bottom=foundations, middle=concepts blob, top=applications
    Row y-values:
      0.0  — foundations row
-     0.9  — Intro to AI gateway (mini)
-     1.75 — concepts row 1: Supervised ML  |  Unsupervised  |  RL
-     2.65 — concepts row 2: Prob & Causal  |  Deep Learning  |  Responsible AI
-     3.65 — applications row 1: Computer Vision  |  Language Models
+     0.9  — gateway pair: AI Literacy (c-intro) | AI Fluency (c-flu)
+     1.75 — concepts row 1: Unsupervised | Supervised | RL
+     2.65 — concepts row 2: Probabilistic | Deep Learning | Responsible AI
+     3.65 — applications row 1: Computer Vision | Language Models
      4.45 — applications row 2: AI Agents
      5.2  — applications row 3: AI Systems & MLOps
 */
@@ -334,8 +343,9 @@ const LAYOUT = {
   "f-prob":    { x: 50, y: 0    },
   "f-opt":     { x: 70, y: 0    },
   "f-prog":    { x: 90, y: 0    },
-  // ── Concepts (gateway) ───────────────────────────────────────
-  "c-intro":   { x: 50, y: 0.9  },
+  // ── Concepts (gateway pair) ──────────────────────────────────
+  "c-intro":   { x: 37, y: 0.9  },  // AI Literacy
+  "c-flu":     { x: 63, y: 0.9  },  // AI Fluency
   // ── Concepts row 1 ───────────────────────────────────────────
   "x-unsup":   { x: 20, y: 1.75 },
   "c-ml":      { x: 50, y: 1.75 },
@@ -377,20 +387,22 @@ const PATHS = {
   executive: {
     hint: "The 6-week executive program — 3-hour sessions: interactive lectures + hands-on notebooks. Build something every week.",
     steps: [
-      { id:"c-intro",   where:"Session 0" },
-      { id:"c-ml",      where:"Week 1" },
-      { id:"c-nn",      where:"Week 2" },
-      { id:"a-vision",  where:"Week 3" },
-      { id:"a-nlp",     where:"Week 4" },
-      { id:"a-agents",  where:"Week 5" },
-      { id:"a-systems", where:"Week 6" },
-      { id:"x-rai",     where:"Bonus", bonus:true },
+      { id:"c-flu",     where:"" },
+      { id:"c-intro",   where:"" },
+      { id:"c-ml",      where:"" },
+      { id:"c-nn",      where:"" },
+      { id:"a-vision",  where:"" },
+      { id:"a-nlp",     where:"" },
+      { id:"a-agents",  where:"" },
+      { id:"a-systems", where:"" },
+      { id:"x-rai",     where:"", bonus:true },
     ],
   },
   public: {
     hint: "Start here. No technical background required — just curiosity about AI.",
     steps: [
-      { id:"c-intro", where:"Start here" },
+      { id:"c-intro", where:"" },
+      { id:"c-flu",   where:"" },
     ],
   },
 };
