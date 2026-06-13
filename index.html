@@ -36,8 +36,10 @@
   .pill.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
   .pill.active .pill-tag { opacity: 0.8; }
 
-  /* View pills — single-line, no pill-tag needed */
-  #view-pills .pill { flex-direction: row; gap: 0; min-width: auto; padding: 7px 16px; }
+  /* View pills — single-line with small icon */
+  #view-pills .pill { flex-direction: row; gap: 6px; min-width: auto; padding: 7px 16px; align-items: center; }
+  #view-pills .pill-icon { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.75; }
+  #view-pills .pill.active .pill-icon { opacity: 1; }
 
   /* Public audience pill — distinct blue-indigo */
   #audience-pills .pill[data-aud="public"].active { background: #5a72c0; border-color: #5a72c0; }
@@ -158,8 +160,26 @@
       </div>
     </div>
     <div class="pills" id="view-pills">
-      <button class="pill active" data-view="map">Skill tree</button>
-      <button class="pill" data-view="path">Your path</button>
+      <button class="pill active" data-view="map">
+        <svg class="pill-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <circle cx="7" cy="2.5" r="1.5"/>
+          <circle cx="2.5" cy="11" r="1.5"/>
+          <circle cx="11.5" cy="11" r="1.5"/>
+          <line x1="7" y1="4" x2="3.3" y2="9.5"/>
+          <line x1="7" y1="4" x2="10.7" y2="9.5"/>
+        </svg>
+        <span class="pill-label">Skill tree</span>
+      </button>
+      <button class="pill" data-view="path">
+        <svg class="pill-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <circle cx="2.5" cy="2.5" r="1.5"/>
+          <circle cx="7" cy="7" r="1.5"/>
+          <circle cx="11.5" cy="11.5" r="1.5"/>
+          <polyline points="4,4 6,6"/>
+          <polyline points="8,8 10,10"/>
+        </svg>
+        <span class="pill-label">Your path</span>
+      </button>
     </div>
   </div>
   <div class="tier-legend" id="tier-legend">
@@ -242,9 +262,9 @@ function positionNodes() {
   const lang = getLang();
   const TL = STRINGS[lang].tier_label;
   const swimlanes = [
-    { tier:"foundations", y: 0      },
-    { tier:"concepts",    y: 1.77   },
-    { tier:"applied",     y: 4.4    },
+    { tier:"foundations", y: 0.45   },  // centred between math row (0) and gateway row (0.9)
+    { tier:"concepts",    y: 2.2    },  // centred between concepts rows (1.75, 2.65)
+    { tier:"applied",     y: 4.05   },  // centred between app rows (3.65, 4.45)
   ];
   for (const { tier, y } of swimlanes) {
     const lbl = document.createElement("div");
@@ -284,8 +304,8 @@ function drawEdges() {
 
 /* ---------- audience ---------- */
 function isActive(id) {
-  // Executives don't need the mathematical foundations highlighted
-  if (audience === "executive" && byId[id].tier === "foundations") return false;
+  // Executives don't need the math-reference foundations — but AI Literacy/Fluency stay active
+  if (audience === "executive" && byId[id].tier === "foundations" && byId[id].ref) return false;
   return byId[id].aud.includes(audience);
 }
 function applyAudience() {
@@ -423,9 +443,10 @@ function applyLang() {
   document.getElementById("ing-strip").innerHTML = ingKeys.map((k,i) =>
     `<span>${ingIcons[i]} <b>${S.ing[k].name}</b> ${S.ing[k].tag}</span>`).join("");
 
-  // View pills
+  // View pills (preserve SVG icon, only update label text)
   document.querySelectorAll("#view-pills .pill").forEach(p => {
-    p.textContent = S.views[p.dataset.view] || p.textContent;
+    const lbl = p.querySelector(".pill-label");
+    if (lbl) lbl.textContent = S.views[p.dataset.view] || lbl.textContent;
   });
 
   // Tier legend

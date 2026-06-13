@@ -226,6 +226,11 @@ footer.site-footer {
 }
 .quiz-score { margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--accent-dark); }
 
+/* ---------- Farsi RTL overrides for path view ---------- */
+html[lang="fa"] #path .step { flex-direction: row-reverse; }
+html[lang="fa"] #path .step::before { left: auto; right: 26px; }
+html[lang="fa"] #path .step-card { text-align: right; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   #minimap { display: none !important; }

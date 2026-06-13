@@ -102,7 +102,7 @@ const STRINGS = {
     map_title: "نقشه یادگیری هوش مصنوعی",
     map_subtitle: "یک مسیر منسجم از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب برای شما. هر ماژول، سه روش:",
     ing: {
-      listen: { name: "گوش ده",  tag: "برای مفاهیم",
+      listen: { name: "گوش بده",  tag: "برای مفاهیم",
         desc: "جلسات درس را تماشا کنید یا گوش دهید." },
       play:   { name: "بازی",    tag: "برای شهود",
         desc: "یادداشت‌های تعاملی — بخوانید، سپس با الگوریتم‌ها بازی کنید." },
@@ -203,16 +203,16 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   // ---- Core / Concepts ----
-  { id:"c-intro", tier:"concepts", mini:true, short:"Lit",
+  { id:"c-intro", tier:"foundations", mini:true, short:"Lit",
     title:"AI Literacy", sub:"what AI is & its history",
     title_fa:"مبانی هوش مصنوعی", sub_fa:"هوش مصنوعی چیست و تاریخچه آن",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
     blurb_fa:"هوش مصنوعی و یادگیری ماشین واقعاً چه هستند، کجا در چشم‌انداز گسترده‌تر جای می‌گیرند، چه زمانی باید از آن‌ها استفاده کرد، و وجه مشترک تمام روش‌های پیش رو.",
-    aud:["student","executive","public"], prereqs:["f-la","f-calc","f-prob","f-opt","f-prog"],
+    aud:["student","executive","public"], prereqs:[],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"c-flu", tier:"concepts", mini:true, short:"Flu",
+  { id:"c-flu", tier:"foundations", mini:true, short:"Flu",
     title:"AI Fluency", sub:"prompting, tools & workflows",
     title_fa:"مهارت هوش مصنوعی", sub_fa:"پرامپت‌نویسی، ابزارها و گردش‌های کاری",
     blurb:"How to use AI tools effectively: prompting strategies, working with LLMs, integrating AI into real workflows, and evaluating outputs critically.",
@@ -318,7 +318,7 @@ const MODULES = [
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"حاکمیت و ریسک",
     blurb:"Lead AI responsibly: governance, risk and compliance, responsible-AI principles, privacy, security and policy, industry cases.",
     blurb_fa:"رهبری مسئولانه هوش مصنوعی: حاکمیت، ریسک و انطباق، اصول AI مسئولانه، حریم خصوصی، امنیت و سیاست.",
-    aud:["executive"], prereqs:["c-ml", "c-flu"],
+    aud:["executive","student"], prereqs:["c-ml", "c-flu"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
@@ -328,22 +328,21 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 /* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
 /* Layout: bottom=foundations, middle=concepts blob, top=applications
    Row y-values:
-     0.0  — foundations row
-     0.9  — gateway pair: AI Literacy (c-intro) | AI Fluency (c-flu)
+     0.0  — foundations row 1: 5 math foundations
+     0.9  — foundations row 2: AI Literacy (c-intro) | AI Fluency (c-flu)
      1.75 — concepts row 1: Unsupervised | Supervised | RL
      2.65 — concepts row 2: Probabilistic | Deep Learning | Responsible AI
      3.65 — applications row 1: Computer Vision | Language Models
-     4.45 — applications row 2: AI Agents
-     5.2  — applications row 3: AI Systems & MLOps
+     4.45 — applications row 2: AI Agents | AI Systems & MLOps
 */
 const LAYOUT = {
-  // ── Foundations ──────────────────────────────────────────────
+  // ── Foundations row 1 ────────────────────────────────────────
   "f-la":      { x: 10, y: 0    },
   "f-calc":    { x: 30, y: 0    },
   "f-prob":    { x: 50, y: 0    },
   "f-opt":     { x: 70, y: 0    },
   "f-prog":    { x: 90, y: 0    },
-  // ── Concepts (gateway pair) ──────────────────────────────────
+  // ── Foundations row 2 (AI entry points) ─────────────────────
   "c-intro":   { x: 37, y: 0.9  },  // AI Literacy
   "c-flu":     { x: 63, y: 0.9  },  // AI Fluency
   // ── Concepts row 1 ───────────────────────────────────────────
@@ -357,8 +356,8 @@ const LAYOUT = {
   // ── Applications ─────────────────────────────────────────────
   "a-vision":  { x: 25, y: 3.65 },
   "a-nlp":     { x: 75, y: 3.65 },
-  "a-agents":  { x: 75, y: 4.45 },
-  "a-systems": { x: 50, y: 5.2  },
+  "a-agents":  { x: 72, y: 4.45 },
+  "a-systems": { x: 28, y: 4.45 },
 };
 
 const EDGES = (() => {
@@ -382,6 +381,7 @@ const PATHS = {
       { id:"x-prob",   where:"Advanced lectures" },
       { id:"x-unsup",  where:"Advanced lectures" },
       { id:"x-rl",     where:"Primer" },
+      { id:"x-rai",    where:"" },
     ],
   },
   executive: {
