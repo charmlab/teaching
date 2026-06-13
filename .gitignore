@@ -13,7 +13,14 @@ modules/*/sources/*
 # extraction jobs (may contain course content summaries)
 modules/*/EXTRACTION_JOB.md
 
-# generated outputs (rebuild with make)
+# old output dir (superseded by assets/)
 modules/*/out/
+
+# xelatex auxiliary files in assets/ (PDFs and .tex are tracked)
+modules/*/assets/*.aux
+modules/*/assets/*.log
+modules/*/assets/*.out
+modules/*/assets/*.toc
+modules/*/assets/*.synctex.gz
 
 .DS_Store

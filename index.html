@@ -21,16 +21,27 @@
   .controls { padding: 18px 0 10px; }
   .controls-inner { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
   .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* Audience pills — 2-line: name + tagline */
   .pill {
     border: 1px solid #ccc; background: #fff; border-radius: var(--radius-pill);
-    padding: 6px 18px; font-size: 13px; font-weight: 600; letter-spacing: 0.4px;
+    padding: 7px 18px; font-size: 13px; letter-spacing: 0.3px;
     cursor: pointer; color: var(--muted); transition: all .15s; font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 82px;
   }
+  .pill .pill-name { font-weight: 600; font-size: 13px; line-height: 1.2; }
+  .pill .pill-tag  { font-weight: 400; font-size: 10px; opacity: 0.65; letter-spacing: 0.2px; line-height: 1.2; }
   .pill:hover { border-color: var(--accent-primary); color: var(--accent-dark); }
+  .pill:hover .pill-tag { opacity: 0.85; }
   .pill.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+  .pill.active .pill-tag { opacity: 0.8; }
+
+  /* View pills — single-line, no pill-tag needed */
+  #view-pills .pill { flex-direction: row; gap: 0; min-width: auto; padding: 7px 16px; }
+
   /* Public audience pill — distinct blue-indigo */
   #audience-pills .pill[data-aud="public"].active { background: #5a72c0; border-color: #5a72c0; }
-  #audience-pills .pill[data-aud="public"]:hover { border-color: #5a72c0; color: #5a72c0; }
+  #audience-pills .pill[data-aud="public"]:hover:not(.active) { border-color: #5a72c0; color: #5a72c0; }
 
   /* ---------- Skill tree canvas ---------- */
   #map-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -140,11 +151,10 @@
   <div class="controls-inner">
     <div>
       <div class="pills" id="audience-pills">
-        <button class="pill" data-aud="student">Student</button>
-        <button class="pill" data-aud="executive">Executive</button>
-        <button class="pill" data-aud="public">Public</button>
+        <button class="pill" data-aud="public"><span class="pill-name">Public</span><span class="pill-tag">use AI</span></button>
+        <button class="pill" data-aud="student"><span class="pill-name">Student</span><span class="pill-tag">build AI</span></button>
+        <button class="pill" data-aud="executive"><span class="pill-name">Executive</span><span class="pill-tag">lead with AI</span></button>
       </div>
-      <div class="aud-tagline" id="aud-tagline">build AI</div>
     </div>
     <div class="pills" id="view-pills">
       <button class="pill active" data-view="map">Skill tree</button>
@@ -233,9 +243,9 @@ function positionNodes() {
   const TL = STRINGS[lang].tier_label;
   const swimlanes = [
     { tier:"foundations", y: 0      },
-    { tier:"core",        y: 1.3    },
-    { tier:"applied",     y: 3.4    },
-    { tier:"advanced",    y: 4.6    },
+    { tier:"core",        y: 1.6    },
+    { tier:"applied",     y: 3.65   },
+    { tier:"advanced",    y: 4.9    },
   ];
   for (const { tier, y } of swimlanes) {
     const lbl = document.createElement("div");
@@ -274,7 +284,11 @@ function drawEdges() {
 }
 
 /* ---------- audience ---------- */
-function isActive(id) { return byId[id].aud.includes(audience); }
+function isActive(id) {
+  // Executives don't need the mathematical foundations highlighted
+  if (audience === "executive" && byId[id].tier === "foundations") return false;
+  return byId[id].aud.includes(audience);
+}
 function applyAudience() {
   for (const m of MODULES) {
     const el = map.querySelector(`.node[data-id="${m.id}"]`);
@@ -288,11 +302,13 @@ function syncAudiencePills() {
   const lang = getLang();
   const S = STRINGS[lang];
   document.querySelectorAll("#audience-pills .pill").forEach(p => {
-    p.textContent = S.audience[p.dataset.aud] || p.dataset.aud;
-    p.classList.toggle("active", p.dataset.aud === audience);
+    const aud = p.dataset.aud;
+    const nameEl = p.querySelector(".pill-name");
+    const tagEl  = p.querySelector(".pill-tag");
+    if (nameEl) nameEl.textContent = S.audience[aud] || aud;
+    if (tagEl)  tagEl.textContent  = S.tagline[aud]   || "";
+    p.classList.toggle("active", aud === audience);
   });
-  // Update tagline
-  document.getElementById("aud-tagline").textContent = S.tagline[audience] || "";
 }
 
 document.getElementById("audience-pills").addEventListener("click", e => {
@@ -333,7 +349,6 @@ function renderPath() {
     div.className = "step" + (isPublic ? " public-step" : (i % 2 ? " alt" : "")) + (s.bonus ? " bonus" : "");
     div.innerHTML = `<div class="step-num">${s.bonus ? "★" : i + 1}</div>
       <div class="step-card">
-        <div class="where">${s.where}</div>
         <div class="t">${title}</div>
         <div class="d">${sub}</div>
       </div>`;

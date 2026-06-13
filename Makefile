@@ -20,7 +20,7 @@ LANG   ?= en          # en = English | fa = Farsi/Persian
 DIR    := modules/$(MODULE)
 SRCDIR := $(DIR)/sources/$(LANG)
 SRC    := $(DIR)/content$(if $(filter fa,$(LANG)),-fa,).md
-OUT    := $(DIR)/out
+ASSETS := $(DIR)/assets
 
 PANDOC_FLAGS := --from markdown+fenced_divs --lua-filter=pipeline/filters/tiers.lua
 
@@ -52,25 +52,30 @@ $(SRC):
 	@echo "✗ $(SRC) not found — run 'make extract MODULE=$(MODULE) LANG=$(LANG)' first"; exit 1
 
 listen: $(SRC)
-	@mkdir -p $(OUT)
+	@mkdir -p $(ASSETS)
+	@echo "→ Generating LaTeX source…"
 	TIER=$(TIER) pandoc $(SRC) $(PANDOC_FLAGS) \
-	  --pdf-engine=xelatex -V geometry:margin=1in -V fontsize=11pt \
+	  --standalone -V geometry:margin=1in -V fontsize=11pt \
 	  -H pipeline/templates/listen-header.tex \
-	  -o $(OUT)/$(MODULE)-$(LANG)-$(TIER).pdf
-	@echo "✓ $(OUT)/$(MODULE)-$(LANG)-$(TIER).pdf"
+	  -o $(ASSETS)/$(MODULE)-$(LANG)-$(TIER).tex
+	@echo "✓ LaTeX: $(ASSETS)/$(MODULE)-$(LANG)-$(TIER).tex"
+	@echo "→ Compiling PDF…"
+	cd $(ASSETS) && xelatex -interaction=nonstopmode $(MODULE)-$(LANG)-$(TIER).tex 2>&1 | tail -5
+	@cp $(ASSETS)/$(MODULE)-$(LANG)-$(TIER).pdf $(ASSETS)/generated.pdf
+	@echo "✓ PDF:   $(ASSETS)/generated.pdf"
 
 play: $(SRC)
-	@mkdir -p $(OUT)
+	@mkdir -p $(ASSETS)
 	TIER=full pandoc $(SRC) $(PANDOC_FLAGS) \
 	  --standalone --katex --table-of-contents \
 	  --template=pipeline/templates/notes.html \
-	  -o $(OUT)/notes-$(LANG).html
-	@echo "✓ $(OUT)/notes-$(LANG).html"
+	  -o $(ASSETS)/notes-$(LANG).html
+	@echo "✓ $(ASSETS)/notes-$(LANG).html"
 
 build: $(SRC)
-	@mkdir -p $(OUT)
-	python3 pipeline/scripts/md_to_ipynb.py $(SRC) $(OUT)/$(MODULE).ipynb
-	@echo "✓ $(OUT)/$(MODULE).ipynb"
+	@mkdir -p $(ASSETS)
+	python3 pipeline/scripts/md_to_ipynb.py $(SRC) $(ASSETS)/$(MODULE).ipynb
+	@echo "✓ $(ASSETS)/$(MODULE).ipynb"
 
 all: play build
 	@$(MAKE) listen MODULE=$(MODULE) LANG=$(LANG) TIER=core
@@ -82,4 +87,5 @@ serve:
 	@python3 -m http.server 8080
 
 clean:
-	rm -rf modules/*/out
+	rm -rf modules/*/assets/generated.pdf modules/*/assets/generated.tex \
+	       modules/*/assets/*.aux modules/*/assets/*.log modules/*/assets/*.out

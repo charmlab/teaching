@@ -25,13 +25,21 @@
   }
   #minimap:hover { opacity: 1; }
   #minimap.traveling { opacity: 1; transform: scale(1.6); }
-  #minimap rect { cursor: pointer; transition: fill .2s ease; }
+  #minimap rect { cursor: pointer; transition: fill .15s ease, stroke .15s ease; }
   #minimap rect.hop { fill: var(--accent-primary); stroke: var(--accent-dark); }
+  #minimap rect.hovered { fill: #e6f7fe !important; stroke: var(--accent-primary) !important; }
+  #minimap text.node-abbr { pointer-events: none; user-select: none; }
   #minimap .label {
     font-size: 9.5px; letter-spacing: 1.5px; text-transform: uppercase;
     color: var(--muted); text-align: center; margin-top: 2px;
   }
-  @media (max-width: 980px) { #minimap { display: none; } }
+  #minimap-tip {
+    position: fixed; z-index: 200; background: rgba(30,36,48,0.88);
+    color: #fff; font-size: 11px; padding: 4px 9px; border-radius: 5px;
+    pointer-events: none; white-space: nowrap; display: none;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.25); letter-spacing: 0.2px;
+  }
+  @media (max-width: 900px) { #minimap { display: none; } }
 
   /* ---------- step nav ---------- */
   .step-nav {
@@ -97,6 +105,7 @@
   </div>
 </nav>
 
+<div id="minimap-tip"></div>
 <div id="minimap" title="Click a node to travel there">
   <svg id="minimap-svg"></svg>
   <div class="label" id="minimap-label">you are here &mdash; click a node to travel</div>
@@ -186,42 +195,17 @@ function renderSections() {
     return;
   }
 
-  // --- Listen section with PDF chooser ---
-  const genPdfPath = `modules/${mod.id}/out/${mod.id}-${lang}.pdf`;
+  // --- Listen section — auto-detect PDF from assets/ ---
   const listenHtml = `
     <section class="flow" id="listen">
       <div class="eyebrow">Step 1 &middot; ${S.ing.listen.tag}</div>
       <h2>${STEP_ICONS.listen} ${S.ing.listen.name}</h2>
       <p class="desc">${S.ing.listen.desc}</p>
 
-      <div class="pdf-chooser">
-        <div class="choose-label">${S.listen_choose}</div>
-        <div class="pdf-options">
-          <div class="pdf-opt" id="pdf-gen-opt">
-            <div class="opt-title">${S.listen_gen_pdf}</div>
-            <div class="opt-sub">${S.listen_gen_pdf_sub}</div>
-            <div class="opt-action">
-              <a class="btn" id="pdf-gen-link" href="${genPdfPath}" target="_blank"
-                 onclick="selectPDF('gen','${genPdfPath}','${S.listen_view_pdf} ${mod.title}'); return false;">
-                ${S.listen_open_pdf}
-              </a>
-            </div>
-          </div>
-          <div class="pdf-opt" id="pdf-upload-opt">
-            <div class="opt-title">${S.listen_own_pdf}</div>
-            <div class="opt-sub">${S.listen_own_pdf_sub}</div>
-            <div class="opt-action">
-              <label class="btn" for="pdf-upload-input" style="cursor:pointer">${S.listen_own_pdf} &hellip;</label>
-              <input type="file" id="pdf-upload-input" accept=".pdf">
-            </div>
-          </div>
-        </div>
-        <div class="pdf-viewer" id="pdf-viewer">
-          <div class="pdf-label">
-            <span id="pdf-label-text"></span>
-            <button style="border:none;background:none;cursor:pointer;color:var(--muted)" onclick="closePDF()">&times;</button>
-          </div>
-          <iframe id="pdf-iframe" src="" title="PDF viewer"></iframe>
+      <div id="pdf-area" style="margin-top:16px">
+        <div class="placeholder" id="pdf-loading">
+          <div class="big">⏳</div>
+          <p style="color:var(--muted);font-size:13px">Checking for lecture notes…</p>
         </div>
       </div>
 
@@ -281,32 +265,41 @@ function renderSections() {
   document.getElementById("sections").innerHTML =
     listenHtml + playHtml + buildHtml + quizHtml + resourcesSection;
 
-  // Wire up PDF upload handler
-  document.getElementById("pdf-upload-input").addEventListener("change", function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    selectPDF("upload", url, `${S.listen_view_pdf} ${file.name}`);
-    document.getElementById("pdf-upload-opt").classList.add("selected");
-    document.getElementById("pdf-gen-opt").classList.remove("selected");
-  });
+  // Auto-detect lecture PDF from assets/
+  autoDetectPDF();
 }
 
-/* ---------- PDF chooser logic ---------- */
-function selectPDF(source, url, label) {
-  const viewer = document.getElementById("pdf-viewer");
-  document.getElementById("pdf-iframe").src = url;
-  document.getElementById("pdf-label-text").textContent = label;
-  viewer.style.display = "block";
-  document.getElementById("pdf-gen-opt").classList.toggle("selected", source === "gen");
-  document.getElementById("pdf-upload-opt").classList.toggle("selected", source === "upload");
-  viewer.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-function closePDF() {
-  const viewer = document.getElementById("pdf-viewer");
-  viewer.style.display = "none";
-  document.getElementById("pdf-iframe").src = "";
-  document.querySelectorAll(".pdf-opt").forEach(o => o.classList.remove("selected"));
+/* ---------- PDF auto-detect (checks assets/manual.pdf then assets/generated.pdf) ---------- */
+async function autoDetectPDF() {
+  const base = `modules/${mod.id}/assets`;
+  const candidates = [
+    { path: `${base}/manual.pdf`,    label: mod.title },
+    { path: `${base}/generated.pdf`, label: mod.title },
+  ];
+  const area = document.getElementById("pdf-area");
+  if (!area) return;
+  for (const { path, label } of candidates) {
+    try {
+      const r = await fetch(path, { method: "HEAD" });
+      if (r.ok) {
+        area.innerHTML = `
+          <div style="border:1px solid var(--line);border-radius:var(--radius-card);overflow:hidden;margin-top:4px">
+            <div style="padding:7px 12px;font-size:12px;color:var(--muted);background:#f8f8f8;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
+              <span>📄 ${label}</span>
+              <a href="${path}" target="_blank" style="font-size:12px;font-weight:600">Open in new tab ↗</a>
+            </div>
+            <iframe src="${path}" title="Lecture notes" style="width:100%;height:540px;border:none;display:block"></iframe>
+          </div>`;
+        track("pdf_auto_load", { module_id: mod.id, pdf_path: path });
+        return;
+      }
+    } catch {}
+  }
+  // No PDF found — show a quiet placeholder
+  area.innerHTML = `
+    <div style="border:1.5px dashed #d5d5d5;border-radius:var(--radius-card);padding:22px;text-align:center;color:var(--muted);background:#fcfcfc;font-size:13px">
+      Lecture notes not yet published — run <code style="background:#f0f0f0;padding:2px 6px;border-radius:4px">make listen MODULE=${mod.id}</code> to generate them.
+    </div>`;
 }
 
 /* ---------- Quiz section builder ---------- */
@@ -418,22 +411,30 @@ function renderNextPrev() {
   const svg = document.getElementById("minimap-svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   svg.setAttribute("width", W); svg.setAttribute("height", H);
+  const tip = document.getElementById("minimap-tip");
+
   const pos = id => ({
     x: Math.max(NW/2 + 2, Math.min((LAYOUT[id].x / 100) * W, W - NW/2 - 2)),
     y: H - PADM - NH / 2 - LAYOUT[id].y * UY,
   });
+
+  // Edge lines
   let lines = "";
   for (const [from, to] of EDGES) {
     const a = pos(from), b = pos(to);
     lines += `<line x1="${a.x}" y1="${a.y - NH/2}" x2="${b.x}" y2="${b.y + NH/2}" stroke="#c9ced2" stroke-width="1"/>`;
   }
   svg.innerHTML = lines;
+
+  // Rects + short labels
+  const rects = [];
   for (const id of Object.keys(LAYOUT)) {
     const p = pos(id);
     const cur = id === mod.id;
     const isMini = byId[id].mini;
-    const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     const nw = isMini ? 22 : NW;
+
+    const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
     r.setAttribute("x", p.x - nw/2); r.setAttribute("y", p.y - NH/2);
     r.setAttribute("width", nw); r.setAttribute("height", NH); r.setAttribute("rx", 3);
     r.setAttribute("fill", cur ? "var(--accent-primary)" : "#fff");
@@ -441,11 +442,46 @@ function renderNextPrev() {
     r.setAttribute("stroke-width", cur ? 1.5 : 1);
     r.setAttribute("stroke-dasharray", isMini && !cur ? "2,2" : "none");
     r.dataset.id = id;
-    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-    title.textContent = byId[id].title;
-    r.appendChild(title);
-    if (!cur) r.addEventListener("click", () => travelTo(id));
+
+    if (!cur) {
+      r.addEventListener("click", () => travelTo(id));
+      r.addEventListener("mouseenter", (evt) => {
+        r.setAttribute("fill", "#daf0fb");
+        r.setAttribute("stroke", "var(--accent-primary)");
+        tip.textContent = byId[id].title;
+        tip.style.display = "block";
+        const minimap = document.getElementById("minimap");
+        const rect = minimap.getBoundingClientRect();
+        tip.style.top  = (rect.top  + p.y * (minimap.offsetHeight / H) - 14) + "px";
+        tip.style.left = (rect.left - tip.offsetWidth - 8) + "px";
+      });
+      r.addEventListener("mouseleave", () => {
+        r.setAttribute("fill", "#fff");
+        r.setAttribute("stroke", isMini ? "#bbd" : "#bbb");
+        tip.style.display = "none";
+      });
+    }
+
     svg.appendChild(r);
+    rects.push({ id, p, nw, cur });
+  }
+
+  // Short-form labels (drawn on top of rects, pointer-events:none)
+  for (const { id, p, nw, cur } of rects) {
+    const abbr = byId[id].short || "";
+    if (!abbr) continue;
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", p.x);
+    t.setAttribute("y", p.y + 0.5);
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("dominant-baseline", "middle");
+    t.setAttribute("font-size", "5");
+    t.setAttribute("fill", cur ? "#fff" : "#999");
+    t.setAttribute("pointer-events", "none");
+    t.setAttribute("font-family", "Raleway, sans-serif");
+    t.classList.add("node-abbr");
+    t.textContent = abbr;
+    svg.appendChild(t);
   }
 })();
 

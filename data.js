@@ -146,7 +146,7 @@ const ING_META = {
 
 const MODULES = [
   // ---- Foundations ----
-  { id:"f-la", tier:"foundations",
+  { id:"f-la", tier:"foundations", short:"LA",
     title:"Linear Algebra", sub:"vectors → SVD",
     title_fa:"جبر خطی", sub_fa:"بردارها تا SVD",
     blurb:"Vectors, matrices, eigendecomposition, SVD and low-rank approximation — the language every model is written in.",
@@ -157,7 +157,7 @@ const MODULES = [
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"f-calc", tier:"foundations",
+  { id:"f-calc", tier:"foundations", short:"∂x",
     title:"Calculus", sub:"gradients & chain rule",
     title_fa:"حساب دیفرانسیل", sub_fa:"گرادیان و قانون زنجیره",
     blurb:"Multivariable differentiation, gradients, and the chain rule — everything backprop quietly assumes you know.",
@@ -168,7 +168,7 @@ const MODULES = [
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"f-prob", tier:"foundations",
+  { id:"f-prob", tier:"foundations", short:"P&S",
     title:"Probability & Statistics", sub:"uncertainty & inference",
     title_fa:"احتمال و آمار", sub_fa:"عدم قطعیت و استنتاج",
     blurb:"Distributions, expectation, estimation, and statistical inference — why ML claims anything at all about unseen data.",
@@ -180,7 +180,7 @@ const MODULES = [
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"f-opt", tier:"foundations",
+  { id:"f-opt", tier:"foundations", short:"Opt",
     title:"Optimization", sub:"gradient descent & friends",
     title_fa:"بهینه‌سازی", sub_fa:"گرادیان کاهشی",
     blurb:"Loss landscapes, convexity, gradient descent, and constrained optimization — how learning actually happens.",
@@ -191,7 +191,7 @@ const MODULES = [
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"f-prog", tier:"foundations",
+  { id:"f-prog", tier:"foundations", short:"Py",
     title:"Programming", sub:"Python, NumPy, Git",
     title_fa:"برنامه‌نویسی", sub_fa:"پایتون و NumPy",
     blurb:"Python, NumPy/pandas, data munging, visualization, Git and the terminal — the workshop where everything gets built.",
@@ -205,7 +205,7 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   // ---- Core / Concepts ----
-  { id:"c-intro", tier:"core", mini:true,
+  { id:"c-intro", tier:"core", mini:true, short:"AI",
     title:"Intro to AI", sub:"what it is & why it matters",
     title_fa:"مقدمه هوش مصنوعی", sub_fa:"چیستی و چرایی",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
@@ -214,7 +214,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"c-ml", tier:"core",
+  { id:"c-ml", tier:"core", short:"ML",
     title:"Classical ML", sub:"KNN → ensembles → SVMs",
     title_fa:"یادگیری ماشین کلاسیک", sub_fa:"KNN تا SVM",
     blurb:"Supervised learning end-to-end: KNN, decision trees, ensembles, linear regression, linear classification, logistic regression and SVMs. The running thread: linear models and linear separability — and where they break.",
@@ -225,7 +225,7 @@ const MODULES = [
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  { id:"c-nn", tier:"core",
+  { id:"c-nn", tier:"core", short:"NN",
     title:"Neural Networks", sub:"beyond linear separability",
     title_fa:"شبکه‌های عصبی", sub_fa:"فراتر از جداسازی خطی",
     blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent. The answer to “what if the data isn’t linearly separable?”",
@@ -238,7 +238,7 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   // ---- Applied / Applications ----
-  { id:"a-vision", tier:"applied",
+  { id:"a-vision", tier:"applied", short:"CV",
     title:"Computer Vision", sub:"CNNs & transfer learning",
     title_fa:"بینایی ماشین", sub_fa:"CNN و انتقال یادگیری",
     blurb:"CNNs and feature hierarchies, convolution / pooling / normalization, transfer learning, data augmentation, evaluation.",
@@ -247,7 +247,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  { id:"a-nlp", tier:"applied",
+  { id:"a-nlp", tier:"applied", short:"LM",
     title:"Language Models", sub:"embeddings → transformers",
     title_fa:"مدل‌های زبانی", sub_fa:"تعبیه‌ها تا ترانسفورمر",
     blurb:"Sequence models, embeddings, attention, transformers, pretraining and fine-tuning, decoding. From n-grams to LLMs.",
@@ -260,7 +260,7 @@ const MODULES = [
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  { id:"a-agents", tier:"applied",
+  { id:"a-agents", tier:"applied", short:"Ag",
     title:"AI Agents", sub:"reasoning, tools, memory",
     title_fa:"عامل‌های هوش مصنوعی", sub_fa:"استدلال، ابزار، حافظه",
     blurb:"Agents and reasoning, planning and memory, tool / function calling, workflows and orchestration, multi-agent concepts.",
@@ -269,7 +269,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  { id:"a-systems", tier:"applied",
+  { id:"a-systems", tier:"applied", short:"Sys",
     title:"AI Systems & MLOps", sub:"models → production",
     title_fa:"سیستم‌های هوش مصنوعی", sub_fa:"مدل‌ها تا تولید",
     blurb:"From models to systems: retrieval and RAG, APIs and services, end-to-end evaluation, reliability and observability.",
@@ -279,7 +279,7 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   // ---- Advanced / Specializations ----
-  { id:"x-prob", tier:"advanced",
+  { id:"x-prob", tier:"advanced", short:"Pr",
     title:"Probabilistic & Causal AI", sub:"Bayes, uncertainty, causality",
     title_fa:"هوش مصنوعی احتمالی", sub_fa:"بیز، عدم قطعیت، علیت",
     blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
@@ -288,7 +288,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-unsup", tier:"advanced",
+  { id:"x-unsup", tier:"advanced", short:"Un",
     title:"Unsupervised Learning", sub:"PCA, clustering, embeddings",
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
@@ -297,7 +297,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rl", tier:"advanced",
+  { id:"x-rl", tier:"advanced", short:"RL",
     title:"Reinforcement Learning", sub:"primer → module",
     title_fa:"یادگیری تقویتی", sub_fa:"مقدمه",
     blurb:"From a brief primer to a full module: MDPs, value functions, policy gradients.",
@@ -306,7 +306,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rai", tier:"advanced",
+  { id:"x-rai", tier:"advanced", short:"RAI",
     title:"Responsible AI", sub:"governance, risk, compliance",
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"حاکمیت و ریسک",
     blurb:"Lead AI responsibly: governance, risk and compliance, responsible-AI principles, privacy, security and policy, industry cases.",
@@ -320,22 +320,22 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 
 /* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
 const LAYOUT = {
-  "f-la":      { x: 10, y: 0 },
-  "f-calc":    { x: 30, y: 0 },
-  "f-prob":    { x: 50, y: 0 },
-  "f-opt":     { x: 70, y: 0 },
-  "f-prog":    { x: 90, y: 0 },
-  "c-intro":   { x: 50, y: 0.62 },
-  "c-ml":      { x: 30, y: 1.25 },
-  "c-nn":      { x: 52, y: 2.1  },
-  "x-unsup":   { x: 10, y: 2.65 },
-  "a-vision":  { x: 30, y: 3.05 },
-  "a-nlp":     { x: 62, y: 3.05 },
-  "x-prob":    { x: 12, y: 3.65 },
-  "a-agents":  { x: 82, y: 3.8  },
-  "x-rl":      { x: 36, y: 4.1  },
-  "a-systems": { x: 62, y: 4.55 },
-  "x-rai":     { x: 82, y: 5.25 },
+  "f-la":      { x: 10, y: 0    },
+  "f-calc":    { x: 30, y: 0    },
+  "f-prob":    { x: 50, y: 0    },
+  "f-opt":     { x: 70, y: 0    },
+  "f-prog":    { x: 90, y: 0    },
+  "c-intro":   { x: 50, y: 0.9  },
+  "c-ml":      { x: 30, y: 1.55 },
+  "c-nn":      { x: 52, y: 2.4  },
+  "x-unsup":   { x: 10, y: 2.95 },
+  "a-vision":  { x: 30, y: 3.35 },
+  "a-nlp":     { x: 62, y: 3.35 },
+  "x-prob":    { x: 12, y: 3.95 },
+  "a-agents":  { x: 82, y: 4.1  },
+  "x-rl":      { x: 36, y: 4.4  },
+  "a-systems": { x: 62, y: 4.85 },
+  "x-rai":     { x: 82, y: 5.55 },
 };
 
 const EDGES = (() => {
