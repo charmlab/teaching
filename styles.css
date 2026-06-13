@@ -226,7 +226,34 @@ footer.site-footer {
 }
 .quiz-score { margin-top: 14px; font-size: 14px; font-weight: 600; color: var(--accent-dark); }
 
-/* ---------- Farsi RTL overrides for path view ---------- */
+/* ---------- Farsi RTL / layout overrides ---------- */
+
+/* Skill tree nodes: text flush right, accent border on right */
+html[lang="fa"] .node {
+  align-items: flex-end;
+  padding: 6px 8px 6px 12px;
+  border-left-width: 1px;
+  border-right-width: 4px;
+  border-right-style: solid;
+  border-right-color: var(--line);
+}
+html[lang="fa"] .node[data-tier="foundations"] { border-right-color: var(--accent-secondary); }
+html[lang="fa"] .node[data-tier="concepts"]    { border-right-color: var(--accent-primary); }
+html[lang="fa"] .node[data-tier="applied"]     { border-right-color: #c08030; }
+html[lang="fa"] .node.mini { border-right-color: var(--accent-primary); }
+html[lang="fa"] .node .t { font-size: 13px; text-align: right; }
+html[lang="fa"] .node .s { font-size: 11px; text-align: right; }
+
+/* Swimlane labels: move to right side, top-to-bottom, larger */
+html[lang="fa"] .swimlane-label {
+  left: auto;
+  right: 3px;
+  font-size: 11px;
+  writing-mode: vertical-rl;
+  transform: translateY(-50%);
+}
+
+/* Path view: step-num on the right, connector line on right */
 html[lang="fa"] #path .step { flex-direction: row-reverse; }
 html[lang="fa"] #path .step::before { left: auto; right: 26px; }
 html[lang="fa"] #path .step-card { text-align: right; }

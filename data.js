@@ -104,7 +104,7 @@ const STRINGS = {
     ing: {
       listen: { name: "گوش بده",  tag: "برای مفاهیم",
         desc: "جلسات درس را تماشا کنید یا گوش دهید." },
-      play:   { name: "بازی",    tag: "برای شهود",
+      play:   { name: "بازی کن",    tag: "برای شهود",
         desc: "یادداشت‌های تعاملی — بخوانید، سپس با الگوریتم‌ها بازی کنید." },
       build:  { name: "بساز",    tag: "برای تسلط",
         desc: "خودتان پیاده‌سازی کنید در یک نوت‌بوک راهنما." },
@@ -208,22 +208,22 @@ const MODULES = [
     title_fa:"مبانی هوش مصنوعی", sub_fa:"هوش مصنوعی چیست و تاریخچه آن",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
     blurb_fa:"هوش مصنوعی و یادگیری ماشین واقعاً چه هستند، کجا در چشم‌انداز گسترده‌تر جای می‌گیرند، چه زمانی باید از آن‌ها استفاده کرد، و وجه مشترک تمام روش‌های پیش رو.",
-    aud:["student","executive","public"], prereqs:[],
+    aud:["public"], prereqs:[],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-flu", tier:"foundations", mini:true, short:"Flu",
-    title:"AI Fluency", sub:"prompting, tools & workflows",
+    title:"AI Fluency", sub:"prompts, tools & workflows",
     title_fa:"مهارت هوش مصنوعی", sub_fa:"پرامپت‌نویسی، ابزارها و گردش‌های کاری",
     blurb:"How to use AI tools effectively: prompting strategies, working with LLMs, integrating AI into real workflows, and evaluating outputs critically.",
     blurb_fa:"چگونه ابزارهای هوش مصنوعی را به طور موثر استفاده کنیم: استراتژی‌های پرامپت، کار با LLM‌ها، ادغام هوش مصنوعی در گردش‌های کاری واقعی و ارزیابی نتایج.",
-    aud:["student","executive","public"], prereqs:[],
+    aud:["public"], prereqs:[],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-ml", tier:"concepts", short:"ML",
-    title:"Supervised Learning", sub:"regression, classification, KNN, decision trees",
-    title_fa:"یادگیری با نظارت", sub_fa:"رگرسیون، طبقه‌بندی، KNN، درخت‌های تصمیم",
+    title:"Supervised Learning", sub:"regression, classification, nearest neighbors, decision trees",
+    title_fa:"یادگیری با نظارت", sub_fa:"رگرسیون، طبقه‌بندی، نزدیک‌ترین همسایه، درخت‌های تصمیم",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["c-intro"],
@@ -314,11 +314,11 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-rai", tier:"concepts", short:"RAI",
-    title:"Responsible AI", sub:"governance, risk, compliance",
-    title_fa:"هوش مصنوعی مسئولانه", sub_fa:"حاکمیت و ریسک",
-    blurb:"Lead AI responsibly: governance, risk and compliance, responsible-AI principles, privacy, security and policy, industry cases.",
-    blurb_fa:"رهبری مسئولانه هوش مصنوعی: حاکمیت، ریسک و انطباق، اصول AI مسئولانه، حریم خصوصی، امنیت و سیاست.",
-    aud:["executive","student"], prereqs:["c-ml", "c-flu"],
+    title:"Responsible AI", sub:"fairness, robustness, security & explainability",
+    title_fa:"هوش مصنوعی مسئولانه", sub_fa:"انصاف، استحکام، امنیت و تبیین‌پذیری",
+    blurb:"Case studies in responsible AI: fairness and bias, robustness under distribution shift, security against adversarial attacks, explainability, privacy, and accountability. What does it mean to build AI that is safe and trustworthy?",
+    blurb_fa:"مطالعات موردی در هوش مصنوعی مسئولانه: انصاف و تعصب، استحکام در برابر تغییر توزیع، امنیت در برابر حملات، تبیین‌پذیری، حریم خصوصی و پاسخگویی. هوش مصنوعی ایمن و قابل اعتماد یعنی چه؟",
+    aud:["student","executive","public"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
@@ -328,23 +328,23 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 /* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
 /* Layout: bottom=foundations, middle=concepts blob, top=applications
    Row y-values:
-     0.0  — foundations row 1: 5 math foundations
-     0.9  — foundations row 2: AI Literacy (c-intro) | AI Fluency (c-flu)
+     0.0  — foundations row 1: AI Literacy | AI Fluency (public entry points, very bottom)
+     0.9  — foundations row 2: 5 math foundations (reference, students/execs)
      1.75 — concepts row 1: Unsupervised | Supervised | RL
      2.65 — concepts row 2: Probabilistic | Deep Learning | Responsible AI
      3.65 — applications row 1: Computer Vision | Language Models
-     4.45 — applications row 2: AI Agents | AI Systems & MLOps
+     4.45 — applications row 2: AI Systems & MLOps | AI Agents
 */
 const LAYOUT = {
-  // ── Foundations row 1 ────────────────────────────────────────
-  "f-la":      { x: 10, y: 0    },
-  "f-calc":    { x: 30, y: 0    },
-  "f-prob":    { x: 50, y: 0    },
-  "f-opt":     { x: 70, y: 0    },
-  "f-prog":    { x: 90, y: 0    },
-  // ── Foundations row 2 (AI entry points) ─────────────────────
-  "c-intro":   { x: 37, y: 0.9  },  // AI Literacy
-  "c-flu":     { x: 63, y: 0.9  },  // AI Fluency
+  // ── Foundations row 1 (AI entry points, very bottom) ────────
+  "c-intro":   { x: 37, y: 0    },  // AI Literacy
+  "c-flu":     { x: 63, y: 0    },  // AI Fluency
+  // ── Foundations row 2 (math references) ─────────────────────
+  "f-la":      { x: 10, y: 0.9  },
+  "f-calc":    { x: 30, y: 0.9  },
+  "f-prob":    { x: 50, y: 0.9  },
+  "f-opt":     { x: 70, y: 0.9  },
+  "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
   "x-unsup":   { x: 20, y: 1.75 },
   "c-ml":      { x: 50, y: 1.75 },
@@ -373,7 +373,6 @@ const PATHS = {
   student: {
     hint: "The full technical path. Foundations are assumed; brush up as needed.",
     steps: [
-      { id:"c-intro",  where:"Week 1 intro" },
       { id:"c-ml",     where:"Weeks 1–4" },
       { id:"c-nn",     where:"Weeks 5–6" },
       { id:"a-vision", where:"2 lectures" },
@@ -387,8 +386,6 @@ const PATHS = {
   executive: {
     hint: "The 6-week executive program — 3-hour sessions: interactive lectures + hands-on notebooks. Build something every week.",
     steps: [
-      { id:"c-flu",     where:"" },
-      { id:"c-intro",   where:"" },
       { id:"c-ml",      where:"" },
       { id:"c-nn",      where:"" },
       { id:"a-vision",  where:"" },
@@ -403,6 +400,7 @@ const PATHS = {
     steps: [
       { id:"c-intro", where:"" },
       { id:"c-flu",   where:"" },
+      { id:"x-rai",   where:"", bonus:true },
     ],
   },
 };
