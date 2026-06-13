@@ -222,8 +222,8 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-ml", tier:"concepts", short:"ML",
-    title:"Supervised Learning", sub:"regression, classification, nearest neighbors, decision trees",
-    title_fa:"یادگیری با نظارت", sub_fa:"رگرسیون، طبقه‌بندی، نزدیک‌ترین همسایه، درخت‌های تصمیم",
+    title:"Supervised Learning", sub:"nearest neighbors, decision trees, regression, classification",
+    title_fa:"یادگیری با نظارت", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، رگرسیون، طبقه‌بندی",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["c-intro"],
@@ -318,7 +318,7 @@ const MODULES = [
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"انصاف، استحکام، امنیت و تبیین‌پذیری",
     blurb:"Case studies in responsible AI: fairness and bias, robustness under distribution shift, security against adversarial attacks, explainability, privacy, and accountability. What does it mean to build AI that is safe and trustworthy?",
     blurb_fa:"مطالعات موردی در هوش مصنوعی مسئولانه: انصاف و تعصب، استحکام در برابر تغییر توزیع، امنیت در برابر حملات، تبیین‌پذیری، حریم خصوصی و پاسخگویی. هوش مصنوعی ایمن و قابل اعتماد یعنی چه؟",
-    aud:["student","executive","public"], prereqs:["c-ml"],
+    aud:["student","executive","public"], prereqs:[],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
@@ -328,17 +328,18 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 /* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
 /* Layout: bottom=foundations, middle=concepts blob, top=applications
    Row y-values:
-     0.0  — foundations row 1: AI Literacy | AI Fluency (public entry points, very bottom)
+     0.0  — foundations row 1: AI Literacy | AI Fluency | Responsible AI (bottom entry row)
      0.9  — foundations row 2: 5 math foundations (reference, students/execs)
      1.75 — concepts row 1: Unsupervised | Supervised | RL
-     2.65 — concepts row 2: Probabilistic | Deep Learning | Responsible AI
+     2.65 — concepts row 2: Deep Learning | Probabilistic AI
      3.65 — applications row 1: Computer Vision | Language Models
      4.45 — applications row 2: AI Systems & MLOps | AI Agents
 */
 const LAYOUT = {
-  // ── Foundations row 1 (AI entry points, very bottom) ────────
-  "c-intro":   { x: 37, y: 0    },  // AI Literacy
-  "c-flu":     { x: 63, y: 0    },  // AI Fluency
+  // ── Foundations row 1 (entry points, very bottom) ───────────
+  "c-intro":   { x: 18, y: 0    },  // AI Literacy
+  "c-flu":     { x: 50, y: 0    },  // AI Fluency
+  "x-rai":     { x: 82, y: 0    },  // Responsible AI
   // ── Foundations row 2 (math references) ─────────────────────
   "f-la":      { x: 10, y: 0.9  },
   "f-calc":    { x: 30, y: 0.9  },
@@ -349,10 +350,9 @@ const LAYOUT = {
   "x-unsup":   { x: 20, y: 1.75 },
   "c-ml":      { x: 50, y: 1.75 },
   "x-rl":      { x: 80, y: 1.75 },
-  // ── Concepts row 2 ───────────────────────────────────────────
-  "x-prob":    { x: 20, y: 2.65 },
-  "c-nn":      { x: 50, y: 2.65 },
-  "x-rai":     { x: 80, y: 2.65 },
+  // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
+  "c-nn":      { x: 30, y: 2.65 },
+  "x-prob":    { x: 70, y: 2.65 },
   // ── Applications ─────────────────────────────────────────────
   "a-vision":  { x: 25, y: 3.65 },
   "a-nlp":     { x: 75, y: 3.65 },
