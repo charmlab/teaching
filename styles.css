@@ -34,9 +34,10 @@ body {
   font-size: 15px;
 }
 html[lang="fa"] body {
-  font-family: "Harmattan", "Tahoma", "Arial", sans-serif;
   direction: ltr; /* layout stays LTR; FA text flows naturally inline */
+  /* font-family intentionally NOT overridden — Raleway stays for UI chrome */
 }
+/* Apply Harmattan only to content-bearing text in FA mode */
 html[lang="fa"] .modal,
 html[lang="fa"] .module-hero,
 html[lang="fa"] .step-card,
@@ -44,6 +45,13 @@ html[lang="fa"] #popup,
 html[lang="fa"] #path {
   direction: rtl;
   text-align: right;
+  font-family: "Harmattan", "Tahoma", "Arial", sans-serif;
+}
+html[lang="fa"] .node .t,
+html[lang="fa"] .node .s,
+html[lang="fa"] .subtitle,
+html[lang="fa"] h1 {
+  font-family: "Harmattan", "Tahoma", "Arial", sans-serif;
 }
 a { color: var(--accent-primary); text-decoration: none; }
 a:hover { color: var(--accent-dark); }
@@ -110,14 +118,13 @@ footer.site-footer {
   color: var(--muted); font-size: 12.5px; margin-top: 48px;
 }
 
-/* ---------- Tier-coloured nodes (left accent + gradient bg) ---------- */
-/* Remove the old bottom-border approach; tiers now use left border + tinted bg */
+/* ---------- Tier-coloured nodes — 3-tier system ---------- */
 .node[data-tier="foundations"] {
   border-left: 4px solid var(--accent-secondary);
   background: linear-gradient(110deg, #eaf7f5 0%, #ffffff 55%);
   padding-left: 8px;
 }
-.node[data-tier="core"] {
+.node[data-tier="concepts"] {
   border-left: 4px solid var(--accent-primary);
   background: linear-gradient(110deg, #e8f4fc 0%, #ffffff 55%);
   padding-left: 8px;
@@ -127,13 +134,8 @@ footer.site-footer {
   background: linear-gradient(110deg, #fdf5e6 0%, #ffffff 55%);
   padding-left: 8px;
 }
-.node[data-tier="advanced"] {
-  border-left: 4px solid #9b6bb5;
-  background: linear-gradient(110deg, #f5eefb 0%, #ffffff 55%);
-  padding-left: 8px;
-}
 
-/* ---------- Mini nodes (Intro to AI gateway) ---------- */
+/* ---------- Mini nodes (Intro to AI gateway — concepts tier) ---------- */
 .node.mini {
   width: 140px; height: 50px;
   border-style: solid; border-color: #c5dce8; border-width: 1px;
@@ -147,6 +149,9 @@ footer.site-footer {
 .node.mini:hover { box-shadow: var(--shadow-card-hover); opacity: 1; }
 .node.mini.inactive { opacity: 0.18; }
 
+/* ---------- Swimlane labels — rotated vertical ---------- */
+/* Override the inline-style positioning in index.html */
+
 /* ---------- Tier legend strip ---------- */
 .tier-legend {
   display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
@@ -159,9 +164,8 @@ footer.site-footer {
   width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
 }
 .tier-legend-item.foundations .swatch { background: var(--accent-secondary); }
-.tier-legend-item.core        .swatch { background: var(--accent-primary); }
+.tier-legend-item.concepts    .swatch { background: var(--accent-primary); }
 .tier-legend-item.applied     .swatch { background: #c08030; }
-.tier-legend-item.advanced    .swatch { background: #9b6bb5; }
 
 /* ---------- Audience tagline (kept for compat; tag now inside pill) ---------- */
 .aud-tagline { display: none; }

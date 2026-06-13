@@ -49,16 +49,17 @@
   #edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   #edges path { transition: stroke .45s ease, stroke-opacity .45s ease; }
   #edges path.off { stroke-opacity: 0.1; }
-  /* tier swimlane labels in the canvas */
+  /* tier swimlane labels — rotated 90° to save horizontal space */
   .swimlane-label {
-    position: absolute; left: 4px; font-size: 9px; font-weight: 600; letter-spacing: 1.8px;
-    text-transform: uppercase; opacity: 0.45; pointer-events: none; white-space: nowrap;
-    transform: translateY(-50%);
+    position: absolute; left: 3px; font-size: 8.5px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; opacity: 0.4; pointer-events: none; white-space: nowrap;
+    writing-mode: vertical-lr;
+    transform: translateY(-50%) rotate(180deg);
+    transform-origin: center center;
   }
   .swimlane-label.foundations { color: var(--accent-secondary); }
-  .swimlane-label.core        { color: var(--accent-dark); }
+  .swimlane-label.concepts    { color: var(--accent-dark); }
   .swimlane-label.applied     { color: #c08030; }
-  .swimlane-label.advanced    { color: #9b6bb5; }
 
   .node {
     position: absolute; width: 168px; height: 64px;
@@ -163,9 +164,8 @@
   </div>
   <div class="tier-legend" id="tier-legend">
     <div class="tier-legend-item foundations"><div class="swatch"></div><span id="tl-foundations">Foundations</span></div>
-    <div class="tier-legend-item core">       <div class="swatch"></div><span id="tl-core">Concepts</span></div>
+    <div class="tier-legend-item concepts">   <div class="swatch"></div><span id="tl-concepts">Concepts</span></div>
     <div class="tier-legend-item applied">    <div class="swatch"></div><span id="tl-applied">Applications</span></div>
-    <div class="tier-legend-item advanced">   <div class="swatch"></div><span id="tl-advanced">Specializations</span></div>
   </div>
 </div>
 
@@ -243,9 +243,8 @@ function positionNodes() {
   const TL = STRINGS[lang].tier_label;
   const swimlanes = [
     { tier:"foundations", y: 0      },
-    { tier:"core",        y: 1.6    },
-    { tier:"applied",     y: 3.65   },
-    { tier:"advanced",    y: 4.9    },
+    { tier:"concepts",    y: 1.75   },
+    { tier:"applied",     y: 4.3    },
   ];
   for (const { tier, y } of swimlanes) {
     const lbl = document.createElement("div");
@@ -431,7 +430,7 @@ function applyLang() {
 
   // Tier legend
   const TL = S.tier_label;
-  ["foundations","core","applied","advanced"].forEach(t => {
+  ["foundations","concepts","applied"].forEach(t => {
     const el = document.getElementById("tl-" + t);
     if (el) el.textContent = TL[t] || t;
   });

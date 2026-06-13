@@ -39,18 +39,16 @@ const AUD_LABEL   = { student: "Student",   executive: "Executive",        publi
 const AUD_TAGLINE = { student: "build AI",  executive: "lead with AI",     public: "use AI"         };
 const AUD_TAGLINE_FA = { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" };
 
-/* ---------- Tier display names ---------- */
+/* ---------- Tier display names (3-tier: foundations / concepts / applications) ---------- */
 const TIER_LABEL = {
   foundations: "Foundations",
-  core:        "Concepts",
+  concepts:    "Concepts",
   applied:     "Applications",
-  advanced:    "Specializations",
 };
 const TIER_LABEL_FA = {
   foundations: "مبانی",
-  core:        "مفاهیم",
+  concepts:    "مفاهیم",
   applied:     "کاربردها",
-  advanced:    "تخصصی",
 };
 
 /* ---------- i18n string tables ---------- */
@@ -60,7 +58,7 @@ const STRINGS = {
     lang_btn: "فا",
     audience: { student: "Student", executive: "Executive", public: "Public" },
     tagline:  { student: "build AI", executive: "lead with AI", public: "use AI" },
-    tier_label: TIER_LABEL,
+    tier_label: { foundations:"Foundations", concepts:"Concepts", applied:"Applications" },
     views: { map: "Skill tree", path: "Your path" },
     map_title: "The AI Learning Map",
     map_subtitle: "One coherent path from mathematical foundations to production AI systems — at the right depth for who you are. Each module, three ways in:",
@@ -99,7 +97,7 @@ const STRINGS = {
     lang_btn: "EN",
     audience: { student: "دانشجو", executive: "مدیر اجرایی", public: "عموم" },
     tagline:  { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" },
-    tier_label: TIER_LABEL_FA,
+    tier_label: { foundations:"مبانی", concepts:"مفاهیم", applied:"کاربردها" },
     views: { map: "درخت مهارت", path: "مسیر شما" },
     map_title: "نقشه یادگیری هوش مصنوعی",
     map_subtitle: "یک مسیر منسجم از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب برای شما. هر ماژول، سه روش:",
@@ -205,7 +203,7 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   // ---- Core / Concepts ----
-  { id:"c-intro", tier:"core", mini:true, short:"AI",
+  { id:"c-intro", tier:"concepts", mini:true, short:"AI",
     title:"Intro to AI", sub:"what it is & why it matters",
     title_fa:"مقدمه هوش مصنوعی", sub_fa:"چیستی و چرایی",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
@@ -214,22 +212,22 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"c-ml", tier:"core", short:"ML",
-    title:"Classical ML", sub:"KNN → ensembles → SVMs",
-    title_fa:"یادگیری ماشین کلاسیک", sub_fa:"KNN تا SVM",
-    blurb:"Supervised learning end-to-end: KNN, decision trees, ensembles, linear regression, linear classification, logistic regression and SVMs. The running thread: linear models and linear separability — and where they break.",
-    blurb_fa:"یادگیری با نظارت از ابتدا تا انتها: KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، طبقه‌بندی خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
+  { id:"c-ml", tier:"concepts", short:"ML",
+    title:"Supervised Learning", sub:"regression, classification, ensembles",
+    title_fa:"یادگیری با نظارت", sub_fa:"رگرسیون، طبقه‌بندی، مجموعه‌ها",
+    blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
+    blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["c-intro"],
     resources:[
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
-  { id:"c-nn", tier:"core", short:"NN",
-    title:"Neural Networks", sub:"beyond linear separability",
-    title_fa:"شبکه‌های عصبی", sub_fa:"فراتر از جداسازی خطی",
-    blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent. The answer to “what if the data isn’t linearly separable?”",
-    blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی. پاسخ به: «اگر داده‌ها به طور خطی جدا نشوند چه؟»",
+  { id:"c-nn", tier:"concepts", short:"DL",
+    title:"Deep Learning", sub:"neural nets, backprop, transformers",
+    title_fa:"یادگیری عمیق", sub_fa:"شبکه‌های عصبی، پس‌انتشار، ترانسفورمر",
+    blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent — then deeper: depth, regularization, and the transformer architecture.",
+    blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
     aud:["student","executive"], prereqs:["c-ml"],
     resources:[
       { title:"3Blue1Brown — Neural Networks", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
@@ -279,7 +277,7 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   // ---- Advanced / Specializations ----
-  { id:"x-prob", tier:"advanced", short:"Pr",
+  { id:"x-prob", tier:"concepts", short:"Pr",
     title:"Probabilistic & Causal AI", sub:"Bayes, uncertainty, causality",
     title_fa:"هوش مصنوعی احتمالی", sub_fa:"بیز، عدم قطعیت، علیت",
     blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
@@ -288,30 +286,30 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-unsup", tier:"advanced", short:"Un",
+  { id:"x-unsup", tier:"concepts", short:"Un",
     title:"Unsupervised Learning", sub:"PCA, clustering, embeddings",
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
-    aud:["student"], prereqs:["c-ml"],
+    aud:["student"], prereqs:["c-intro"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rl", tier:"advanced", short:"RL",
-    title:"Reinforcement Learning", sub:"primer → module",
-    title_fa:"یادگیری تقویتی", sub_fa:"مقدمه",
-    blurb:"From a brief primer to a full module: MDPs, value functions, policy gradients.",
-    blurb_fa:"از مقدمه‌ای کوتاه تا یک ماژول کامل: MDP، توابع ارزش، گرادیان سیاست.",
-    aud:["student"], prereqs:["c-nn"],
+  { id:"x-rl", tier:"concepts", short:"RL",
+    title:"Reinforcement Learning", sub:"MDPs, value functions, policy gradient",
+    title_fa:"یادگیری تقویتی", sub_fa:"MDP، توابع ارزش، گرادیان سیاست",
+    blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
+    blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
+    aud:["student"], prereqs:["c-intro"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rai", tier:"advanced", short:"RAI",
+  { id:"x-rai", tier:"concepts", short:"RAI",
     title:"Responsible AI", sub:"governance, risk, compliance",
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"حاکمیت و ریسک",
     blurb:"Lead AI responsibly: governance, risk and compliance, responsible-AI principles, privacy, security and policy, industry cases.",
     blurb_fa:"رهبری مسئولانه هوش مصنوعی: حاکمیت، ریسک و انطباق، اصول AI مسئولانه، حریم خصوصی، امنیت و سیاست.",
-    aud:["executive"], prereqs:["a-systems"],
+    aud:["executive"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
@@ -319,23 +317,38 @@ const MODULES = [
 const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 
 /* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
+/* Layout: bottom=foundations, middle=concepts blob, top=applications
+   Row y-values:
+     0.0  — foundations row
+     0.9  — Intro to AI gateway (mini)
+     1.75 — concepts row 1: Supervised ML  |  Unsupervised  |  RL
+     2.65 — concepts row 2: Prob & Causal  |  Deep Learning  |  Responsible AI
+     3.65 — applications row 1: Computer Vision  |  Language Models
+     4.45 — applications row 2: AI Agents
+     5.2  — applications row 3: AI Systems & MLOps
+*/
 const LAYOUT = {
+  // ── Foundations ──────────────────────────────────────────────
   "f-la":      { x: 10, y: 0    },
   "f-calc":    { x: 30, y: 0    },
   "f-prob":    { x: 50, y: 0    },
   "f-opt":     { x: 70, y: 0    },
   "f-prog":    { x: 90, y: 0    },
+  // ── Concepts (gateway) ───────────────────────────────────────
   "c-intro":   { x: 50, y: 0.9  },
-  "c-ml":      { x: 30, y: 1.55 },
-  "c-nn":      { x: 52, y: 2.4  },
-  "x-unsup":   { x: 10, y: 2.95 },
-  "a-vision":  { x: 30, y: 3.35 },
-  "a-nlp":     { x: 62, y: 3.35 },
-  "x-prob":    { x: 12, y: 3.95 },
-  "a-agents":  { x: 82, y: 4.1  },
-  "x-rl":      { x: 36, y: 4.4  },
-  "a-systems": { x: 62, y: 4.85 },
-  "x-rai":     { x: 82, y: 5.55 },
+  // ── Concepts row 1 ───────────────────────────────────────────
+  "x-unsup":   { x: 20, y: 1.75 },
+  "c-ml":      { x: 50, y: 1.75 },
+  "x-rl":      { x: 80, y: 1.75 },
+  // ── Concepts row 2 ───────────────────────────────────────────
+  "x-prob":    { x: 20, y: 2.65 },
+  "c-nn":      { x: 50, y: 2.65 },
+  "x-rai":     { x: 80, y: 2.65 },
+  // ── Applications ─────────────────────────────────────────────
+  "a-vision":  { x: 25, y: 3.65 },
+  "a-nlp":     { x: 75, y: 3.65 },
+  "a-agents":  { x: 75, y: 4.45 },
+  "a-systems": { x: 50, y: 5.2  },
 };
 
 const EDGES = (() => {
