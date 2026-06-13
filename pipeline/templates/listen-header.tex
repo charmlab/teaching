@@ -1,0 +1,10 @@
+% listen-header.tex — included in every Listen PDF
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhead[L]{\small The AI Learning Map}
+\fancyhead[R]{\small teaching.amirhkarimi.com}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.2pt}
+% quote blocks (tier asides) get a left rule
+\usepackage{etoolbox}
+\AtBeginEnvironment{quote}{\small}

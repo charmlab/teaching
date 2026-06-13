@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The AI Learning Map &middot; Amir-Hossein Karimi</title>
+<link href="https://fonts.googleapis.com/css?family=Raleway:400,300,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<style>
+  /* ---------- Hero ---------- */
+  header.hero { padding: 52px 0 20px; text-align: center; }
+  .working-title {
+    display: inline-block; font-size: 10.5px; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+    border: 1px dashed #ccc; border-radius: var(--radius-pill);
+    padding: 3px 12px; margin-bottom: 16px;
+  }
+  h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 600; letter-spacing: -1px; line-height: 1.15; }
+  .subtitle { max-width: 600px; margin: 14px auto 0; color: var(--muted); font-size: 16px; font-weight: 300; }
+  .ingredients-strip { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
+  .ingredients-strip span {
+    font-size: 12.5px; background: #fff; border: 1px solid var(--line);
+    border-radius: var(--radius-pill); padding: 5px 14px;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls { padding: 18px 0 6px; }
+  .controls-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill {
+    border: 1px solid #ccc; background: #fff; border-radius: var(--radius-pill);
+    padding: 6px 18px; font-size: 13px; font-weight: 600; letter-spacing: 0.4px;
+    cursor: pointer; color: var(--muted); transition: all .15s; font-family: inherit;
+  }
+  .pill:hover { border-color: var(--accent-primary); color: var(--accent-dark); }
+  .pill.active { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; }
+
+  /* ---------- Skill tree canvas ---------- */
+  #map-scroll { overflow-x: auto; }
+  #map { position: relative; min-width: 720px; margin: 14px auto 0; }
+  #edges { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #edges path { transition: stroke .45s ease, stroke-opacity .45s ease; }
+  #edges path.off { stroke-opacity: 0.25; }
+  .node {
+    position: absolute; width: 168px; height: 64px;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+    text-align: center; cursor: pointer; padding: 6px 12px;
+    transition: opacity .45s ease, filter .45s ease, transform .15s ease, box-shadow .15s ease;
+    z-index: 2;
+  }
+  .node:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); border-color: var(--accent-primary); }
+  .node .t { font-weight: 600; font-size: 13.5px; line-height: 1.25; }
+  .node .s { font-size: 11px; color: var(--muted); margin-top: 2px; font-weight: 400; }
+  .node[data-tier="foundations"] { border-bottom: 3px solid var(--accent-secondary); }
+  .node[data-tier="core"]        { border-bottom: 3px solid var(--accent-primary); }
+  .node[data-tier="applied"]     { border-bottom: 3px solid #b8842b; }
+  .node[data-tier="advanced"]    { border-bottom: 3px solid #c0626a; }
+  .node.inactive { opacity: 0.28; filter: grayscale(1); box-shadow: none; }
+  .node.inactive:hover { opacity: 0.8; filter: grayscale(0.3); }
+  .node.pulse { animation: pulse 1.2s ease 3; border-color: var(--accent-primary); }
+  @keyframes pulse {
+    0%, 100% { box-shadow: var(--shadow-card); }
+    50% { box-shadow: 0 0 0 10px rgba(51, 195, 240, 0.25); }
+  }
+
+  /* ---------- Path view ---------- */
+  #path { display: none; padding: 26px 0 30px; max-width: 620px; margin: 0 auto; }
+  .path-hint { text-align: center; color: var(--muted); font-size: 13.5px; margin-bottom: 26px; font-weight: 300; }
+  .step { display: flex; gap: 18px; position: relative; padding-bottom: 36px; }
+  .step:last-child { padding-bottom: 0; }
+  .step::before {
+    content: ""; position: absolute; left: 26px; top: 54px; bottom: 0;
+    border-left: 3px dotted #d8d8d8;
+  }
+  .step:last-child::before { display: none; }
+  .step-num {
+    flex: 0 0 54px; height: 54px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 17px; color: #fff; background: var(--accent-primary);
+    box-shadow: 0 3px 0 var(--accent-dark); z-index: 2;
+  }
+  .step.alt .step-num { background: var(--accent-secondary); box-shadow: 0 3px 0 #2e7c7a; }
+  .step.bonus .step-num { background: #b8842b; box-shadow: 0 3px 0 #8f6315; font-size: 19px; }
+  .step-card {
+    flex: 1; background: #fff; border: 1px solid var(--line); border-radius: var(--radius-card);
+    padding: 13px 18px; cursor: pointer; transition: all .15s; box-shadow: var(--shadow-card);
+  }
+  .step-card:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-card-hover); }
+  .step-card .where { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+  .step-card .t { font-weight: 600; font-size: 15.5px; margin-top: 1px; }
+  .step-card .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  /* ---------- Ingredient popup ---------- */
+  #popup h2 { font-size: 21px; font-weight: 600; margin-bottom: 2px; }
+  #popup .blurb { color: var(--muted); font-size: 13.5px; margin: 10px 0 16px; }
+  .ing-option {
+    display: flex; align-items: center; gap: 14px;
+    border: 1px solid var(--line); border-radius: var(--radius-card);
+    padding: 13px 16px; margin-bottom: 10px; cursor: pointer; transition: all .15s;
+    color: var(--text);
+  }
+  .ing-option:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-card); color: var(--text); }
+  .ing-option .icon { font-size: 24px; }
+  .ing-option .h { font-weight: 600; font-size: 14.5px; }
+  .ing-option .h em { font-style: normal; color: var(--accent-dark); font-weight: 400; font-size: 13px; }
+  .ing-option .d { font-size: 12.5px; color: var(--muted); }
+
+  /* ---------- Quiz ---------- */
+  #quiz h2 { font-size: 20px; font-weight: 600; }
+  #quiz .fa { font-size: 13px; color: var(--muted); }
+  #quiz .q { margin-top: 18px; font-weight: 600; font-size: 14.5px; }
+  #quiz .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+  #quiz .opts button {
+    text-align: left; border: 1px solid var(--line); background: #fff;
+    border-radius: var(--radius-pill); padding: 9px 14px; font-size: 13.5px;
+    cursor: pointer; font-family: inherit; transition: all .15s;
+  }
+  #quiz .opts button:hover, #quiz .opts button.sel {
+    border-color: var(--accent-primary); background: #f2fbfe;
+  }
+  #quiz .result { margin-top: 18px; padding: 14px 16px; background: #f2fbfe; border-radius: var(--radius-card); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="wrap inner">
+    <span class="brand">Amir-Hossein Karimi &middot; <span class="teaching">Teaching</span></span>
+    <span class="links">
+      <a href="#" id="quiz-link">Find your level &middot; &#x062A;&#x0639;&#x06CC;&#x06CC;&#x0646; &#x0633;&#x0637;&#x062D;</a>
+      <a href="https://amirhkarimi.com" target="_blank">amirhkarimi.com</a>
+    </span>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="working-title">working title &middot; teaching.amirhkarimi.com</div>
+  <h1>The AI Learning Map</h1>
+  <p class="subtitle">One coherent path from mathematical foundations to production AI systems &mdash; at the right depth for who you are. Each module, three ways in:</p>
+  <div class="ingredients-strip">
+    <span>&#127911; <b>Listen</b> for concepts</span>
+    <span>&#127918; <b>Play</b> for intuition</span>
+    <span>&#128296; <b>Build</b> for mastery</span>
+  </div>
+</header>
+
+<div class="controls wrap">
+  <div class="controls-inner">
+    <div class="pills" id="audience-pills">
+      <button class="pill" data-aud="student">Student</button>
+      <button class="pill" data-aud="executive">Executive</button>
+    </div>
+    <div class="pills" id="view-pills">
+      <button class="pill active" data-view="map">Skill tree</button>
+      <button class="pill" data-view="path">Your path</button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div id="map-scroll">
+    <div id="map"><svg id="edges"></svg></div>
+  </div>
+  <div id="path">
+    <p class="path-hint" id="path-hint"></p>
+    <div id="path-steps"></div>
+  </div>
+</main>
+
+<div class="overlay" id="popup-overlay">
+  <div class="modal" id="popup"></div>
+</div>
+
+<div class="overlay" id="quiz-overlay">
+  <div class="modal" id="quiz"></div>
+</div>
+
+<footer class="site-footer">
+  <div class="wrap">Sequence may evolve based on feedback and emerging technology. &middot; &copy; 2026 Amir-Hossein Karimi</div>
+</footer>
+
+<script src="data.js"></script>
+<script>
+const CARD_W = 168, CARD_H = 64, UNIT_Y = 104, PAD = 18;
+let audience = getAudience();
+let view = "map";
+
+/* ---------- build nodes once (shared layout, fixed positions) ---------- */
+const map = document.getElementById("map");
+for (const m of MODULES) {
+  const el = document.createElement("div");
+  el.className = "node";
+  el.dataset.id = m.id;
+  el.dataset.tier = m.tier;
+  el.innerHTML = `<div class="t">${m.title}</div><div class="s">${m.sub}</div>`;
+  el.addEventListener("click", () => openPopup(m.id));
+  map.appendChild(el);
+}
+
+function mapHeight() {
+  const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y));
+  return maxY * UNIT_Y + CARD_H + 2 * PAD;
+}
+function positionNodes() {
+  const W = map.clientWidth, H = mapHeight();
+  map.style.height = H + "px";
+  for (const id of Object.keys(LAYOUT)) {
+    const el = map.querySelector(`.node[data-id="${id}"]`);
+    const p = LAYOUT[id];
+    el.style.left = Math.max(4, Math.min((p.x / 100) * W - CARD_W / 2, W - CARD_W - 4)) + "px";
+    el.style.top = (H - PAD - CARD_H - p.y * UNIT_Y) + "px";
+  }
+  drawEdges();
+}
+function drawEdges() {
+  const svg = document.getElementById("edges");
+  const W = map.clientWidth, H = map.clientHeight;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.innerHTML = "";
+  for (const [from, to] of EDGES) {
+    const a = map.querySelector(`.node[data-id="${from}"]`);
+    const b = map.querySelector(`.node[data-id="${to}"]`);
+    const x1 = a.offsetLeft + CARD_W / 2, y1 = a.offsetTop;            // top of prereq
+    const x2 = b.offsetLeft + CARD_W / 2, y2 = b.offsetTop + CARD_H;   // bottom of dependent
+    const my = (y1 + y2) / 2;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `M ${x1} ${y1} C ${x1} ${my}, ${x2} ${my}, ${x2} ${y2}`);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#c5ccd1");
+    path.setAttribute("stroke-width", "1.5");
+    path.dataset.from = from; path.dataset.to = to;
+    svg.appendChild(path);
+  }
+  applyAudience();
+}
+
+/* ---------- audience: same positions, (de)activate with animation ---------- */
+function isActive(id) { return byId[id].aud.includes(audience); }
+function applyAudience() {
+  for (const m of MODULES) {
+    map.querySelector(`.node[data-id="${m.id}"]`).classList.toggle("inactive", !isActive(m.id));
+  }
+  document.querySelectorAll("#edges path").forEach(p =>
+    p.classList.toggle("off", !isActive(p.dataset.from) || !isActive(p.dataset.to)));
+}
+function syncAudiencePills() {
+  document.querySelectorAll("#audience-pills .pill")
+    .forEach(p => p.classList.toggle("active", p.dataset.aud === audience));
+}
+document.getElementById("audience-pills").addEventListener("click", e => {
+  const btn = e.target.closest(".pill"); if (!btn) return;
+  audience = btn.dataset.aud;
+  setAudience(audience);
+  track("audience_toggle", { audience });
+  syncAudiencePills();
+  applyAudience();
+  renderPath();
+});
+
+/* ---------- view toggle ---------- */
+document.getElementById("view-pills").addEventListener("click", e => {
+  const btn = e.target.closest(".pill"); if (!btn) return;
+  view = btn.dataset.view;
+  track("view_toggle", { view });
+  document.querySelectorAll("#view-pills .pill").forEach(p => p.classList.toggle("active", p === btn));
+  document.getElementById("map-scroll").style.display = view === "map" ? "block" : "none";
+  document.getElementById("path").style.display = view === "path" ? "block" : "none";
+  if (view === "map") positionNodes(); else renderPath();
+});
+
+/* ---------- path view ---------- */
+function renderPath() {
+  const cfg = PATHS[audience];
+  document.getElementById("path-hint").textContent = cfg.hint;
+  const wrap = document.getElementById("path-steps");
+  wrap.innerHTML = "";
+  cfg.steps.forEach((s, i) => {
+    const m = byId[s.id];
+    const div = document.createElement("div");
+    div.className = "step" + (i % 2 ? " alt" : "") + (s.bonus ? " bonus" : "");
+    div.innerHTML = `<div class="step-num">${s.bonus ? "★" : i + 1}</div>
+      <div class="step-card">
+        <div class="where">${s.where}</div>
+        <div class="t">${m.title}</div>
+        <div class="d">${m.sub}</div>
+      </div>`;
+    div.querySelector(".step-card").addEventListener("click", () => openPopup(m.id));
+    wrap.appendChild(div);
+  });
+}
+
+/* ---------- ingredient popup ---------- */
+const RES_ICON = { video: "\u{1F3A5}", website: "\u{1F310}", pdf: "\u{1F4C4}", book: "\u{1F4D8}" };
+function openPopup(id) {
+  const m = byId[id];
+  track("module_popup", { module_id: id, audience });
+  let body;
+  if (m.ref) {
+    /* Reference module: no Listen/Play/Build — point to the best teachers out there */
+    body = `
+      <p class="blurb">${m.blurb}</p>
+      <p class="blurb" style="font-style:italic">Reference module &mdash; no original content here for now. Learn this from the excellent resources below.</p>
+      ${m.resources.map(r => `
+        <a class="ing-option" href="${r.url}" target="_blank" rel="noopener"
+           onclick="track('resource_click',{module_id:'${m.id}',resource:'${r.url}'})">
+          <span class="icon">${RES_ICON[r.type] || RES_ICON.website}</span>
+          <span>
+            <div class="h">${r.title}</div>
+            <div class="d">${r.url.replace(/^https?:\/\//, "")}</div>
+          </span>
+        </a>`).join("")}`;
+  } else {
+    body = `
+      <p class="blurb">${m.blurb}</p>
+      ${Object.entries(ING_META).map(([k, meta]) => `
+        <a class="ing-option" href="module.html?id=${m.id}&mode=${k}"
+           onclick="track('ingredient_select',{module_id:'${m.id}',ingredient:'${k}'})">
+          <span class="icon">${meta.icon}</span>
+          <span>
+            <div class="h">${meta.name} <em>&mdash; ${meta.tag}</em></div>
+            <div class="d">${meta.desc}</div>
+          </span>
+        </a>`).join("")}`;
+  }
+  document.getElementById("popup").innerHTML = `
+    <button class="close" onclick="closeOverlays()">&times;</button>
+    <h2>${m.title}</h2>
+    ${m.aud.map(a => `<span class="chip aud">${AUD_LABEL[a]}</span>`).join("")}
+    ${body}`;
+  document.getElementById("popup-overlay").classList.add("open");
+}
+function closeOverlays() {
+  document.querySelectorAll(".overlay").forEach(o => o.classList.remove("open"));
+}
+document.querySelectorAll(".overlay").forEach(o =>
+  o.addEventListener("click", e => { if (e.target === o) closeOverlays(); }));
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeOverlays(); });
+
+/* ---------- placement quiz (تعیین سطح) ---------- */
+const QUIZ = [
+  { q: "What brings you here?", key: "goal",
+    opts: [["Course credit or deep technical understanding", "student"],
+           ["Applying AI at work / leading teams", "executive"]] },
+  { q: "Comfort with linear algebra & calculus?", key: "math",
+    opts: [["Comfortable — I can take gradients in my sleep", "ok"],
+           ["Rusty — a refresher would help", "rusty"]] },
+  { q: "Have you trained an ML model before?", key: "ml",
+    opts: [["Yes — I've fit models and evaluated them", "yes"],
+           ["Not really / only tutorials", "no"]] },
+];
+const quizAns = {};
+function renderQuiz() {
+  const el = document.getElementById("quiz");
+  const done = QUIZ.every(q => quizAns[q.key]);
+  let rec = null;
+  if (done) {
+    const aud = quizAns.goal;
+    const start = quizAns.math === "rusty" ? "f-la" : (quizAns.ml === "yes" ? "c-nn" : "c-ml");
+    rec = { aud, start };
+  }
+  el.innerHTML = `
+    <button class="close" onclick="closeOverlays()">&times;</button>
+    <h2>Find your level</h2>
+    <div class="fa">&#x062A;&#x0639;&#x06CC;&#x06CC;&#x0646; &#x0633;&#x0637;&#x062D; &mdash; three quick questions to place you on the map.</div>
+    ${QUIZ.map(q => `
+      <div class="q">${q.q}</div>
+      <div class="opts">${q.opts.map(([label, val]) => `
+        <button class="${quizAns[q.key] === val ? "sel" : ""}"
+          onclick="quizAns['${q.key}']='${val}'; renderQuiz()">${label}</button>`).join("")}
+      </div>`).join("")}
+    ${rec ? `
+      <div class="result">
+        We suggest the <b>${AUD_LABEL[rec.aud]}</b> path, starting at <b>${byId[rec.start].title}</b>.
+        <div style="margin-top:10px">
+          <button class="btn primary" onclick="applyQuiz('${rec.aud}','${rec.start}')">Show me</button>
+        </div>
+      </div>` : ""}`;
+}
+function applyQuiz(aud, start) {
+  closeOverlays();
+  track("quiz_complete", { audience: aud, start_module: start });
+  audience = aud; setAudience(aud);
+  syncAudiencePills();
+  applyAudience();
+  renderPath();
+  setTimeout(() => {
+    const el = map.querySelector(`.node[data-id="${start}"]`);
+    el.classList.add("pulse");
+    if (el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => el.classList.remove("pulse"), 4000);
+  }, 400);
+}
+document.getElementById("quiz-link").addEventListener("click", e => {
+  e.preventDefault(); renderQuiz();
+  document.getElementById("quiz-overlay").classList.add("open");
+});
+if (!localStorage.getItem("alm-visited")) {
+  localStorage.setItem("alm-visited", "1");
+  renderQuiz();
+  document.getElementById("quiz-overlay").classList.add("open");
+}
+
+/* ---------- init ---------- */
+syncAudiencePills();
+positionNodes();
+window.addEventListener("resize", () => { if (view === "map") positionNodes(); });
+</script>
+</body>
+</html>

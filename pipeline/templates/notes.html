@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>$if(title)$$title$$else$Notes$endif$ &middot; The AI Learning Map</title>
+<link href="https://fonts.googleapis.com/css?family=Raleway:400,300,600&display=swap" rel="stylesheet">
+$if(math)$
+$math$
+$endif$
+<style>
+  :root {
+    --accent: #33c3f0; --accent-dark: #1EAEDB; --text: #222; --muted: #777;
+    --line: #e8e8e8; --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Raleway", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--text); margin: 0; line-height: 1.65; font-size: 15.5px; background: #fff;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  .topbar {
+    position: sticky; top: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line); padding: 12px 24px; z-index: 50;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+  }
+  .topbar .brand { font-weight: 600; font-size: 14px; }
+  .topbar .brand span { color: var(--accent); }
+  .tier-toggle { display: flex; gap: 6px; }
+  .tier-toggle button {
+    border: 1px solid #ccc; background: #fff; border-radius: 8px; padding: 5px 14px;
+    font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer;
+  }
+  .tier-toggle button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  main { max-width: 760px; margin: 0 auto; padding: 36px 24px 80px; }
+  h1 { font-weight: 600; letter-spacing: -0.8px; }
+  h2 { font-weight: 600; letter-spacing: -0.4px; margin-top: 2em; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  #TOC { font-size: 13.5px; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 26px; background: #fafafa; }
+  #TOC ul { margin: 4px 0; }
+  .student, .deep, .example, .widget, .build, .animation {
+    border-radius: var(--radius); padding: 14px 18px; margin: 18px 0; position: relative;
+  }
+  .student, .deep, .example { border: 1px solid var(--line); }
+  .student::before, .deep::before, .example::before, .widget::before, .build::before, .animation::before {
+    display: block; font-size: 10.5px; letter-spacing: 1.5px; text-transform: uppercase;
+    font-weight: 600; margin-bottom: 6px;
+  }
+  .student { background: #f4fbfe; }
+  .student::before { content: "Student tier"; color: var(--accent-dark); }
+  .deep { background: #fbf7ef; }
+  .deep::before { content: "For the interested reader"; color: #b8842b; }
+  .example { background: #f7faf7; }
+  .example::before { content: "Example"; color: #2e7c4f; }
+  .widget, .animation { border: 1.5px dashed #cdd6da; background: #fbfdfe; }
+  .widget::before { content: "\1F3AE  Interactive component — coming soon"; color: var(--muted); }
+  .animation::before { content: "\1F3AC  Animation (Manim) — coming soon"; color: var(--muted); }
+  .widget, .animation { color: var(--muted); font-size: 13.5px; }
+  .build { border: 1.5px dashed #d8cdb6; background: #fefcf8; }
+  .build::before { content: "\1F528  Build exercise — see the notebook"; color: #8f6315; }
+  body[data-tier="core"] .student, body[data-tier="core"] .deep { display: none; }
+  body[data-tier="student"] .deep { display: none; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 30px 0; border-top: 1px solid var(--line); }
+</style>
+</head>
+<body data-tier="full">
+<div class="topbar">
+  <span class="brand">Amir-Hossein Karimi &middot; <span>Teaching</span></span>
+  <div class="tier-toggle">
+    <button data-t="core">Executive</button>
+    <button data-t="student">Student</button>
+    <button data-t="full" class="active">Everything</button>
+  </div>
+</div>
+<main>
+$if(title)$<h1>$title$</h1>$endif$
+$if(toc)$$table-of-contents$$endif$
+$body$
+</main>
+<footer>The AI Learning Map &middot; compiled from content.md</footer>
+<script>
+document.querySelectorAll(".tier-toggle button").forEach(b => b.addEventListener("click", () => {
+  document.body.dataset.tier = b.dataset.t;
+  document.querySelectorAll(".tier-toggle button").forEach(x => x.classList.toggle("active", x === b));
+}));
+</script>
+</body>
+</html>

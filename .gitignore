@@ -1,0 +1,9 @@
+# raw lecture materials stay local — this repo is PUBLIC (GitHub Pages)
+modules/*/sources/*
+!modules/*/sources/.gitkeep
+modules/*/EXTRACTION_JOB.md
+
+# generated outputs (rebuild with make)
+modules/*/out/
+
+.DS_Store
