@@ -64,11 +64,11 @@
   .swimlane-label.applied     { color: #c08030; }
 
   .node {
-    position: absolute; width: 162px; height: 64px;
+    position: absolute; width: 150px; height: 64px;
     border: 1px solid var(--line); border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-    cursor: pointer; padding: 5px 10px;
+    cursor: pointer; padding: 5px 8px;
     transition: opacity .45s ease, filter .45s ease, transform .15s ease, box-shadow .15s ease;
     z-index: 2;
   }
@@ -219,11 +219,11 @@
 
 <script src="data.js"></script>
 <script>
-const CARD_W = 162, CARD_H = 64, MINI_W = 130, MINI_H = 52, UNIT_Y = 118, PAD = 20;
+const CARD_W = 150, CARD_H = 64, MINI_W = 122, MINI_H = 52, UNIT_Y = 118, PAD = 20;
 const CARD_H_MOB = 50, MINI_H_MOB = 42;  // mobile: no subtitle
 function isMob() { return window.innerWidth < 640; }
 const MAP_REF_W = 560; // natural map width used for mobile scale calc
-const X_SCALE = 0.80;   // horizontal tightening factor (1 = no change)
+const X_SCALE = 0.74;   // horizontal tightening factor (1 = no change)
 const Y_GAP   = 0.55;   // extra UNIT_Y gaps added above foundations row
 let audience = getAudience();
 let view = "map";
