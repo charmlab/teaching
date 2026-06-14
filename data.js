@@ -228,8 +228,8 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-ml", tier:"concepts", short:"ML",
-    title:"Supervised Learning", sub:"nearest neighbors, decision trees, ensembling",
-    title_fa:"یادگیری با نظارت", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، یادگیری گروهی",
+    title:"Classical ML Models", sub:"nearest neighbors, decision trees, ensembling, naive bayes",
+    title_fa:"مدل‌های کلاسیک یادگیری ماشین", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، یادگیری گروهی",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
@@ -239,8 +239,8 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   { id:"c-nn", tier:"concepts", short:"DL",
-    title:"Deep Learning", sub:"linear regression & classification, neural nets, backprop, depth & scale",
-    title_fa:"یادگیری عمیق", sub_fa:"شبکه‌های عصبی، پس‌انتشار، عمق و مقیاس",
+    title:"Linear to Neural Models", sub:"linear and logistic regression, neural nets, backprop, depth & scale",
+    title_fa:"از خطی تا عصبی", sub_fa:"شبکه‌های عصبی، پس‌انتشار، عمق و مقیاس",
     blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent — then deeper: depth, regularization, and the transformer architecture.",
     blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
     aud:["student","executive"], prereqs:["c-ml"],
@@ -306,7 +306,7 @@ const MODULES = [
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
-    aud:["student"], prereqs:["junc-f2c"],
+    aud:["student"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -315,7 +315,7 @@ const MODULES = [
     title_fa:"یادگیری تقویتی", sub_fa:"باندیت‌ها، MDP، توابع ارزش، گرادیان سیاست",
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
-    aud:["student"], prereqs:["junc-f2c"],
+    aud:["student"], prereqs:["c-ml"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -355,12 +355,12 @@ const LAYOUT = {
   "f-opt":     { x: 70, y: 0.9  },
   "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
-  "x-unsup":   { x: 20, y: 1.75 },
-  "c-ml":      { x: 50, y: 1.75 },
-  "x-rl":      { x: 80, y: 1.75 },
+  "x-unsup":   { x: 20, y: 2.65 },
+  "c-ml":      { x: 35, y: 1.75 },
+  "x-rl":      { x: 80, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
-  "c-nn":      { x: 30, y: 2.65 },
-  "x-prob":    { x: 70, y: 2.65 },
+  "c-nn":      { x: 65, y: 1.75 },
+  "x-prob":    { x: 50, y: 2.65 },
   // ── Applications ─────────────────────────────────────────────
   "a-vision":  { x: 25, y: 3.65 },
   "a-nlp":     { x: 75, y: 3.65 },
