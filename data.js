@@ -400,10 +400,10 @@ const LAYOUT = {
   "s-nsai":    { x: 88, y: 5.35 },
   // ── Applications ─────────────────────────────────────────────
   "a-vision":  { x: 15, y: 3.65 },
-  "a-nlp":     { x: 85, y: 3.65 },
-  "a-agents":  { x: 78, y: 4.45 },
-  "a-robotics":{ x: 50, y: 3.65 },
-  "a-systems": { x: 22, y: 4.45 },
+  "a-nlp":     { x: 50, y: 3.65 },
+  "a-agents":  { x: 68, y: 4.45 },
+  "a-robotics":{ x: 85, y: 3.65 },
+  "a-systems": { x: 32, y: 4.45 },
 };
 
 const EDGES = (() => {
