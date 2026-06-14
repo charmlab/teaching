@@ -36,8 +36,8 @@ function setLang(l) { localStorage.setItem("alm-lang", l); }
 
 /* ---------- Audience ---------- */
 const AUD_LABEL   = { student: "🧑🏻‍🎓 Student", executive: "💼 Executive",    public: "🌐 Public"        };
-const AUD_TAGLINE = { student: "build AI",  executive: "lead with AI",     public: "use AI"         };
-const AUD_TAGLINE_FA = { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" };
+const AUD_TAGLINE = { student: "🎯 build AI",  executive: "🎯 lead with AI",  public: "🎯 use AI"       };
+const AUD_TAGLINE_FA = { student: "🎯 هوش مصنوعی بسازید", executive: "🎯 با هوش مصنوعی رهبری کنید", public: "🎯 از هوش مصنوعی استفاده کنید" };
 
 /* ---------- Tier display names (3-tier: foundations / concepts / applications) ---------- */
 const TIER_LABEL = {
@@ -57,7 +57,7 @@ const STRINGS = {
     find_level: "Find your level · تعیین سطح",
     lang_btn: "فا",
     audience: { student: "🧑🏻‍🎓 Student", executive: "💼 Executive", public: "🌐 Public" },
-    tagline:  { student: "build AI", executive: "lead with AI", public: "use AI" },
+    tagline:  { student: "🎯 build AI", executive: "🎯 lead with AI", public: "🎯 use AI" },
     tier_label: { foundations:"Foundations", concepts:"Concepts", applied:"Applications" },
     views: { map: "Skill tree", path: "Your path" },
     map_title: "The AI Learning Map",
@@ -239,7 +239,7 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   { id:"c-nn", tier:"concepts", short:"DL",
-    title:"Deep Learning", sub:"neural nets, backprop, depth & scale",
+    title:"Deep Learning", sub:"linear regression & classification, neural nets, backprop, depth & scale",
     title_fa:"یادگیری عمیق", sub_fa:"شبکه‌های عصبی، پس‌انتشار، عمق و مقیاس",
     blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent — then deeper: depth, regularization, and the transformer architecture.",
     blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
