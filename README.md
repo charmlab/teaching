@@ -1,30 +1,44 @@
-# 📘 ECE 457B | 657: Starter Assignment Files
+# ECE 457B / 657 — Teaching Repository
 
-Welcome to the starter files repository for **Machine Learning** at the University of Waterloo. This repository contains the initial materials you’ll need to begin your course assignments.
+**University of Waterloo · Dr. Amir-Hossein Karimi**
 
-## 📁 Directory Structure
+This repository powers two things:
 
-- `assignment2/` – Starter notebook and scaffolding code for Assignment 2  
-- `assignment3/` – Starter notebook and scaffolding code for Assignment 3
-- `assignment4/` – Starter notebook and scaffolding code for Assignment 4 
-- `README.md` – You’re here!
+## 1. AI Learning Map — [teaching.amirhkarimi.com](https://teaching.amirhkarimi.com)
 
-## 🎯 Purpose
+An interactive skill-tree website for students, executives, and the general public to
+navigate AI/ML topics. Built as a static site (HTML/CSS/JS, no build step).
 
-This repository provides partially implemented code to help you get started with each assignment.  
-Within each notebook, you'll find `TODO` sections that guide you through the required implementations. These are designed to support your understanding of the concepts taught in class.
+**Key files:**
+- `index.html` — skill tree map
+- `module.html` — per-module page (Listen / Play / Build / Quiz)
+- `data.js` — all module content, layout, audience logic
+- `styles.css` — shared styles
+- `modules/{id}/play.html` — interactive playground per module (drop-in)
+- `modules/{id}/assets/` — lecture PDFs (gitignored for raw sources)
 
-## 🧠 Technical Notes
+**To run locally:**
+```bash
+python3 -m http.server 8787
+# open http://localhost:8787
+```
 
-- All code is written in **Python**.
-- Some notebooks may require additional libraries such as:
-  - [`jax`](https://github.com/google/jax)
-  - [`numpy`](https://numpy.org/)
-  - [`torch`](https://pytorch.org/)
-- Please refer to individual assignment instructions or the course documentation for setup and dependencies.
+## 2. Assignment Starter Files (ECE 457B / 657)
 
-## 🙌 Acknowledgments
+Starter notebooks for course assignments. Each folder contains partially implemented
+code with `TODO` sections.
 
-Developed by the **ECE 657 Teaching Team** – Spring 2025  
-- **Instructor**: Professor Amir-Hossein Karimi  
-- **Teaching Assistant**: Arezoo Alipanah
+```
+assignments/
+  assignment-2/   jax.ipynb
+  assignment-3/   MLE.ipynb, Gaussian_Process_Regression.ipynb, RNN_Music_Generation.ipynb
+  assignment-4/   AE.ipynb, bandit_Q.ipynb, Kaggle_starter_code.ipynb
+```
+
+**Dependencies:** Python, `jax`, `numpy`, `torch` (see individual notebooks).
+
+---
+
+**Instructor:** Prof. Amir-Hossein Karimi  
+**Teaching Assistant:** Arezoo Alipanah  
+**Course:** ECE 457B / 657 — Foundations of Computational Intelligence, Spring 2025
