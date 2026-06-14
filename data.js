@@ -355,12 +355,11 @@ const LAYOUT = {
   "f-opt":     { x: 70, y: 0.9  },
   "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
-  "x-unsup":   { x: 20, y: 2.65 },
-  "c-ml":      { x: 35, y: 1.75 },
+  "x-unsup":   { x: 50, y: 2.65 },
+  "c-ml":      { x: 50, y: 1.75 },
   "x-rl":      { x: 80, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
-  "c-nn":      { x: 65, y: 1.75 },
-  "x-prob":    { x: 50, y: 2.65 },
+  "c-nn":      { x: 22, y: 2.65 },
   // ── Applications ─────────────────────────────────────────────
   "a-vision":  { x: 25, y: 3.65 },
   "a-nlp":     { x: 75, y: 3.65 },
