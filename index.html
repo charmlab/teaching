@@ -68,7 +68,7 @@
     border: 1px solid var(--line); border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
-    cursor: pointer; padding: 5px 9px 5px 8px;
+    cursor: pointer; padding: 3px 8px 3px 8px;
     transition: opacity .45s ease, filter .45s ease, transform .15s ease, box-shadow .15s ease;
     z-index: 2;
   }
@@ -351,8 +351,10 @@ function drawEdges() {
   for (const m of MODULES) {
     if (!m.junction || !(m.id in LAYOUT)) continue;
     const p = LAYOUT[m.id];
-    const cx = (p.x / 100) * W;
-    const cy = H - PAD - CARD_H / 2 - p.y * UNIT_Y;
+    const jax = 50 + (p.x - 50) * X_SCALE;
+    const jay = p.y > 0.9 ? p.y + Y_GAP : p.y;
+    const cx = (jax / 100) * W;
+    const cy = H - PAD - CARD_H / 2 - jay * UNIT_Y;
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", cx); circle.setAttribute("cy", cy);
     circle.setAttribute("r", "5");
