@@ -1,18 +1,20 @@
 <!-- Supervised Learning — Interactive Playground
      Injected into module.html #play-content for module c-ml.
-     Components derived from ECE 457B lec 02 (kNN), lec 03 (Decision Trees), lec 07 (Ensembles). -->
+     Components: kNN Explorer, Decision Tree Splitter,
+                 Bias-Variance Dartboard, lp-Norm Shape Explorer.
+     Lecture sources: lec 02 (kNN, lp norms), lec 03 (decision trees), lec 07 (bias-variance). -->
 
 <style>
   .play-card {
     border: 1px solid var(--line); border-radius: var(--radius-card);
     padding: 22px 24px; margin-top: 18px; background: #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
   }
   .play-card-title {
     font-weight: 700; font-size: 15px; margin-bottom: 4px; color: var(--text);
   }
   .play-card-sub {
-    font-size: 12.5px; color: var(--muted); margin-bottom: 14px;
+    font-size: 13px; color: var(--muted); margin-bottom: 14px; line-height: 1.55;
   }
   .play-controls {
     display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
@@ -27,12 +29,14 @@
     border: 1px solid #ccc; border-radius: 6px; padding: 3px 8px;
     font-size: 12.5px; font-family: inherit; cursor: pointer;
   }
-  .play-controls .val-badge {
+  .play-controls .vb {
     background: var(--accent-primary); color: #fff; border-radius: 12px;
     padding: 1px 8px; font-size: 12px; font-weight: 700; min-width: 22px; text-align: center;
   }
-  .play-canvas-wrap { position: relative; }
-  .play-canvas-wrap canvas { display: block; border-radius: 8px; border: 1px solid var(--line); cursor: crosshair; }
+  .play-canvas-wrap canvas {
+    display: block; border-radius: 8px; border: 1px solid var(--line);
+  }
+  .play-canvas-wrap canvas.crosshair { cursor: crosshair; }
   .play-hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
   .play-result {
     margin-top: 10px; padding: 9px 14px; border-radius: 8px; font-size: 13.5px; font-weight: 600;
@@ -42,605 +46,811 @@
   .play-result.lemon { background: #fffbe8; border: 1px solid #e6c840; color: #8a7000; }
   .play-result.orange { background: #fff3e8; border: 1px solid #e89c40; color: #8a4800; }
   .play-result.info  { background: #e8f4fc; border: 1px solid #33c3f0; color: #1565a0; }
-
-  /* coming-soon cards */
-  .play-soon {
-    border: 1.5px dashed #d5d5d5; border-radius: var(--radius-card);
-    padding: 18px 24px; margin-top: 14px; display: flex; align-items: center; gap: 14px;
-    background: #fcfcfc;
+  /* slide context blocks */
+  .slide-ctx {
+    margin-top: 28px; padding: 14px 18px 14px 16px;
+    border-left: 3px solid var(--accent-primary);
+    background: #f8f9fa; border-radius: 0 8px 8px 0;
+    font-size: 13px; color: #444; line-height: 1.6;
   }
-  .play-soon .soon-icon { font-size: 26px; flex-shrink: 0; }
-  .play-soon .soon-title { font-weight: 700; font-size: 13.5px; color: var(--text); }
-  .play-soon .soon-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .soon-chip {
-    display: inline-block; background: var(--wip-soft); color: var(--wip);
-    font-size: 10.5px; font-weight: 700; border-radius: 10px; padding: 1px 8px;
-    letter-spacing: 0.3px; margin-top: 5px;
+  .slide-ctx strong { color: var(--text); }
+  .slide-ctx .src {
+    display: block; margin-top: 8px; font-size: 11px; color: var(--muted);
+    font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
   }
+  /* stats bar */
+  .bv-stats {
+    display: flex; gap: 18px; flex-wrap: wrap; padding: 10px 14px;
+    background: #f8f9fa; border-radius: 8px; margin-top: 12px;
+    font-size: 12.5px;
+  }
+  .bv-stat { display: flex; flex-direction: column; align-items: center; }
+  .bv-stat .bv-val { font-size: 18px; font-weight: 700; color: var(--accent-primary); }
+  .bv-stat .bv-lbl { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
 </style>
 
-<!-- ════════════════════════════════════════════════════════════
+<!-- ═══════════════════════════════════════════════════════════
      COMPONENT 1 — kNN Distance Explorer
-     Source: lec 02 slides 19–21 (Nearest Neighbors, ℓp norms)
-     ════════════════════════════════════════════════════════════ -->
-<div class="play-card">
+     ═══════════════════════════════════════════════════════════ -->
+<div class="slide-ctx">
+  <strong>Nearest Neighbours.</strong>
+  Given a query point <em>x</em>, measure its distance to every training point, keep the <em>k</em> closest,
+  and predict by majority vote. The <em>distance metric</em> determines the shape of the neighbourhood:
+  L¹ gives diamond-shaped balls, L² gives circles, L∞ gives squares. Try switching metrics
+  while watching the neighbourhood region change — the boundary between classes shifts.
+  <span class="src">Lec 02 — Nearest Neighbours &amp; Distance Metrics</span>
+</div>
+
+<div class="play-card" style="margin-top:12px">
   <div class="play-card-title">🔍 k-Nearest Neighbours Explorer</div>
   <div class="play-card-sub">
-    Click anywhere on the canvas to place a query point. The model finds the <em>k</em> closest
-    training examples and predicts by majority vote. Experiment with <em>k</em> and distance metrics
-    — does the prediction change?
+    Click the canvas to place a query point. The model finds the <em>k</em> closest training
+    examples and predicts by majority vote. Toggle &ldquo;Show neighbourhood&rdquo; to see the
+    shape of the decision ball under each metric.
   </div>
-
   <div class="play-controls">
-    <label>
-      k =
-      <input type="range" id="knn-k" min="1" max="9" step="2" value="3">
-      <span class="val-badge" id="knn-k-val">3</span>
-    </label>
-    <label>
-      Distance
+    <label>k = <input type="range" id="knn-k" min="1" max="15" step="2" value="3">
+      <span class="vb" id="knn-k-val">3</span></label>
+    <label>Distance
       <select id="knn-metric">
         <option value="l2">L² (Euclidean)</option>
         <option value="l1">L¹ (Manhattan)</option>
-        <option value="linf">L∞ (Max)</option>
+        <option value="linf">L∞ (Chebyshev)</option>
       </select>
     </label>
-    <label>
-      <input type="checkbox" id="knn-show-ball"> Show neighbourhood
-    </label>
+    <label><input type="checkbox" id="knn-ball"> Show neighbourhood</label>
   </div>
-
   <div class="play-canvas-wrap">
-    <canvas id="knn-canvas" width="660" height="340"></canvas>
+    <canvas id="knn-canvas" class="crosshair" style="width:660px;height:340px"></canvas>
   </div>
-  <div class="play-hint">Click canvas to place / move query point &nbsp;·&nbsp; Training points are fixed.</div>
+  <div class="play-hint">Click canvas to place query point &nbsp;·&nbsp; ▲ Lemons &nbsp; ● Oranges</div>
   <div class="play-result" id="knn-result"></div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     COMPONENT 2 — Decision Tree Splitter (Lemons vs Oranges)
-     Source: lec 03 slides 7–10 (Decision Tree training)
-     ════════════════════════════════════════════════════════════ -->
-<div class="play-card" style="margin-top:22px">
-  <div class="play-card-title">🌿 Decision Tree Splitter — Lemons vs Oranges</div>
+<!-- ═══════════════════════════════════════════════════════════
+     COMPONENT 2 — Decision Tree Splitter
+     ═══════════════════════════════════════════════════════════ -->
+<div class="slide-ctx" style="margin-top:32px">
+  <strong>Decision Trees.</strong>
+  At each internal node, ask a yes/no question about a <em>single feature</em> (e.g.
+  &ldquo;Is width &lt; 6.5 cm?&rdquo;). This recursively partitions the feature space into
+  axis-aligned rectangles. The goal is to choose thresholds that maximise
+  <em>purity</em> — each leaf should contain mostly one class.
+  Drag the sliders to discover which threshold gives the cleanest separation.
+  <span class="src">Lec 03 — Decision Trees, Slides 7–10</span>
+</div>
+
+<div class="play-card" style="margin-top:12px">
+  <div class="play-card-title">🌿 Decision Tree Splitter</div>
   <div class="play-card-sub">
-    Drag the sliders to set the split thresholds on <em>width</em> and <em>height</em>.
-    Each split partitions the feature space into axis-aligned regions, just like a decision tree.
-    Watch your training accuracy update live.
+    Adjust the split thresholds. The tree first splits on <em>width</em>, then applies a
+    second split on <em>height</em> within the narrow branch. Training accuracy updates live.
+    Can you reach 100%?
   </div>
-
   <div class="play-controls">
-    <label>
-      Width split
-      <input type="range" id="dt-width" min="4.0" max="10.0" step="0.1" value="6.5">
-      <span class="val-badge" id="dt-width-val">6.5</span> cm
+    <label>Root — width &lt;
+      <input type="range" id="dt-w" min="4.0" max="10.0" step="0.1" value="6.5">
+      <span class="vb" id="dt-w-val">6.5</span> cm
     </label>
-    <label>
-      Height split (left branch)
-      <input type="range" id="dt-height-l" min="4.0" max="10.5" step="0.1" value="9.5">
-      <span class="val-badge" id="dt-height-l-val">9.5</span> cm
-    </label>
-    <label>
-      Height split (right branch)
-      <input type="range" id="dt-height-r" min="4.0" max="10.5" step="0.1" value="6.0">
-      <span class="val-badge" id="dt-height-r-val">6.0</span> cm
+    <label>Narrow branch — height ≥
+      <input type="range" id="dt-hl" min="4.0" max="11.0" step="0.1" value="6.5">
+      <span class="vb" id="dt-hl-val">6.5</span> cm
     </label>
   </div>
-
   <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
     <div class="play-canvas-wrap">
-      <canvas id="dt-canvas" width="360" height="320"></canvas>
+      <canvas id="dt-scatter" style="width:360px;height:320px"></canvas>
     </div>
-    <div style="flex:1;min-width:200px">
-      <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Tree structure</div>
-      <canvas id="dt-tree-canvas" width="260" height="260"></canvas>
-      <div class="play-result show info" id="dt-result" style="margin-top:10px"></div>
+    <div style="flex:1;min-width:220px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Tree structure</div>
+      <canvas id="dt-tree" style="width:260px;height:240px"></canvas>
+      <div class="play-result show info" id="dt-acc" style="margin-top:10px"></div>
     </div>
   </div>
   <div class="play-hint">
-    Regions: <span style="color:#3c9d9b;font-weight:700">■ Lemon</span> &nbsp;
-    <span style="color:#e8803a;font-weight:700">■ Orange</span>
-    &nbsp;·&nbsp; Misclassified points shown with ✕.
+    <span style="color:#3c9d9b;font-weight:700">▲ Lemon</span>&nbsp;&nbsp;
+    <span style="color:#e8803a;font-weight:700">● Orange</span>
+    &nbsp;·&nbsp; ✕ = misclassified
   </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════════
-     COMING SOON CARDS
-     ════════════════════════════════════════════════════════════ -->
-<div style="margin-top:22px;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase">More coming soon</div>
+<!-- ═══════════════════════════════════════════════════════════
+     COMPONENT 3 — Bias-Variance Dartboard
+     ═══════════════════════════════════════════════════════════ -->
+<div class="slide-ctx" style="margin-top:32px">
+  <strong>Bias-Variance Tradeoff.</strong>
+  Imagine training the same model 50 times on 50 different (bootstrap) samples of data.
+  Each run produces a slightly different prediction for the same test input.
+  <em>Variance</em> is how much those predictions spread. <em>Bias</em> is how far the
+  average prediction sits from the true answer. Small <em>k</em> memorises noise (high variance),
+  large <em>k</em> oversmoothes (high bias). The optimal <em>k</em> balances both.
+  <span class="src">Lec 07 — Bias-Variance Decomposition</span>
+</div>
 
-<div class="play-soon">
-  <div class="soon-icon">🎯</div>
-  <div>
-    <div class="soon-title">Bias–Variance Dartboard</div>
-    <div class="soon-sub">
-      Adjust <em>k</em> in kNN and see how predictions spread across training folds.
-      Low <em>k</em> = high variance; high <em>k</em> = high bias.
-      Directly from the dart-throwing analogy in lec 07.
+<div class="play-card" style="margin-top:12px">
+  <div class="play-card-title">🎯 Bias-Variance Dartboard</div>
+  <div class="play-card-sub">
+    Each dot is the kNN regression prediction from one bootstrap sample of training data,
+    evaluated at a fixed test point (dashed line). The bullseye = true value.
+    Slide <em>k</em> and watch how spread (variance) and offset (bias) change.
+  </div>
+  <div class="play-controls">
+    <label>k = <input type="range" id="bv-k" min="1" max="19" step="2" value="1">
+      <span class="vb" id="bv-k-val">1</span></label>
+  </div>
+  <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div class="play-canvas-wrap">
+      <canvas id="bv-dart" style="width:320px;height:320px"></canvas>
     </div>
-    <div class="soon-chip">In progress</div>
-  </div>
-</div>
-
-<div class="play-soon">
-  <div class="soon-icon">📐</div>
-  <div>
-    <div class="soon-title">ℓp-Norm Shape Explorer</div>
-    <div class="soon-sub">
-      Slide <em>p</em> from 1 → ∞ and watch the unit ball morph from a diamond (L¹) to a
-      circle (L²) to a square (L∞). Compute distances interactively.
+    <div style="flex:1;min-width:220px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Regression fit (one bootstrap)</div>
+      <canvas id="bv-curve" style="width:300px;height:260px"></canvas>
     </div>
-    <div class="soon-chip">Planned</div>
   </div>
-</div>
-
-<div class="play-soon">
-  <div class="soon-icon">🌲</div>
-  <div>
-    <div class="soon-title">Entropy & Information Gain</div>
-    <div class="soon-sub">
-      Build a decision tree step-by-step: choose splits that maximise information gain.
-      Visualises entropy before and after each split. From lec 03 sections 3–4.
+  <div class="bv-stats">
+    <div class="bv-stat"><div class="bv-val" id="bv-bias2">—</div><div class="bv-lbl">Bias²</div></div>
+    <div class="bv-stat"><div class="bv-val" id="bv-var">—</div><div class="bv-lbl">Variance</div></div>
+    <div class="bv-stat"><div class="bv-val" id="bv-mse">—</div><div class="bv-lbl">MSE</div></div>
+    <div class="bv-stat" style="flex:1;align-items:flex-start;padding-top:2px">
+      <div style="font-size:12px;color:var(--muted);line-height:1.5" id="bv-note"></div>
     </div>
-    <div class="soon-chip">Planned</div>
+  </div>
+  <div class="play-hint">50 bootstrap predictions · true function: y = sin(x) · test point at x = π</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     COMPONENT 4 — ℓp-Norm Shape Explorer
+     ═══════════════════════════════════════════════════════════ -->
+<div class="slide-ctx" style="margin-top:32px">
+  <strong>The ℓp Unit Ball.</strong>
+  The ℓp norm of a vector <strong>x</strong> is
+  ‖<strong>x</strong>‖<sub>p</sub> = (|x₁|<sup>p</sup> + |x₂|<sup>p</sup>)<sup>1/p</sup>.
+  The <em>unit ball</em> — the set of all points at distance ≤ 1 from the origin — changes
+  shape as <em>p</em> varies. p = 1 gives a diamond, p = 2 a circle, p → ∞ a square.
+  The choice of <em>p</em> in kNN changes which points are considered &ldquo;near&rdquo;,
+  and changes the shape of the decision neighbourhood.
+  <span class="src">Lec 02 — Distance Metrics &amp; ℓp Norms</span>
+</div>
+
+<div class="play-card" style="margin-top:12px">
+  <div class="play-card-title">📐 ℓp-Norm Shape Explorer</div>
+  <div class="play-card-sub">
+    Drag the slider to morph the unit ball from a diamond (p = 1) through a circle (p = 2)
+    to a square (p → ∞). Click the canvas to place a point and read off its ℓp distance
+    from the origin.
+  </div>
+  <div class="play-controls">
+    <label>p =
+      <input type="range" id="lp-p" min="0.5" max="20" step="0.1" value="2">
+      <span class="vb" id="lp-p-val">2.0</span>
+    </label>
+    <label><input type="checkbox" id="lp-ghost" checked> Show L¹, L², L∞ reference balls</label>
+  </div>
+  <div class="play-canvas-wrap">
+    <canvas id="lp-canvas" class="crosshair" style="width:480px;height:400px"></canvas>
+  </div>
+  <div class="play-result show info" id="lp-result" style="margin-top:10px">
+    Click the canvas to place a point and measure its ℓp distance from the origin.
+  </div>
+  <div class="play-hint">
+    Unit ball: <span style="color:#e8803a;font-weight:700">■ current p</span>&nbsp;
+    <span style="color:#aaa;font-weight:700">· · · L¹, L², L∞ reference</span>
   </div>
 </div>
 
-<div class="play-soon">
-  <div class="soon-icon">🎲</div>
-  <div>
-    <div class="soon-title">Random Forest vs Single Tree</div>
-    <div class="soon-sub">
-      Compare decision boundaries from one tree vs an ensemble of random trees.
-      Drag training points to see which model is more robust.
-    </div>
-    <div class="soon-chip">Planned</div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════════════════════════════════
-     JAVASCRIPT — Component logic
-     ════════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ═══════════════════════════════════════════════════════════ -->
 <script>
 (function () {
 "use strict";
 
-/* ── helpers ── */
+/* ─── utilities ─── */
 const $ = id => document.getElementById(id);
+const dpr = window.devicePixelRatio || 1;
 
-/* ================================================================
-   COMPONENT 1 — kNN
-   ================================================================ */
-(function knnPlayground() {
+function initCanvas(id, logW, logH) {
+  const c = $(id);
+  c.width  = Math.round(logW * dpr);
+  c.height = Math.round(logH * dpr);
+  c.style.width  = logW + 'px';
+  c.style.height = logH + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { c, ctx, W: logW, H: logH };
+}
 
-  // Fixed training data: [x_cm, y_cm, label] — same fruit domain as lec 03
-  // label 0 = lemon, label 1 = orange
-  const TRAIN = [
-    // lemons (roughly narrow + tall)
-    [5.2,9.8,0],[5.5,8.9,0],[5.1,8.3,0],[5.8,9.6,0],[4.9,9.1,0],
-    [5.4,8.6,0],[6.1,9.4,0],[5.7,10.1,0],[4.8,8.8,0],[5.3,9.3,0],
-    [5.6,8.1,0],[5.0,9.7,0],
-    // oranges (roughly wide + shorter)
-    [7.2,8.1,1],[7.8,7.9,1],[8.4,8.6,1],[7.5,8.8,1],[8.1,9.2,1],
-    [9.0,8.5,1],[8.7,7.4,1],[7.3,8.3,1],[9.2,9.0,1],[8.0,7.6,1],
-    [7.6,8.0,1],[8.3,8.9,1],[6.4,4.5,1],[5.8,4.2,1],[6.8,4.8,1],
-    [6.2,4.1,1],[7.0,5.0,1],
-  ];
+/* ═══════════════════════════════════════════════════════════
+   SHARED TRAINING DATA (lemons & oranges)
+   ═══════════════════════════════════════════════════════════ */
+const TRAIN = [
+  // Lemons (0): narrow & tall
+  [5.2,9.8,0],[5.5,8.9,0],[5.1,8.3,0],[5.8,9.6,0],[4.9,9.1,0],
+  [5.4,8.6,0],[6.1,9.4,0],[5.7,10.1,0],[4.8,8.8,0],[5.3,9.3,0],
+  [5.6,8.1,0],[5.0,9.7,0],
+  // Oranges (1): wide OR narrow+short
+  [7.2,8.1,1],[7.8,7.9,1],[8.4,8.6,1],[7.5,8.8,1],[8.1,9.2,1],
+  [9.0,8.5,1],[8.7,7.4,1],[7.3,8.3,1],[9.2,9.0,1],[8.0,7.6,1],
+  [7.6,8.0,1],[8.3,8.9,1],
+  [6.4,4.5,1],[5.8,4.2,1],[6.8,4.8,1],[6.2,4.1,1],[7.0,5.0,1],
+];
+const COL = { 0:'#3c9d9b', 1:'#e8803a' };
+const NAME = { 0:'🍋 Lemon', 1:'🍊 Orange' };
+const XMIN=4, XMAX=10.5, YMIN=3.5, YMAX=11;
 
-  const XMIN=4, XMAX=10.5, YMIN=3.5, YMAX=11;
-  const C = $("knn-canvas");
-  const ctx = C.getContext("2d");
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT 1 — kNN Explorer
+   ═══════════════════════════════════════════════════════════ */
+(function knnPlay() {
+  const {c, ctx, W, H} = initCanvas('knn-canvas', 660, 340);
+  const PAD = 38;
   let query = null;
 
-  const COLORS = { 0:"#3c9d9b", 1:"#e8803a" };
-  const NAMES  = { 0:"🍋 Lemon", 1:"🍊 Orange" };
-
-  function toCanvas(cx, cy) {
-    const W = C.width, H = C.height, PAD = 36;
-    const x = PAD + (cx - XMIN) / (XMAX - XMIN) * (W - PAD*2);
-    const y = H - PAD - (cy - YMIN) / (YMAX - YMIN) * (H - PAD*2);
-    return [x, y];
+  function toC(x, y) {
+    return [PAD + (x-XMIN)/(XMAX-XMIN)*(W-2*PAD),
+            H-PAD - (y-YMIN)/(YMAX-YMIN)*(H-2*PAD)];
   }
-  function fromCanvas(px, py) {
-    const W = C.width, H = C.height, PAD = 36;
-    const cx = (px - PAD) / (W - PAD*2) * (XMAX - XMIN) + XMIN;
-    const cy = (H - PAD - py) / (H - PAD*2) * (YMAX - YMIN) + YMIN;
-    return [cx, cy];
+  function fromC(px, py) {
+    return [(px-PAD)/(W-2*PAD)*(XMAX-XMIN)+XMIN,
+            (H-PAD-py)/(H-2*PAD)*(YMAX-YMIN)+YMIN];
   }
-
-  function dist(a, b, metric) {
-    const dx = Math.abs(a[0]-b[0]), dy = Math.abs(a[1]-b[1]);
-    if (metric === "l1")   return dx + dy;
-    if (metric === "linf") return Math.max(dx, dy);
-    return Math.sqrt(dx*dx + dy*dy); // l2
+  function dist(a, b, m) {
+    const dx=Math.abs(a[0]-b[0]), dy=Math.abs(a[1]-b[1]);
+    return m==='l1' ? dx+dy : m==='linf' ? Math.max(dx,dy) : Math.sqrt(dx*dx+dy*dy);
   }
 
   function draw() {
-    const W = C.width, H = C.height, PAD = 36;
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,W,H);
 
-    // Background
-    ctx.fillStyle = "#fafafa";
-    ctx.fillRect(0, 0, W, H);
+    // grid
+    ctx.strokeStyle='#ebebeb'; ctx.lineWidth=1;
+    for(let v=Math.ceil(XMIN);v<=XMAX;v++){const[x]=toC(v,0);ctx.beginPath();ctx.moveTo(x,PAD);ctx.lineTo(x,H-PAD);ctx.stroke();}
+    for(let v=Math.ceil(YMIN);v<=YMAX;v++){const[,y]=toC(0,v);ctx.beginPath();ctx.moveTo(PAD,y);ctx.lineTo(W-PAD,y);ctx.stroke();}
 
-    // Grid lines
-    ctx.strokeStyle = "#eee"; ctx.lineWidth = 1;
-    for (let v = Math.ceil(XMIN); v <= XMAX; v++) {
-      const [x] = toCanvas(v, 0); const [,y0] = toCanvas(0, YMIN); const [,y1] = toCanvas(0, YMAX);
-      ctx.beginPath(); ctx.moveTo(x, H-PAD); ctx.lineTo(x, PAD); ctx.stroke();
-    }
-    for (let v = Math.ceil(YMIN); v <= YMAX; v++) {
-      const [,y] = toCanvas(0, v);
-      ctx.beginPath(); ctx.moveTo(PAD, y); ctx.lineTo(W-PAD, y); ctx.stroke();
-    }
+    // axis labels
+    ctx.fillStyle='#aaa'; ctx.font=`${11*Math.min(1,W/400)}px Raleway,sans-serif`; ctx.textAlign='center';
+    for(let v=4;v<=10;v+=2){const[x]=toC(v,0);ctx.fillText(v,x,H-10);}
+    ctx.textAlign='right';
+    for(let v=4;v<=10;v+=2){const[,y]=toC(0,v);ctx.fillText(v,PAD-5,y+4);}
+    ctx.fillStyle='#888'; ctx.font='11px Raleway,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('width (cm)',W/2,H-1);
+    ctx.save(); ctx.translate(12,H/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText('height (cm)',0,0); ctx.restore();
 
-    // Axes labels
-    ctx.fillStyle = "#999"; ctx.font = "11px Raleway,sans-serif"; ctx.textAlign = "center";
-    for (let v = 4; v <= 10; v += 2) {
-      const [x] = toCanvas(v, 0); ctx.fillText(v, x, H-10);
-    }
-    ctx.textAlign = "right";
-    for (let v = 4; v <= 10; v += 2) {
-      const [,y] = toCanvas(0, v); ctx.fillText(v, PAD-5, y+4);
-    }
-    ctx.fillStyle="#777"; ctx.font="12px Raleway,sans-serif"; ctx.textAlign="center";
-    ctx.fillText("width (cm)", W/2, H-1);
-    ctx.save(); ctx.translate(12, H/2); ctx.rotate(-Math.PI/2);
-    ctx.fillText("height (cm)", 0, 0); ctx.restore();
+    const k = parseInt($('knn-k').value);
+    const metric = $('knn-metric').value;
+    const showBall = $('knn-ball').checked;
 
-    const k = parseInt($("knn-k").value);
-    const metric = $("knn-metric").value;
-    const showBall = $("knn-show-ball").checked;
+    let ranked=[], pred=null;
+    if(query) {
+      ranked = TRAIN.map((pt,i)=>({i,d:dist(query,pt,metric),label:pt[2]})).sort((a,b)=>a.d-b.d);
+      const top=ranked.slice(0,k), v=[0,0]; top.forEach(t=>v[t.label]++);
+      pred = v[1]>v[0]?1:0;
 
-    // Compute nearest neighbours if query exists
-    let ranked = [], prediction = null;
-    if (query) {
-      ranked = TRAIN.map((pt, i) => ({i, d: dist(query, pt, metric), label: pt[2]}))
-                    .sort((a,b) => a.d - b.d);
-      const top = ranked.slice(0, k);
-      const votes = [0,0];
-      top.forEach(t => votes[t.label]++);
-      prediction = votes[1] > votes[0] ? 1 : 0;
-
-      // Draw neighbourhood ball
-      if (showBall) {
-        const [qx, qy] = toCanvas(query[0], query[1]);
-        const radius = ranked[k-1].d;
-        ctx.save();
-        if (metric === "l2") {
-          const [rx] = toCanvas(query[0]+radius, query[1]);
-          const r_px = rx - qx;
-          ctx.beginPath();
-          ctx.arc(qx, qy, r_px, 0, Math.PI*2);
-        } else if (metric === "l1") {
-          // Diamond: rotate a square 45°
-          const [rx] = toCanvas(query[0]+radius, query[1]);
-          const r_px = rx - qx;
-          ctx.beginPath();
-          ctx.moveTo(qx, qy - r_px);
-          ctx.lineTo(qx + r_px, qy);
-          ctx.lineTo(qx, qy + r_px);
-          ctx.lineTo(qx - r_px, qy);
-          ctx.closePath();
-        } else { // linf — axis-aligned square
-          const [rx] = toCanvas(query[0]+radius, query[1]);
-          const [,ry] = toCanvas(query[0], query[1]+radius);
-          const rw = rx - qx, rh = qy - ry;
-          ctx.beginPath();
-          ctx.rect(qx - rw, qy - rh, rw*2, rh*2);
-        }
-        ctx.fillStyle = "rgba(51,195,240,0.07)";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(51,195,240,0.5)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4,3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
-      }
-
-      // Draw connecting lines to neighbours
-      const topSet = new Set(top.map(t => t.i));
-      const [qx, qy] = toCanvas(query[0], query[1]);
-      top.forEach(t => {
-        const [px, py] = toCanvas(TRAIN[t.i][0], TRAIN[t.i][1]);
-        ctx.beginPath(); ctx.moveTo(qx, qy); ctx.lineTo(px, py);
-        ctx.strokeStyle = "rgba(100,100,100,0.25)"; ctx.lineWidth = 1.5;
-        ctx.stroke();
-      });
-    }
-
-    // Draw training points
-    const topSet = query ? new Set(ranked.slice(0, k).map(t => t.i)) : new Set();
-    TRAIN.forEach((pt, i) => {
-      const [px, py] = toCanvas(pt[0], pt[1]);
-      const isNeighbour = topSet.has(i);
-      ctx.beginPath();
-      ctx.arc(px, py, isNeighbour ? 8 : 5.5, 0, Math.PI*2);
-      ctx.fillStyle = COLORS[pt[2]] + (isNeighbour ? "ff" : "bb");
-      ctx.fill();
-      if (isNeighbour) {
-        ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-        ctx.strokeStyle = COLORS[pt[2]]; ctx.lineWidth = 3; ctx.stroke();
-      }
-      // Shape: triangle for lemon, circle for orange (follows lec 03 scatter plot convention)
-      if (pt[2] === 0) {
-        // Draw triangle marker over circle
+      // neighbourhood ball
+      if(showBall) {
+        const r=ranked[k-1].d;
+        const[qx,qy]=toC(query[0],query[1]);
+        ctx.save(); ctx.fillStyle='rgba(51,195,240,0.06)'; ctx.strokeStyle='rgba(51,195,240,0.45)';
+        ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
         ctx.beginPath();
-        const r = isNeighbour ? 6 : 4;
-        ctx.moveTo(px, py - r); ctx.lineTo(px + r*0.87, py + r*0.5); ctx.lineTo(px - r*0.87, py + r*0.5);
+        if(metric==='l2'){
+          const rx=toC(query[0]+r,query[1])[0]-qx;
+          ctx.arc(qx,qy,rx,0,Math.PI*2);
+        } else if(metric==='l1'){
+          const rx=toC(query[0]+r,query[1])[0]-qx;
+          ctx.moveTo(qx,qy-rx); ctx.lineTo(qx+rx,qy); ctx.lineTo(qx,qy+rx); ctx.lineTo(qx-rx,qy); ctx.closePath();
+        } else {
+          const rx=toC(query[0]+r,query[1])[0]-qx;
+          const ry=qy-toC(query[0],query[1]+r)[1];
+          ctx.rect(qx-rx,qy-ry,rx*2,ry*2);
+        }
+        ctx.fill(); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+
+        // connecting lines
+        const[qx2,qy2]=toC(query[0],query[1]);
+        top.forEach(t=>{
+          const[px,py]=toC(TRAIN[t.i][0],TRAIN[t.i][1]);
+          ctx.beginPath(); ctx.moveTo(qx2,qy2); ctx.lineTo(px,py);
+          ctx.strokeStyle='rgba(100,100,100,0.2)'; ctx.lineWidth=1.5; ctx.stroke();
+        });
+      }
+    }
+
+    const topSet = query ? new Set(ranked.slice(0,k).map(t=>t.i)) : new Set();
+
+    // Training points
+    TRAIN.forEach((pt,i)=>{
+      const[px,py]=toC(pt[0],pt[1]);
+      const isN = topSet.has(i);
+      const r = isN ? 8 : 5.5;
+
+      if(pt[2]===0) { // lemon: triangle
+        ctx.beginPath();
+        ctx.moveTo(px,py-r); ctx.lineTo(px+r*0.87,py+r*0.5); ctx.lineTo(px-r*0.87,py+r*0.5);
         ctx.closePath();
-        ctx.fillStyle = COLORS[0] + (isNeighbour ? "ff" : "cc");
-        ctx.fill();
-        if (isNeighbour) { ctx.strokeStyle="#fff"; ctx.lineWidth=1.5; ctx.stroke(); }
+        ctx.fillStyle=COL[0]+(isN?'ff':'aa'); ctx.fill();
+        if(isN){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+               ctx.strokeStyle=COL[0];ctx.lineWidth=2.5;ctx.stroke();}
+      } else { // orange: circle
+        ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2);
+        ctx.fillStyle=COL[1]+(isN?'ff':'aa'); ctx.fill();
+        if(isN){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();
+               ctx.strokeStyle=COL[1];ctx.lineWidth=2.5;ctx.stroke();}
       }
     });
 
-    // Draw query point
-    if (query) {
-      const [qx, qy] = toCanvas(query[0], query[1]);
-      ctx.beginPath(); ctx.arc(qx, qy, 9, 0, Math.PI*2);
-      ctx.fillStyle = prediction !== null ? COLORS[prediction] + "33" : "#33c3f033";
-      ctx.fill();
-      ctx.beginPath(); ctx.arc(qx, qy, 9, 0, Math.PI*2);
-      ctx.strokeStyle = "#222"; ctx.lineWidth = 2.5; ctx.stroke();
-      ctx.beginPath(); ctx.arc(qx, qy, 4, 0, Math.PI*2);
-      ctx.fillStyle = "#222"; ctx.fill();
-      // "?" or prediction label
-      ctx.fillStyle = "#fff"; ctx.font = "bold 10px Raleway,sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("?", qx, qy + 3.5);
+    // Query point
+    if(query){
+      const[qx,qy]=toC(query[0],query[1]);
+      ctx.beginPath(); ctx.arc(qx,qy,10,0,Math.PI*2);
+      ctx.fillStyle=pred!==null?COL[pred]+'25':'#33c3f025'; ctx.fill();
+      ctx.strokeStyle='#222'; ctx.lineWidth=2.5; ctx.stroke();
+      ctx.beginPath(); ctx.arc(qx,qy,4,0,Math.PI*2);
+      ctx.fillStyle='#222'; ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='bold 9px Raleway,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('?',qx,qy+3.5);
     }
 
-    // Legend
-    const lx = W - PAD - 90;
-    [[0,"▲ Lemon"],[1,"● Orange"]].forEach(([l, label], i) => {
-      ctx.fillStyle = COLORS[l]; ctx.font = "12px Raleway,sans-serif"; ctx.textAlign = "left";
-      ctx.fillText(label, lx, PAD + 16 + i*18);
-    });
+    // Legend (top-right)
+    const lx=W-PAD-4, ly=PAD+4;
+    ctx.font='12px Raleway,sans-serif'; ctx.textAlign='right';
+    ctx.fillStyle=COL[0]; ctx.fillText('▲ Lemon',lx,ly+14);
+    ctx.fillStyle=COL[1]; ctx.fillText('● Orange',lx,ly+30);
 
     // Result
-    const resEl = $("knn-result");
-    if (query && prediction !== null) {
-      const top = ranked.slice(0, k);
-      const votes = [0,0]; top.forEach(t => votes[t.label]++);
-      resEl.className = "play-result show " + (prediction === 0 ? "lemon" : "orange");
-      resEl.textContent = `Prediction: ${NAMES[prediction]}  (votes: ${votes[0]} lemon, ${votes[1]} orange out of k=${k} neighbours)`;
-    } else {
-      resEl.className = "play-result";
-    }
+    const el=$('knn-result');
+    if(query && pred!==null){
+      const top=ranked.slice(0,k), v=[0,0]; top.forEach(t=>v[t.label]++);
+      el.className='play-result show '+(pred===0?'lemon':'orange');
+      el.textContent=`Prediction: ${NAME[pred]}  (${v[0]} lemon, ${v[1]} orange among k=${k} neighbours)`;
+    } else { el.className='play-result'; }
   }
 
-  C.addEventListener("click", e => {
-    const rect = C.getBoundingClientRect();
-    const px = (e.clientX - rect.left) * (C.width / rect.width);
-    const py = (e.clientY - rect.top)  * (C.height / rect.height);
-    query = fromCanvas(px, py);
-    // Clamp
-    query[0] = Math.max(XMIN+0.1, Math.min(XMAX-0.1, query[0]));
-    query[1] = Math.max(YMIN+0.1, Math.min(YMAX-0.1, query[1]));
-    draw();
+  c.addEventListener('click', e=>{
+    const rect=c.getBoundingClientRect();
+    const px=(e.clientX-rect.left)*(W/rect.width);
+    const py=(e.clientY-rect.top)*(H/rect.height);
+    let [cx,cy]=fromC(px,py);
+    cx=Math.max(XMIN+0.1,Math.min(XMAX-0.1,cx));
+    cy=Math.max(YMIN+0.1,Math.min(YMAX-0.1,cy));
+    query=[cx,cy]; draw();
   });
-
-  ["knn-k","knn-metric","knn-show-ball"].forEach(id => {
-    $(id).addEventListener("input", () => {
-      $("knn-k-val").textContent = $("knn-k").value;
-      draw();
-    });
-    $(id).addEventListener("change", () => {
-      $("knn-k-val").textContent = $("knn-k").value;
-      draw();
-    });
+  ['knn-k','knn-metric','knn-ball'].forEach(id=>{
+    $(id).addEventListener('input',()=>{ $('knn-k-val').textContent=$('knn-k').value; draw(); });
+    $(id).addEventListener('change',()=>{ $('knn-k-val').textContent=$('knn-k').value; draw(); });
   });
-
   draw();
 })();
 
 
-/* ================================================================
+/* ═══════════════════════════════════════════════════════════
    COMPONENT 2 — Decision Tree Splitter
-   ================================================================ */
-(function dtPlayground() {
+   ═══════════════════════════════════════════════════════════ */
+(function dtPlay() {
+  const {c:sc, ctx:sctx, W:SW, H:SH} = initCanvas('dt-scatter', 360, 320);
+  const {c:tc, ctx:tctx, W:TW, H:TH} = initCanvas('dt-tree', 260, 240);
+  const PAD=36;
 
-  // Same training data as kNN
-  const TRAIN = [
-    [5.2,9.8,0],[5.5,8.9,0],[5.1,8.3,0],[5.8,9.6,0],[4.9,9.1,0],
-    [5.4,8.6,0],[6.1,9.4,0],[5.7,10.1,0],[4.8,8.8,0],[5.3,9.3,0],
-    [5.6,8.1,0],[5.0,9.7,0],
-    [7.2,8.1,1],[7.8,7.9,1],[8.4,8.6,1],[7.5,8.8,1],[8.1,9.2,1],
-    [9.0,8.5,1],[8.7,7.4,1],[7.3,8.3,1],[9.2,9.0,1],[8.0,7.6,1],
-    [7.6,8.0,1],[8.3,8.9,1],[6.4,4.5,1],[5.8,4.2,1],[6.8,4.8,1],
-    [6.2,4.1,1],[7.0,5.0,1],
-  ];
-  const XMIN=4, XMAX=10.5, YMIN=3.5, YMAX=11;
-
-  const SC = $("dt-canvas");
-  const sctx = SC.getContext("2d");
-  const TC = $("dt-tree-canvas");
-  const tctx = TC.getContext("2d");
-
-  const COLORS = { 0:"#3c9d9b", 1:"#e8803a" };
-
-  function toSC(cx, cy) {
-    const W=SC.width, H=SC.height, PAD=36;
-    return [PAD + (cx-XMIN)/(XMAX-XMIN)*(W-PAD*2),
-            H-PAD - (cy-YMIN)/(YMAX-YMIN)*(H-PAD*2)];
+  function toS(x,y){
+    return [PAD+(x-XMIN)/(XMAX-XMIN)*(SW-2*PAD), SH-PAD-(y-YMIN)/(YMAX-YMIN)*(SH-2*PAD)];
   }
 
-  // Majority vote in a set of points
-  function majority(pts) {
-    const v=[0,0]; pts.forEach(p=>v[p[2]]++);
-    return v[1]>v[0]?1:0;
+  function predict(pt, wSplit, hlSplit) {
+    if(pt[0] < wSplit) return pt[1] >= hlSplit ? 0 : 1; // narrow: tall→lemon, short→orange
+    return 1; // wide → always orange
   }
 
-  function predictTree(pt, wSplit, hlSplit, hrSplit) {
-    if (pt[0] >= wSplit) { // left branch: wide
-      return hrSplit !== null && pt[1] >= hrSplit ? 0 : 1;
-    } else { // right branch: narrow
-      return hlSplit !== null && pt[1] >= hlSplit ? 0 : 1;
-    }
-  }
-
-  function drawScatter(wSplit, hlSplit, hrSplit) {
-    const W=SC.width, H=SC.height, PAD=36;
-    sctx.clearRect(0,0,W,H);
+  function drawScatter(ws, hl) {
+    sctx.clearRect(0,0,SW,SH);
+    sctx.fillStyle='#fafafa'; sctx.fillRect(0,0,SW,SH);
 
     // Region fills
-    // Build pixel-by-pixel region (simplified: just 4 axis-aligned regions)
-    const regions = [
-      // [x1,y1,x2,y2, label] in canvas coords — derive from splits
-      // We'll just fill the 3 or 4 regions
-    ];
-
-    // Fill regions
-    function fillRegion(xMin, xMax, yMin, yMax, label) {
-      const [x0,y0] = toSC(xMin, yMax);
-      const [x1,y1] = toSC(xMax, yMin);
-      sctx.fillStyle = COLORS[label] + "22";
-      sctx.fillRect(x0, y0, x1-x0, y1-y0);
+    function fill(x0,x1,y0,y1,label){
+      const[cx0,cy0]=toS(x0,y1), [cx1,cy1]=toS(x1,y0);
+      sctx.fillStyle=COL[label]+'20'; sctx.fillRect(cx0,cy0,cx1-cx0,cy1-cy0);
     }
-
-    // Region: width < wSplit (left), height >= hlSplit → lemon
-    fillRegion(XMIN, wSplit, hlSplit, YMAX, 0);
-    // Region: width < wSplit (left), height < hlSplit → orange
-    fillRegion(XMIN, wSplit, YMIN, hlSplit, 1);
-    // Region: width >= wSplit (right), height >= hrSplit → lemon
-    fillRegion(wSplit, XMAX, hrSplit, YMAX, 0);
-    // Region: width >= wSplit (right), height < hrSplit → orange
-    fillRegion(wSplit, XMAX, YMIN, hrSplit, 1);
+    fill(XMIN,ws,hl,YMAX,0);   // narrow+tall → lemon
+    fill(XMIN,ws,YMIN,hl,1);   // narrow+short → orange
+    fill(ws,XMAX,YMIN,YMAX,1); // wide → orange
 
     // Grid
-    sctx.strokeStyle="#eee"; sctx.lineWidth=1;
-    for (let v=4;v<=10;v++) { const[x]=toSC(v,0); sctx.beginPath();sctx.moveTo(x,PAD);sctx.lineTo(x,H-PAD);sctx.stroke(); }
-    for (let v=4;v<=10;v++) { const[,y]=toSC(0,v); sctx.beginPath();sctx.moveTo(PAD,y);sctx.lineTo(W-PAD,y);sctx.stroke(); }
+    sctx.strokeStyle='#ebebeb'; sctx.lineWidth=1;
+    for(let v=4;v<=10;v++){const[x]=toS(v,0);sctx.beginPath();sctx.moveTo(x,PAD);sctx.lineTo(x,SH-PAD);sctx.stroke();}
+    for(let v=4;v<=10;v++){const[,y]=toS(0,v);sctx.beginPath();sctx.moveTo(PAD,y);sctx.lineTo(SW-PAD,y);sctx.stroke();}
 
     // Split lines
-    const[wx]=toSC(wSplit,0);
-    sctx.strokeStyle="#333"; sctx.lineWidth=2.5; sctx.setLineDash([]);
-    sctx.beginPath(); sctx.moveTo(wx,PAD); sctx.lineTo(wx,H-PAD); sctx.stroke();
-
-    // Height split on left (width < wSplit)
-    const[,hly]=toSC(0, hlSplit);
-    sctx.strokeStyle="#555"; sctx.lineWidth=1.8; sctx.setLineDash([5,3]);
+    const[wx]=toS(ws,0);
+    sctx.strokeStyle='#333'; sctx.lineWidth=2.5; sctx.setLineDash([]);
+    sctx.beginPath(); sctx.moveTo(wx,PAD); sctx.lineTo(wx,SH-PAD); sctx.stroke();
+    const[,hly]=toS(0,hl);
+    sctx.strokeStyle='#666'; sctx.lineWidth=1.8; sctx.setLineDash([5,4]);
     sctx.beginPath(); sctx.moveTo(PAD,hly); sctx.lineTo(wx,hly); sctx.stroke();
-
-    // Height split on right (width >= wSplit)
-    const[,hry]=toSC(0, hrSplit);
-    sctx.beginPath(); sctx.moveTo(wx,hry); sctx.lineTo(W-PAD,hry); sctx.stroke();
     sctx.setLineDash([]);
 
     // Axis labels
-    sctx.fillStyle="#999"; sctx.font="11px Raleway,sans-serif"; sctx.textAlign="center";
-    for(let v=4;v<=10;v+=2){const[x]=toSC(v,0);sctx.fillText(v,x,H-8);}
-    sctx.textAlign="right";
-    for(let v=4;v<=10;v+=2){const[,y]=toSC(0,v);sctx.fillText(v,PAD-5,y+4);}
-    sctx.fillStyle="#777"; sctx.font="12px Raleway,sans-serif"; sctx.textAlign="center";
-    sctx.fillText("width (cm)",W/2,H-1);
-    sctx.save(); sctx.translate(12,H/2); sctx.rotate(-Math.PI/2);
-    sctx.fillText("height (cm)",0,0); sctx.restore();
+    sctx.fillStyle='#aaa'; sctx.font='11px Raleway,sans-serif'; sctx.textAlign='center';
+    for(let v=4;v<=10;v+=2){const[x]=toS(v,0);sctx.fillText(v,x,SH-8);}
+    sctx.textAlign='right';
+    for(let v=4;v<=10;v+=2){const[,y]=toS(0,v);sctx.fillText(v,PAD-5,y+4);}
+    sctx.fillStyle='#888'; sctx.font='11px Raleway,sans-serif'; sctx.textAlign='center';
+    sctx.fillText('width (cm)',SW/2,SH-1);
+    sctx.save(); sctx.translate(12,SH/2); sctx.rotate(-Math.PI/2);
+    sctx.fillText('height (cm)',0,0); sctx.restore();
 
-    // Split labels
-    sctx.fillStyle="#333"; sctx.font="bold 11px Raleway,sans-serif"; sctx.textAlign="center";
-    const[wxl]=toSC(wSplit+0.05,0);
-    sctx.fillText("w≥"+wSplit.toFixed(1)+"?", wxl+26, PAD+12);
-
-    // Training points
-    let correct=0;
-    TRAIN.forEach(pt => {
-      const pred = predictTree(pt, wSplit, hlSplit, hrSplit);
-      const ok = pred === pt[2];
-      if(ok) correct++;
-      const[px,py]=toSC(pt[0],pt[1]);
-      sctx.beginPath(); sctx.arc(px,py,5.5,0,Math.PI*2);
-      sctx.fillStyle=COLORS[pt[2]]+(ok?"cc":"55"); sctx.fill();
-      if(pt[2]===0){
-        // triangle
-        sctx.beginPath(); sctx.moveTo(px,py-5); sctx.lineTo(px+4.3,py+2.5); sctx.lineTo(px-4.3,py+2.5); sctx.closePath();
-        sctx.fillStyle=COLORS[0]+(ok?"cc":"55"); sctx.fill();
+    // Points
+    let ok=0;
+    TRAIN.forEach(pt=>{
+      const p=predict(pt,ws,hl), correct=p===pt[2];
+      if(correct) ok++;
+      const[px,py]=toS(pt[0],pt[1]);
+      if(pt[2]===0){ // lemon triangle
+        sctx.beginPath(); sctx.moveTo(px,py-5.5); sctx.lineTo(px+4.8,py+2.8); sctx.lineTo(px-4.8,py+2.8); sctx.closePath();
+        sctx.fillStyle=COL[0]+(correct?'cc':'44'); sctx.fill();
+      } else {
+        sctx.beginPath(); sctx.arc(px,py,5,0,Math.PI*2);
+        sctx.fillStyle=COL[1]+(correct?'cc':'44'); sctx.fill();
       }
-      if(!ok){
-        // ✕ mark
-        sctx.strokeStyle="#c00"; sctx.lineWidth=1.5;
+      if(!correct){
+        sctx.strokeStyle='#c00'; sctx.lineWidth=1.5;
         sctx.beginPath(); sctx.moveTo(px-5,py-5); sctx.lineTo(px+5,py+5); sctx.stroke();
         sctx.beginPath(); sctx.moveTo(px+5,py-5); sctx.lineTo(px-5,py+5); sctx.stroke();
       }
     });
 
     // Accuracy
-    const acc = Math.round(correct/TRAIN.length*100);
-    $("dt-result").innerHTML = `Training accuracy: <strong>${acc}%</strong> (${correct}/${TRAIN.length} correct)`;
-    const cls = acc >= 90 ? "info" : acc >= 75 ? "info" : "info";
-    $("dt-result").className = "play-result show " + cls;
+    const acc=Math.round(ok/TRAIN.length*100);
+    $('dt-acc').innerHTML=`Training accuracy: <strong>${acc}%</strong> (${ok}/${TRAIN.length})`;
+    $('dt-acc').className='play-result show '+(acc===100?'lemon':'info');
   }
 
-  function drawTree(wSplit, hlSplit, hrSplit) {
-    const W=TC.width, H=TC.height;
-    tctx.clearRect(0,0,W,H);
-
-    // Node drawing helper
-    function box(x,y,text,subtext,color) {
-      tctx.fillStyle=color||"#f0f0f0"; tctx.strokeStyle="#aaa"; tctx.lineWidth=1.5;
-      const bw=120, bh=34, bx=x-bw/2, by=y-bh/2;
+  function drawTree(ws, hl) {
+    tctx.clearRect(0,0,TW,TH);
+    const f=(x,y,txt,sub,bg)=>{
+      tctx.fillStyle=bg||'#eef7fb'; tctx.strokeStyle='#b8d4e0'; tctx.lineWidth=1.5;
+      const bw=130,bh=36,bx=x-bw/2,by=y-bh/2;
       tctx.beginPath(); tctx.roundRect(bx,by,bw,bh,6); tctx.fill(); tctx.stroke();
-      tctx.fillStyle="#333"; tctx.font="bold 11px Raleway,sans-serif"; tctx.textAlign="center";
-      tctx.fillText(text, x, y+1);
-      if(subtext){tctx.fillStyle="#888"; tctx.font="10px Raleway,sans-serif"; tctx.fillText(subtext,x,y+13);}
-    }
-    function leaf(x,y,label,color) {
-      tctx.fillStyle=color; tctx.strokeStyle=color;
-      tctx.globalAlpha=0.85;
-      tctx.beginPath(); tctx.roundRect(x-38,y-16,76,32,20); tctx.fill();
-      tctx.globalAlpha=1;
-      tctx.fillStyle="#fff"; tctx.font="bold 11px Raleway,sans-serif"; tctx.textAlign="center";
-      tctx.fillText(label, x, y+4);
-    }
-    function arrow(x1,y1,x2,y2,label) {
-      tctx.strokeStyle="#888"; tctx.lineWidth=1.5;
+      tctx.fillStyle='#333'; tctx.font='bold 11px Raleway,sans-serif'; tctx.textAlign='center';
+      tctx.fillText(txt,x,y+(sub?-3:4));
+      if(sub){tctx.fillStyle='#888';tctx.font='10px Raleway,sans-serif';tctx.fillText(sub,x,y+11);}
+    };
+    const leaf=(x,y,lbl,col)=>{
+      tctx.fillStyle=col+'cc'; tctx.strokeStyle=col; tctx.lineWidth=1.5;
+      tctx.beginPath(); tctx.roundRect(x-30,y-14,60,28,14); tctx.fill(); tctx.stroke();
+      tctx.fillStyle='#fff'; tctx.font='bold 11px Raleway,sans-serif'; tctx.textAlign='center';
+      tctx.fillText(lbl,x,y+4);
+    };
+    const arrow=(x1,y1,x2,y2,lbl,side)=>{
+      tctx.strokeStyle='#bbb'; tctx.lineWidth=1.5;
       tctx.beginPath(); tctx.moveTo(x1,y1); tctx.lineTo(x2,y2); tctx.stroke();
-      if(label){
-        tctx.fillStyle="#666"; tctx.font="10px Raleway,sans-serif"; tctx.textAlign="center";
+      if(lbl){
+        tctx.fillStyle='#888'; tctx.font='10px Raleway,sans-serif'; tctx.textAlign='center';
         const mx=(x1+x2)/2, my=(y1+y2)/2;
-        tctx.fillText(label, mx+(x2>x1?6:-6), my);
+        tctx.fillText(lbl,mx+(side||0),my);
       }
+    };
+    // Root
+    const rx=TW/2, ry=28;
+    f(rx,ry,`width < ${ws.toFixed(1)}?`,null,'#eef7fb');
+    // Left (narrow → second split)
+    const lx=68, ly=105;
+    arrow(rx,ry+18,lx,ly-18,'Yes',-8);
+    f(lx,ly,`height ≥ ${hl.toFixed(1)}?`,null,'#eef7fb');
+    leaf(lx-30,ly+68,'🍋',COL[0]);
+    leaf(lx+30,ly+68,'🍊',COL[1]);
+    arrow(lx,ly+18,lx-30,ly+54,'Yes',-10);
+    arrow(lx,ly+18,lx+30,ly+54,'No',10);
+    // Right (wide → leaf Orange)
+    const lrx=192, lry=105;
+    arrow(rx,ry+18,lrx,lry-18,'No',10);
+    leaf(lrx,lry,'🍊',COL[1]);
+  }
+
+  function update(){
+    const ws=parseFloat($('dt-w').value), hl=parseFloat($('dt-hl').value);
+    $('dt-w-val').textContent=ws.toFixed(1); $('dt-hl-val').textContent=hl.toFixed(1);
+    drawScatter(ws,hl); drawTree(ws,hl);
+  }
+  ['dt-w','dt-hl'].forEach(id=>$(id).addEventListener('input',update));
+  update();
+})();
+
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT 3 — Bias-Variance Dartboard
+   ═══════════════════════════════════════════════════════════ */
+(function bvPlay() {
+  const {c:dc,ctx:dctx,W:DW,H:DH} = initCanvas('bv-dart',  320, 320);
+  const {c:cc,ctx:cctx,W:CW,H:CH} = initCanvas('bv-curve', 300, 260);
+
+  // True function: y = sin(x), test point x=π, y_true=0
+  const X_TEST = Math.PI;
+  const Y_TRUE = 0;
+
+  // Pre-generated training data (y = sin(x) + noise, x in [0, 2π])
+  const BV_TRAIN = [
+    {x:0.31,y:0.34},{x:0.67,y:0.58},{x:1.12,y:0.93},
+    {x:1.38,y:0.94},{x:1.75,y:0.98},{x:2.08,y:0.89},
+    {x:2.43,y:0.66},{x:2.62,y:0.50},{x:2.91,y:0.27},
+    {x:3.18,y:-0.11},{x:3.42,y:-0.37},{x:3.65,y:-0.54},
+    {x:3.98,y:-0.80},{x:4.24,y:-0.90},{x:4.58,y:-0.99},
+    {x:4.89,y:-0.97},{x:5.21,y:-0.88},{x:5.53,y:-0.64},
+    {x:5.81,y:-0.40},{x:6.10,y:-0.14},
+  ];
+  const N = BV_TRAIN.length;
+
+  // Seeded LCG
+  let _s = 0xDEAD1234|0;
+  function rng(){_s=Math.imul(_s,1664525)+1013904223|0;return(_s>>>0)/0xFFFFFFFF;}
+
+  // Pre-generate 50 bootstrap samples
+  const BOOTS = Array.from({length:50},()=>
+    Array.from({length:N},()=>BV_TRAIN[Math.floor(rng()*N)])
+  );
+  // Pre-generate vertical jitter per bootstrap
+  const JITTER = Array.from({length:50},()=>(rng()-0.5)*0.35);
+
+  function knnRegress(xTest, data, k) {
+    const s=[...data].sort((a,b)=>Math.abs(a.x-xTest)-Math.abs(b.x-xTest));
+    return s.slice(0,k).reduce((sm,d)=>sm+d.y,0)/k;
+  }
+
+  function knnCurve(xs, data, k) {
+    return xs.map(x=>knnRegress(x,data,k));
+  }
+
+  function drawDart(k) {
+    dctx.clearRect(0,0,DW,DH);
+    const cx=DW/2, cy=DH/2, scale=105;
+    // Concentric rings
+    const rings=[{r:0.8,c:'#fbe8e8'},{r:0.5,c:'#fdf3e7'},{r:0.25,c:'#f0f9f0'},{r:0.1,c:'#e6f4ff'}];
+    rings.forEach(({r,c})=>{
+      dctx.beginPath(); dctx.arc(cx,cy,r*scale,0,Math.PI*2);
+      dctx.fillStyle=c; dctx.fill();
+      dctx.strokeStyle='#ddd'; dctx.lineWidth=1; dctx.stroke();
+    });
+    // Axes
+    dctx.strokeStyle='#ccc'; dctx.lineWidth=1; dctx.setLineDash([3,3]);
+    dctx.beginPath(); dctx.moveTo(PAD=20,cy); dctx.lineTo(DW-PAD,cy); dctx.stroke();
+    dctx.beginPath(); dctx.moveTo(cx,PAD); dctx.lineTo(cx,DH-PAD); dctx.stroke();
+    dctx.setLineDash([]);
+    // Bullseye
+    dctx.beginPath(); dctx.arc(cx,cy,7,0,Math.PI*2);
+    dctx.fillStyle='#e8404088'; dctx.fill();
+    dctx.beginPath(); dctx.arc(cx,cy,3,0,Math.PI*2);
+    dctx.fillStyle='#c03030'; dctx.fill();
+
+    // Ring labels
+    dctx.fillStyle='#bbb'; dctx.font='9px Raleway,sans-serif'; dctx.textAlign='left';
+    [0.1,0.25,0.5,0.8].forEach(r=>{
+      dctx.fillText(r.toFixed(2),cx+r*scale+3,cy-3);
+    });
+
+    // Compute predictions
+    const preds = BOOTS.map(bs=>knnRegress(X_TEST,bs,k));
+    const mean = preds.reduce((s,p)=>s+p,0)/preds.length;
+    const bias2 = (mean-Y_TRUE)**2;
+    const variance = preds.reduce((s,p)=>s+(p-mean)**2,0)/preds.length;
+    const mse = preds.reduce((s,p)=>s+(p-Y_TRUE)**2,0)/preds.length;
+
+    // Darts
+    preds.forEach((p,i)=>{
+      const x = cx + p*scale;
+      const y = cy + JITTER[i]*scale*0.5;
+      dctx.beginPath(); dctx.arc(x,y,4,0,Math.PI*2);
+      dctx.fillStyle='#33c3f0cc'; dctx.fill();
+      dctx.strokeStyle='#fff'; dctx.lineWidth=1; dctx.stroke();
+    });
+    // Mean marker
+    dctx.beginPath(); dctx.arc(cx+mean*scale,cy,6,0,Math.PI*2);
+    dctx.fillStyle='#e8803a'; dctx.fill();
+    dctx.strokeStyle='#fff'; dctx.lineWidth=1.5; dctx.stroke();
+
+    // Axis label
+    dctx.fillStyle='#888'; dctx.font='11px Raleway,sans-serif'; dctx.textAlign='center';
+    dctx.fillText('prediction y',cx,DH-4);
+    dctx.fillText('y_true=0',cx+5,cy-10);
+
+    // Stats
+    $('bv-bias2').textContent=bias2.toFixed(3);
+    $('bv-var').textContent=variance.toFixed(3);
+    $('bv-mse').textContent=mse.toFixed(3);
+    const note = k<=3 ? 'Small k: predictions spread widely — high variance, low bias.' :
+                 k>=15 ? 'Large k: tight cluster, but shifted from truth — low variance, high bias.' :
+                 'Middle ground: balancing bias and variance.';
+    $('bv-note').textContent=note;
+  }
+
+  function drawCurve(k) {
+    cctx.clearRect(0,0,CW,CH);
+    cctx.fillStyle='#fafafa'; cctx.fillRect(0,0,CW,CH);
+    const PADx=32, PADy=18;
+    const W2=CW-PADx*2, H2=CH-PADy*2;
+    const toX=x=>(x/(2*Math.PI))*W2+PADx;
+    const toY=y=>PADy+H2/2 - y*(H2/2)*0.9;
+
+    // Grid / zero line
+    cctx.strokeStyle='#eee'; cctx.lineWidth=1;
+    cctx.beginPath(); cctx.moveTo(PADx,toY(0)); cctx.lineTo(PADx+W2,toY(0)); cctx.stroke();
+
+    // True function
+    cctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const x=i/200*2*Math.PI, y=Math.sin(x);
+      const px=toX(x), py=toY(y);
+      i===0?cctx.moveTo(px,py):cctx.lineTo(px,py);
+    }
+    cctx.strokeStyle='#ccc'; cctx.lineWidth=1.5; cctx.setLineDash([4,4]); cctx.stroke(); cctx.setLineDash([]);
+
+    // kNN fit from bootstrap 0
+    const xs=Array.from({length:80},(_,i)=>i/79*2*Math.PI);
+    const ys=knnCurve(xs,BOOTS[0],k);
+    cctx.beginPath();
+    xs.forEach((x,i)=>{
+      const px=toX(x), py=toY(ys[i]);
+      i===0?cctx.moveTo(px,py):cctx.lineTo(px,py);
+    });
+    cctx.strokeStyle='#33c3f0'; cctx.lineWidth=2; cctx.stroke();
+
+    // Training points
+    BV_TRAIN.forEach(d=>{
+      cctx.beginPath(); cctx.arc(toX(d.x),toY(d.y),3.5,0,Math.PI*2);
+      cctx.fillStyle='#444'; cctx.fill();
+    });
+
+    // Test point
+    const tx=toX(X_TEST), ty=toY(Y_TRUE);
+    cctx.strokeStyle='#e8803a'; cctx.lineWidth=1.5; cctx.setLineDash([3,3]);
+    cctx.beginPath(); cctx.moveTo(tx,PADy); cctx.lineTo(tx,CH-PADy); cctx.stroke();
+    cctx.setLineDash([]);
+    cctx.beginPath(); cctx.arc(tx,ty,5,0,Math.PI*2);
+    cctx.fillStyle='#e8803a'; cctx.fill();
+
+    // Labels
+    cctx.fillStyle='#888'; cctx.font='10px Raleway,sans-serif'; cctx.textAlign='center';
+    cctx.fillText('x=π',tx,PADy-4);
+    cctx.fillStyle='#aaa'; cctx.fillText('——  sin(x) true','',0);
+    cctx.fillStyle='#33c3f0'; cctx.fillText(`— k=${k} kNN fit (bootstrap #1)`,CW/2,CH-2);
+  }
+
+  let PAD=20;
+  function update(){
+    const k=parseInt($('bv-k').value);
+    $('bv-k-val').textContent=k;
+    drawDart(k); drawCurve(k);
+  }
+  $('bv-k').addEventListener('input',update);
+  update();
+})();
+
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT 4 — ℓp-Norm Shape Explorer
+   ═══════════════════════════════════════════════════════════ */
+(function lpPlay() {
+  const {c, ctx, W, H} = initCanvas('lp-canvas', 480, 400);
+  const cx=W/2, cy=H/2, SCALE=130;
+  let point=null;
+
+  function lpNorm(x, y, p) {
+    if(p>=18) return Math.max(Math.abs(x),Math.abs(y));
+    return Math.pow(Math.pow(Math.abs(x),p)+Math.pow(Math.abs(y),p),1/p);
+  }
+
+  function lpRadius(theta, p) {
+    if(p>=18) return 1/Math.max(Math.abs(Math.cos(theta)),Math.abs(Math.sin(theta)));
+    const ct=Math.abs(Math.cos(theta)), st=Math.abs(Math.sin(theta));
+    return Math.pow(Math.pow(ct,p)+Math.pow(st,p),-1/p);
+  }
+
+  function drawBall(p, color, alpha, lw) {
+    ctx.beginPath();
+    const steps=720;
+    for(let i=0;i<=steps;i++){
+      const t=2*Math.PI*i/steps;
+      const r=lpRadius(t,p);
+      const x=cx+r*Math.cos(t)*SCALE;
+      const y=cy-r*Math.sin(t)*SCALE;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle=color+'18'; ctx.fill();
+    ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,W,H);
+
+    // Grid
+    ctx.strokeStyle='#ebebeb'; ctx.lineWidth=1;
+    for(let v=-2;v<=2;v++){
+      const px=cx+v*SCALE, py=cy-v*SCALE;
+      ctx.beginPath(); ctx.moveTo(px,20); ctx.lineTo(px,H-20); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(20,py); ctx.lineTo(W-20,py); ctx.stroke();
+    }
+    // Axes
+    ctx.strokeStyle='#bbb'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(20,cy); ctx.lineTo(W-20,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,20); ctx.lineTo(cx,H-20); ctx.stroke();
+    // Unit ticks
+    [-1,1].forEach(v=>{
+      ctx.fillStyle='#aaa'; ctx.font='11px Raleway,sans-serif'; ctx.textAlign='center';
+      ctx.fillText(v,cx+v*SCALE,cy+15);
+      ctx.textAlign='right';
+      ctx.fillText(-v,cx-8,cy-v*SCALE+4);
+    });
+    ctx.fillStyle='#888'; ctx.textAlign='center';
+    ctx.fillText('x₁',W-15,cy-6); ctx.fillText('x₂',cx+8,14);
+
+    const p=parseFloat($('lp-p').value);
+    const showGhost=$('lp-ghost').checked;
+
+    // Ghost balls
+    if(showGhost){
+      drawBall(1,'#aaa',0.5,1);       // L1 diamond
+      drawBall(2,'#888',0.5,1);       // L2 circle
+      drawBall(18,'#666',0.4,1);      // L∞ square
     }
 
-    const rootX=W/2, rootY=28;
-    // Root node
-    box(rootX, rootY, `width ≥ ${wSplit.toFixed(1)}?`, null, "#e8f4fc");
-    // Left branch (width >= wSplit → orange side mostly)
-    const lX=70, lY=100;
-    arrow(rootX,rootY+17, lX,lY-17, "Yes");
-    box(lX, lY, `height ≥ ${hrSplit.toFixed(1)}?`, null, "#e8f4fc");
-    leaf(lX-30, lY+60, "🍊", "#e8803a");
-    leaf(lX+30, lY+60, "🍋", "#3c9d9b");
-    arrow(lX,lY+17, lX-30,lY+44, "No");
-    arrow(lX,lY+17, lX+30,lY+44, "Yes");
+    // Current ball
+    drawBall(p,'#e8803a',1,2.5);
 
-    // Right branch (width < wSplit → lemon side mostly)
-    const rX=190, rY=100;
-    arrow(rootX,rootY+17, rX,rY-17, "No");
-    box(rX, rY, `height ≥ ${hlSplit.toFixed(1)}?`, null, "#e8f4fc");
-    leaf(rX-30, lY+60, "🍋", "#3c9d9b");
-    leaf(rX+30, lY+60, "🍊", "#e8803a");
-    arrow(rX,rY+17, rX-30,rY+44, "Yes");
-    arrow(rX,rY+17, rX+30,rY+44, "No");
+    // Origin
+    ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2);
+    ctx.fillStyle='#444'; ctx.fill();
+
+    // Clicked point
+    if(point){
+      const[px,py]=point;
+      const[sx,sy]=[cx+px*SCALE, cy-py*SCALE];
+      // Line from origin
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(sx,sy);
+      ctx.strokeStyle='#33c3f066'; ctx.lineWidth=1.5; ctx.stroke();
+      // Point
+      ctx.beginPath(); ctx.arc(sx,sy,6,0,Math.PI*2);
+      ctx.fillStyle='#33c3f0'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke();
+      // Distance
+      const d=lpNorm(px,py,p);
+      const pLabel=p>=18?'∞':p.toFixed(1);
+      $('lp-result').textContent=`Point (${px.toFixed(2)}, ${py.toFixed(2)})  →  ‖x‖_${pLabel} = ${d.toFixed(4)}`
+        + (d<1?' < 1 (inside unit ball)' : d>1?' > 1 (outside unit ball)' : ' = 1 (on boundary)');
+    }
+
+    // p label
+    const pLabel=p>=18?'∞':p.toFixed(1);
+    ctx.fillStyle='#e8803a'; ctx.font='bold 13px Raleway,sans-serif'; ctx.textAlign='left';
+    ctx.fillText(`p = ${pLabel}`,22,24);
+    if(showGhost){
+      ctx.fillStyle='#999'; ctx.font='11px Raleway,sans-serif';
+      ctx.fillText('grey: L¹ L² L∞',22,40);
+    }
   }
 
-  function update() {
-    const wSplit  = parseFloat($("dt-width").value);
-    const hlSplit = parseFloat($("dt-height-l").value);
-    const hrSplit = parseFloat($("dt-height-r").value);
-    $("dt-width-val").textContent   = wSplit.toFixed(1);
-    $("dt-height-l-val").textContent= hlSplit.toFixed(1);
-    $("dt-height-r-val").textContent= hrSplit.toFixed(1);
-    drawScatter(wSplit, hlSplit, hrSplit);
-    drawTree(wSplit, hlSplit, hrSplit);
-  }
-
-  ["dt-width","dt-height-l","dt-height-r"].forEach(id => {
-    $(id).addEventListener("input", update);
+  c.addEventListener('click',e=>{
+    const rect=c.getBoundingClientRect();
+    const px=(e.clientX-rect.left)*(W/rect.width);
+    const py=(e.clientY-rect.top)*(H/rect.height);
+    point=[(px-cx)/SCALE, (cy-py)/SCALE];
+    draw();
   });
-
-  update();
+  ['lp-p','lp-ghost'].forEach(id=>{
+    $(id).addEventListener('input',()=>{
+      const p=parseFloat($('lp-p').value);
+      $('lp-p-val').textContent=p>=18?'∞':p.toFixed(1);
+      draw();
+    });
+    $(id).addEventListener('change',()=>{
+      const p=parseFloat($('lp-p').value);
+      $('lp-p-val').textContent=p>=18?'∞':p.toFixed(1);
+      draw();
+    });
+  });
+  draw();
 })();
 
 })();
