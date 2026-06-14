@@ -61,7 +61,8 @@
   }
   .swimlane-label.foundations { color: var(--accent-secondary); }
   .swimlane-label.concepts    { color: var(--accent-dark); }
-  .swimlane-label.applied     { color: #c08030; }
+  .swimlane-label.applied         { color: #c08030; }
+  .swimlane-label.specializations { color: #8b5cf6; }
 
   .node {
     position: absolute; width: 150px; height: 64px;
@@ -134,6 +135,8 @@
     #map { min-width: unset; }                          /* let map shrink freely */
     .node .s { display: none; }                         /* drop subtitles */
     .node .t { font-size: 14px; white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.25; }
+    header.hero { padding: 28px 24px 12px; }
+    .subtitle { padding: 0 20px; }
     .controls-inner { flex-direction: column; gap: 8px; align-items: center; }
     .pills { justify-content: center; }
     .tier-legend { justify-content: center; }
@@ -198,6 +201,7 @@
     <div class="tier-legend-item foundations"><div class="swatch"></div><span id="tl-foundations">Foundations</span></div>
     <div class="tier-legend-item concepts">   <div class="swatch"></div><span id="tl-concepts">Concepts</span></div>
     <div class="tier-legend-item applied">    <div class="swatch"></div><span id="tl-applied">Applications</span></div>
+    <div class="tier-legend-item specializations"><div class="swatch"></div><span id="tl-specializations">Specializations</span></div>
   </div>
 </div>
 
@@ -285,6 +289,7 @@ function positionNodes() {
     { tier:"foundations", y: 0.45   },  // centred between AI entry row (0) and math row (0.9)
     { tier:"concepts",    y: 2.2  + Y_GAP },  // centred between concepts rows
     { tier:"applied",     y: 4.05 + Y_GAP },  // centred between app rows
+    { tier:"specializations", y: 5.35 + Y_GAP },  // specializations top row
   ];
   for (const { tier, y } of swimlanes) {
     const lbl = document.createElement("div");
@@ -478,7 +483,11 @@ function openPopup(id) {
   track("module_popup", { module_id: id, audience });
 
   let body;
-  if (m.ref) {
+  if (m.planned) {
+    body = `
+      <p class="blurb">${blurb}</p>
+      <p class="blurb" style="font-style:italic;color:var(--muted)">🚧 This module is planned — content coming soon.</p>`;
+  } else if (m.ref) {
     body = `
       <p class="blurb">${blurb}</p>
       <p class="blurb" style="font-style:italic">${S.ref_note}</p>
@@ -542,7 +551,7 @@ function applyLang() {
 
   // Tier legend
   const TL = S.tier_label;
-  ["foundations","concepts","applied"].forEach(t => {
+  ["foundations","concepts","applied","specializations"].forEach(t => {
     const el = document.getElementById("tl-" + t);
     if (el) el.textContent = TL[t] || t;
   });

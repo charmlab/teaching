@@ -144,6 +144,11 @@ footer.site-footer {
   background: linear-gradient(110deg, #e8f4fc 0%, #ffffff 55%);
   padding-left: 8px;
 }
+.node[data-tier="specializations"] {
+  border-left: 4px solid #8b5cf6;
+  background: linear-gradient(110deg, #f3eeff 0%, #ffffff 55%);
+  padding-left: 8px;
+}
 .node[data-tier="applied"] {
   border-left: 4px solid #c08030;
   background: linear-gradient(110deg, #fdf5e6 0%, #ffffff 55%);
@@ -180,7 +185,8 @@ footer.site-footer {
 }
 .tier-legend-item.foundations .swatch { background: var(--accent-secondary); }
 .tier-legend-item.concepts    .swatch { background: var(--accent-primary); }
-.tier-legend-item.applied     .swatch { background: #c08030; }
+.tier-legend-item.applied          .swatch { background: #c08030; }
+.tier-legend-item.specializations .swatch { background: #8b5cf6; }
 
 /* ---------- Audience tagline (kept for compat; tag now inside pill) ---------- */
 .aud-tagline { display: none; }
