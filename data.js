@@ -290,7 +290,7 @@ const MODULES = [
     title_fa:"رباتیک", sub_fa:"درک، برنامه‌ریزی، کنترل",
     blurb:"Embodied AI — perception, motion planning, and control in physical environments.",
     blurb_fa:"هوش مصنوعی تجسم‌یافته — درک، برنامه‌ریزی حرکت و کنترل در محیط‌های فیزیکی.",
-    aud:["student"], prereqs:["a-vision"],
+    aud:["student"], prereqs:["c-nn","x-rl"],
     resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
   { id:"a-systems", tier:"applied", short:"Sys",
     title:"AI Systems & MLOps", sub:"models → production",
@@ -399,10 +399,10 @@ const LAYOUT = {
   "x-rai":     { x: 63, y: 5.35 },
   "s-nsai":    { x: 88, y: 5.35 },
   // ── Applications ─────────────────────────────────────────────
-  "a-vision":  { x: 25, y: 3.65 },
-  "a-nlp":     { x: 75, y: 3.65 },
+  "a-vision":  { x: 15, y: 3.65 },
+  "a-nlp":     { x: 85, y: 3.65 },
   "a-agents":  { x: 78, y: 4.45 },
-  "a-robotics":{ x: 50, y: 4.45 },
+  "a-robotics":{ x: 50, y: 3.65 },
   "a-systems": { x: 22, y: 4.45 },
 };
 
