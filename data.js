@@ -228,8 +228,8 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-ml", tier:"concepts", short:"ML",
-    title:"Supervised Learning", sub:"nearest neighbors, decision trees, regression, classification",
-    title_fa:"یادگیری با نظارت", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، رگرسیون، طبقه‌بندی",
+    title:"Supervised Learning", sub:"nearest neighbors, decision trees, ensembling",
+    title_fa:"یادگیری با نظارت", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، یادگیری گروهی",
     blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
