@@ -35,7 +35,7 @@ function getLang() {
 function setLang(l) { localStorage.setItem("alm-lang", l); }
 
 /* ---------- Audience ---------- */
-const AUD_LABEL   = { student: "Student",   executive: "Executive",        public: "Public"         };
+const AUD_LABEL   = { student: "🧑🏻‍🎓 Student", executive: "💼 Executive",    public: "🌐 Public"        };
 const AUD_TAGLINE = { student: "build AI",  executive: "lead with AI",     public: "use AI"         };
 const AUD_TAGLINE_FA = { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" };
 
@@ -56,7 +56,7 @@ const STRINGS = {
   en: {
     find_level: "Find your level · تعیین سطح",
     lang_btn: "فا",
-    audience: { student: "Student", executive: "Executive", public: "Public" },
+    audience: { student: "🧑🏻‍🎓 Student", executive: "💼 Executive", public: "🌐 Public" },
     tagline:  { student: "build AI", executive: "lead with AI", public: "use AI" },
     tier_label: { foundations:"Foundations", concepts:"Concepts", applied:"Applications" },
     views: { map: "Skill tree", path: "Your path" },
@@ -95,7 +95,7 @@ const STRINGS = {
   fa: {
     find_level: "تعیین سطح",
     lang_btn: "EN",
-    audience: { student: "دانشجو", executive: "مدیر اجرایی", public: "عموم" },
+    audience: { student: "🧑🏻‍🎓 دانشجو", executive: "💼 مدیر اجرایی", public: "🌐 عموم" },
     tagline:  { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" },
     tier_label: { foundations:"مبانی", concepts:"مفاهیم", applied:"کاربردها" },
     views: { map: "درخت مهارت", path: "مسیر شما" },
