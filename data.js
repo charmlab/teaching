@@ -320,7 +320,7 @@ const MODULES = [
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-rai", tier:"concepts", short:"RAI",
-    title:"Responsible AI", sub:"fairness, robustness, security & explainability",
+    title:"Responsible AI", sub:"safety, fairness, robustness, security, privacy, & explainability",
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"انصاف، استحکام، امنیت و تبیین‌پذیری",
     blurb:"Case studies in responsible AI: fairness and bias, robustness under distribution shift, security against adversarial attacks, explainability, privacy, and accountability. What does it mean to build AI that is safe and trustworthy?",
     blurb_fa:"مطالعات موردی در هوش مصنوعی مسئولانه: انصاف و تعصب، استحکام در برابر تغییر توزیع، امنیت در برابر حملات، تبیین‌پذیری، حریم خصوصی و پاسخگویی. هوش مصنوعی ایمن و قابل اعتماد یعنی چه؟",

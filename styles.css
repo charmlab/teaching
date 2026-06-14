@@ -152,7 +152,7 @@ footer.site-footer {
 
 /* ---------- Mini nodes (Intro to AI gateway — concepts tier) ---------- */
 .node.mini {
-  width: 140px; height: 50px;
+  width: 116px; height: 46px;
   border-style: solid; border-color: #c5dce8; border-width: 1px;
   border-left-width: 4px; border-left-color: var(--accent-primary);
   background: linear-gradient(110deg, #ddf0fa 0%, #f8fdff 55%);
