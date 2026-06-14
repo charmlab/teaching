@@ -64,7 +64,7 @@
   .swimlane-label.applied     { color: #c08030; }
 
   .node {
-    position: absolute; width: 142px; height: 60px;
+    position: absolute; width: 145px; height: 54px;
     border: 1px solid var(--line); border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
     display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
@@ -74,8 +74,8 @@
   }
   .node:hover { transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
   .node:hover { border-color: rgba(0,0,0,0.18); }
-  .node .t { font-weight: 600; font-size: 11px; line-height: 1.2; }
-  .node .s { font-size: 9px; color: var(--muted); margin-top: 1px; font-weight: 400; }
+  .node .t { font-weight: 600; font-size: 9.5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node .s { font-size: 8px; color: var(--muted); margin-top: 2px; font-weight: 400; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .node.inactive { opacity: 0.22; filter: grayscale(1); box-shadow: none; }
   .node.inactive:hover { opacity: 0.75; filter: grayscale(0.4); }
   .node.pulse { animation: pulse 1.2s ease 3; }
@@ -209,8 +209,10 @@
 
 <script src="data.js"></script>
 <script>
-const CARD_W = 142, CARD_H = 60, MINI_W = 116, MINI_H = 46, UNIT_Y = 118, PAD = 20;
+const CARD_W = 145, CARD_H = 54, MINI_W = 120, MINI_H = 48, UNIT_Y = 118, PAD = 20;
 const MAP_REF_W = 560; // natural map width used for mobile scale calc
+const X_SCALE = 0.80;   // horizontal tightening factor (1 = no change)
+const Y_GAP   = 0.55;   // extra UNIT_Y gaps added above foundations row
 let audience = getAudience();
 let view = "map";
 const map = document.getElementById("map");
@@ -239,7 +241,7 @@ function buildNodes() {
 }
 
 function mapHeight() {
-  const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y));
+  const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y > 0.9 ? p.y + Y_GAP : p.y));
   return maxY * UNIT_Y + CARD_H + 2 * PAD;
 }
 
@@ -255,8 +257,10 @@ function positionNodes() {
     const p = LAYOUT[id];
     el.style.width  = nw + "px";
     el.style.height = nh + "px";
-    el.style.left = Math.max(24, Math.min((p.x / 100) * W - nw / 2, W - nw - 8)) + "px";
-    el.style.top  = (H - PAD - nh - p.y * UNIT_Y) + "px";
+    const ax = 50 + (p.x - 50) * X_SCALE;
+    const ay = p.y > 0.9 ? p.y + Y_GAP : p.y;
+    el.style.left = Math.max(PAD, Math.min((ax / 100) * W - nw / 2, W - nw - PAD)) + "px";
+    el.style.top  = (H - PAD - nh - ay * UNIT_Y) + "px";
   }
 
   // Swimlane labels
@@ -265,8 +269,8 @@ function positionNodes() {
   const TL = STRINGS[lang].tier_label;
   const swimlanes = [
     { tier:"foundations", y: 0.45   },  // centred between AI entry row (0) and math row (0.9)
-    { tier:"concepts",    y: 2.2    },  // centred between concepts rows (1.75 and 2.65)
-    { tier:"applied",     y: 4.05   },  // centred between app rows (3.65 and 4.45)
+    { tier:"concepts",    y: 2.2  + Y_GAP },  // centred between concepts rows
+    { tier:"applied",     y: 4.05 + Y_GAP },  // centred between app rows
   ];
   for (const { tier, y } of swimlanes) {
     const lbl = document.createElement("div");
@@ -307,7 +311,9 @@ function edgePoint(id, side) {
   if (m && m.junction && id in LAYOUT) {
     const p = LAYOUT[id];
     const W = map.clientWidth, H = map.clientHeight;
-    return { x: (p.x / 100) * W, y: H - PAD - CARD_H / 2 - p.y * UNIT_Y };
+    const jax = 50 + (p.x - 50) * X_SCALE;
+    const jay = p.y > 0.9 ? p.y + Y_GAP : p.y;
+    return { x: (jax / 100) * W, y: H - PAD - CARD_H / 2 - jay * UNIT_Y };
   }
   const el = map.querySelector(`.node[data-id="${id}"]`);
   if (!el) return null;
