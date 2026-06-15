@@ -297,7 +297,7 @@ const MODULES = [
     title_fa:"سیستم‌های هوش مصنوعی", sub_fa:"مدل‌ها تا تولید",
     blurb:"From models to systems: retrieval and RAG, APIs and services, end-to-end evaluation, reliability and observability.",
     blurb_fa:"از مدل‌ها به سیستم‌ها: بازیابی و RAG، API‌ها و سرویس‌ها، ارزیابی انتها به انتها، قابلیت اطمینان و مشاهده‌پذیری.",
-    aud:["executive"], prereqs:["a-agents","a-vision"],
+    aud:["student","executive"], prereqs:["a-agents","a-vision"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
@@ -358,7 +358,7 @@ const MODULES = [
     title_fa:"هوش مصنوعی مسئولانه", sub_fa:"انصاف، استحکام، امنیت و تبیین‌پذیری",
     blurb:"Case studies in responsible AI: fairness and bias, robustness under distribution shift, security against adversarial attacks, explainability, privacy, and accountability. What does it mean to build AI that is safe and trustworthy?",
     blurb_fa:"مطالعات موردی در هوش مصنوعی مسئولانه: انصاف و تعصب، استحکام در برابر تغییر توزیع، امنیت در برابر حملات، تبیین‌پذیری، حریم خصوصی و پاسخگویی. هوش مصنوعی ایمن و قابل اعتماد یعنی چه؟",
-    aud:["student","executive","public"], prereqs:[],
+    aud:["student","executive"], prereqs:[],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 ];
@@ -377,8 +377,8 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 */
 const LAYOUT = {
   // ── Foundations row 1 (entry points, very bottom) ───────────
-  "c-intro":   { x: 18, y: 0    },  // AI Literacy
-  "c-flu":     { x: 50, y: 0    },  // AI Fluency
+  "c-intro":   { x: 35, y: 0    },  // AI Literacy
+  "c-flu":     { x: 65, y: 0    },  // AI Fluency
   // ── Junction dot (between math row and concepts row 1) ──────
   "junc-f2c":  { x: 50, y: 1.325 },
   // ── Foundations row 2 (math references) ─────────────────────
@@ -446,7 +446,6 @@ const PATHS = {
     steps: [
       { id:"c-intro", where:"" },
       { id:"c-flu",   where:"" },
-      { id:"x-rai",   where:"", bonus:true },
     ],
   },
 };
