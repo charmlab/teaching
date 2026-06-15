@@ -390,11 +390,11 @@ const LAYOUT = {
   "f-opt":     { x: 70, y: 0.9  },
   "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
-  "x-unsup":   { x: 50, y: 2.65 },
-  "c-ml":      { x: 30, y: 1.75 },
-  "x-rl":      { x: 80, y: 2.65 },
+  "x-unsup":   { x: 55, y: 2.65 },
+  "c-ml":      { x: 20, y: 1.75 },
+  "x-rl":      { x: 87, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
-  "c-nn":      { x: 22, y: 2.65 },
+  "c-nn":      { x: 12, y: 2.65 },
   // ── Specializations ─────────────────────────────────────────────────
   "s-causal":  { x: 12, y: 5.35 },
   "s-xai":     { x: 37, y: 5.35 },
