@@ -78,6 +78,7 @@ const STRINGS = {
       public:    "Start here. No technical background required — just curiosity about AI.",
     },
     ref_note: "Reference module — no original content here. Learn this from the excellent resources below.",
+    supervised_learning: "Supervised Learning",
     back_to_map: "← back to the map",
     minimap_label: "you are here — click a node to travel",
     resources_title: "\u{1F4DA} Learn more",
@@ -100,6 +101,7 @@ const STRINGS = {
     audience: { student: "🧑🏻‍🎓 دانشجو", executive: "💼 مدیر اجرایی", public: "🌐 عموم" },
     tagline:  { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" },
     tier_label: { foundations:"مبانی", concepts:"مفاهیم", applied:"کاربردها", specializations:"تخصص‌ها" },
+    supervised_learning: "یادگیری با نظارت",
     views: { map: "درخت مهارت", path: "مسیر شما" },
     map_title: "نقشه یادگیری هوش مصنوعی",
     map_subtitle: "یک مسیر منسجم از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب برای شما. هر ماژول، سه روش:",
@@ -316,7 +318,7 @@ const MODULES = [
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
-    aud:["student"], prereqs:["c-ml"],
+    aud:["student"], prereqs:["junc-f2c"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -325,7 +327,7 @@ const MODULES = [
     title_fa:"یادگیری تقویتی", sub_fa:"باندیت‌ها، MDP، توابع ارزش، گرادیان سیاست",
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
-    aud:["student"], prereqs:["c-ml"],
+    aud:["student"], prereqs:["junc-f2c"],
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -389,7 +391,7 @@ const LAYOUT = {
   "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
   "x-unsup":   { x: 50, y: 2.65 },
-  "c-ml":      { x: 50, y: 1.75 },
+  "c-ml":      { x: 30, y: 1.75 },
   "x-rl":      { x: 80, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
   "c-nn":      { x: 22, y: 2.65 },
