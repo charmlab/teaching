@@ -101,7 +101,7 @@
   }
   #supervised-plate .plate-label {
     position: absolute;
-    top: 5px; right: 9px;
+    bottom: 6px; left: 9px;
     font-size: 7.5px; font-weight: 700;
     letter-spacing: 1.2px; text-transform: uppercase;
     color: rgba(90, 90, 110, 0.55);
@@ -348,7 +348,7 @@ function updatePlate() {
     plate.appendChild(lbl);
     map.appendChild(plate);
   }
-  const pad = 10;
+  const pad = 10, padB = 24;
   const ids = ["c-nn", "c-ml"];
   let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
   for (const id of ids) {
@@ -362,7 +362,7 @@ function updatePlate() {
   plate.style.left   = (minL - pad) + "px";
   plate.style.top    = (minT - pad) + "px";
   plate.style.width  = (maxR - minL + 2 * pad) + "px";
-  plate.style.height = (maxB - minT + 2 * pad) + "px";
+  plate.style.height = (maxB - minT + pad + padB) + "px";
   plate.querySelector(".plate-label").textContent = STRINGS[getLang()].supervised_learning || "Supervised Learning";
 }
 
