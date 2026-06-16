@@ -157,7 +157,6 @@ const MODULES = [
     resources:[
       { title:"3Blue1Brown — Essence of Linear Algebra", type:"video", url:"https://www.3blue1brown.com/topics/linear-algebra" },
       { title:"StatQuest — Essential Matrix Algebra for Neural Networks", type:"video", url:"https://youtu.be/ZTt9gsGcdDo" },
-      { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -184,7 +183,6 @@ const MODULES = [
       { title:"Seeing Theory — visual introduction to probability", type:"website", url:"https://seeing-theory.brown.edu" },
       { title:"StatQuest — Statistics Fundamentals (playlist)", type:"video", url:"https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9" },
       { title:"StatQuest — Bayes' Theorem, Clearly Explained", type:"video", url:"https://youtu.be/9wCnvr7Xw4E" },
-      { title:"StatQuest — Maximum Likelihood", type:"video", url:"https://youtu.be/XepXtl9YKwc" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -196,8 +194,6 @@ const MODULES = [
     ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"Khan Academy — Multivariable Calculus (optimization units)", type:"website", url:"https://www.khanacademy.org/math/multivariable-calculus" },
-      { title:"StatQuest — Gradient Descent", type:"video", url:"https://youtu.be/sDv4f4s2SB8" },
-      { title:"StatQuest — Stochastic Gradient Descent", type:"video", url:"https://youtu.be/vMh0zPT0tLI" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -259,6 +255,9 @@ const MODULES = [
     resources:[
       { title:"3Blue1Brown — Neural Networks", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
+      { title:"StatQuest — Maximum Likelihood", type:"video", url:"https://youtu.be/XepXtl9YKwc" },
+      { title:"StatQuest — Gradient Descent", type:"video", url:"https://youtu.be/sDv4f4s2SB8" },
+      { title:"StatQuest — Stochastic Gradient Descent", type:"video", url:"https://youtu.be/vMh0zPT0tLI" },
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
@@ -327,7 +326,9 @@ const MODULES = [
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
     aud:["student"], prereqs:["junc-f2c"],
-    resources:[],
+    resources:[
+      { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
+    ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-rl", tier:"concepts", short:"RL",
@@ -336,7 +337,9 @@ const MODULES = [
     blurb:"MDPs, value functions, Q-learning, and policy gradients — learning by interacting with an environment.",
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
     aud:["student"], prereqs:["junc-f2c"],
-    resources:[],
+    resources:[
+      { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
+    ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"s-causal", tier:"specializations", short:"Cau", planned:true,
