@@ -391,7 +391,7 @@ const LAYOUT = {
   "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
   "x-unsup":   { x: 50, y: 2.65 },
-  "c-ml":      { x: 31, y: 1.95 },
+  "c-ml":      { x: 26, y: 1.95 },
   "x-rl":      { x: 81, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
   "c-nn":      { x: 19, y: 2.65 },
