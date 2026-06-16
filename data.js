@@ -156,6 +156,7 @@ const MODULES = [
     ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"3Blue1Brown — Essence of Linear Algebra", type:"video", url:"https://www.3blue1brown.com/topics/linear-algebra" },
+      { title:"Gilbert Strang — Linear Algebra (MIT 18.06)", type:"video", url:"https://www.youtube.com/watch?v=7UJ4CFRGd-U&list=PLE7DDD91010BC51F8" },
       { title:"StatQuest — Essential Matrix Algebra for Neural Networks", type:"video", url:"https://youtu.be/ZTt9gsGcdDo" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
