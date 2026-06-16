@@ -379,8 +379,8 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 */
 const LAYOUT = {
   // ── Foundations row 1 (entry points, very bottom) ───────────
-  "c-intro":   { x: 35, y: 0    },  // AI Literacy
-  "c-flu":     { x: 65, y: 0    },  // AI Fluency
+  "c-intro":   { x: 25, y: 0    },  // AI Literacy
+  "c-flu":     { x: 50, y: 0    },  // AI Fluency
   // ── Junction dot (between math row and concepts row 1) ──────
   "junc-f2c":  { x: 50, y: 1.325 },
   // ── Foundations row 2 (math references) ─────────────────────
@@ -390,22 +390,22 @@ const LAYOUT = {
   "f-opt":     { x: 70, y: 0.9  },
   "f-prog":    { x: 90, y: 0.9  },
   // ── Concepts row 1 ───────────────────────────────────────────
-  "x-unsup":   { x: 55, y: 2.65 },
+  "x-unsup":   { x: 50, y: 2.65 },
   "c-ml":      { x: 31, y: 1.95 },
-  "x-rl":      { x: 87, y: 2.65 },
+  "x-rl":      { x: 75, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
-  "c-nn":      { x: 22, y: 2.65 },
+  "c-nn":      { x: 25, y: 2.65 },
   // ── Specializations ─────────────────────────────────────────────────
-  "s-causal":  { x: 12, y: 5.35 },
-  "s-xai":     { x: 37, y: 5.35 },
-  "x-rai":     { x: 85, y: 0    },
-  "s-nsai":    { x: 88, y: 5.35 },
+  "s-causal":  { x: 25, y: 5.35 },
+  "s-xai":     { x: 50, y: 5.35 },
+  "x-rai":     { x: 75, y: 0    },
+  "s-nsai":    { x: 75, y: 5.35 },
   // ── Applications ─────────────────────────────────────────────
-  "a-vision":  { x: 15, y: 3.65 },
+  "a-vision":  { x: 25, y: 3.65 },
   "a-nlp":     { x: 50, y: 3.65 },
-  "a-agents":  { x: 68, y: 4.45 },
-  "a-robotics":{ x: 85, y: 3.65 },
-  "a-systems": { x: 32, y: 4.45 },
+  "a-agents":  { x: 67, y: 4.45 },
+  "a-robotics":{ x: 75, y: 3.65 },
+  "a-systems": { x: 33, y: 4.45 },
 };
 
 const EDGES = (() => {
