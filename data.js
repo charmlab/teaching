@@ -280,6 +280,7 @@ const MODULES = [
     blurb_fa:"مدل‌های دنباله، تعبیه‌ها، توجه، ترانسفورمرها، پیش‌آموزش و تنظیم دقیق، رمزگشایی. از n-gram تا LLM.",
     aud:["student","executive"], prereqs:["c-nn"],
     resources:[
+      { title:"Lena Voita — NLP Course for You", type:"website", url:"https://lena-voita.github.io/nlp_course.html#main_page_content" },
       { title:"Jay Alammar — The Illustrated Transformer", type:"website", url:"https://jalammar.github.io/illustrated-transformer/" },
       { title:"3Blue1Brown — Neural Networks (attention & transformers chapters)", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero (GPT lectures)", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
