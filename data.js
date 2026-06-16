@@ -392,19 +392,19 @@ const LAYOUT = {
   // ── Concepts row 1 ───────────────────────────────────────────
   "x-unsup":   { x: 50, y: 2.65 },
   "c-ml":      { x: 31, y: 1.95 },
-  "x-rl":      { x: 75, y: 2.65 },
+  "x-rl":      { x: 90, y: 2.65 },
   // ── Concepts row 2 (Deep Learning left, Prob AI right) ──────
-  "c-nn":      { x: 25, y: 2.65 },
+  "c-nn":      { x: 10, y: 2.65 },
   // ── Specializations ─────────────────────────────────────────────────
-  "s-causal":  { x: 25, y: 5.35 },
+  "s-causal":  { x: 10, y: 5.35 },
   "s-xai":     { x: 50, y: 5.35 },
   "x-rai":     { x: 75, y: 0    },
-  "s-nsai":    { x: 75, y: 5.35 },
+  "s-nsai":    { x: 90, y: 5.35 },
   // ── Applications ─────────────────────────────────────────────
-  "a-vision":  { x: 25, y: 3.65 },
+  "a-vision":  { x: 10, y: 3.65 },
   "a-nlp":     { x: 50, y: 3.65 },
   "a-agents":  { x: 67, y: 4.45 },
-  "a-robotics":{ x: 75, y: 3.65 },
+  "a-robotics":{ x: 90, y: 3.65 },
   "a-systems": { x: 33, y: 4.45 },
 };
 
