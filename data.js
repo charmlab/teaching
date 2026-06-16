@@ -156,6 +156,8 @@ const MODULES = [
     ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"3Blue1Brown — Essence of Linear Algebra", type:"video", url:"https://www.3blue1brown.com/topics/linear-algebra" },
+      { title:"StatQuest — Essential Matrix Algebra for Neural Networks", type:"video", url:"https://youtu.be/ZTt9gsGcdDo" },
+      { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -167,6 +169,7 @@ const MODULES = [
     ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"3Blue1Brown — Essence of Calculus", type:"video", url:"https://www.3blue1brown.com/topics/calculus" },
+      { title:"StatQuest — The Chain Rule", type:"video", url:"https://youtu.be/wl1myxrtQHQ" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -179,6 +182,9 @@ const MODULES = [
     resources:[
       { title:"Khan Academy — Statistics & Probability", type:"website", url:"https://www.khanacademy.org/math/statistics-probability" },
       { title:"Seeing Theory — visual introduction to probability", type:"website", url:"https://seeing-theory.brown.edu" },
+      { title:"StatQuest — Statistics Fundamentals (playlist)", type:"video", url:"https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9" },
+      { title:"StatQuest — Bayes' Theorem, Clearly Explained", type:"video", url:"https://youtu.be/9wCnvr7Xw4E" },
+      { title:"StatQuest — Maximum Likelihood", type:"video", url:"https://youtu.be/XepXtl9YKwc" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
@@ -190,6 +196,8 @@ const MODULES = [
     ref:true, aud:["student","executive"], prereqs:[],
     resources:[
       { title:"Khan Academy — Multivariable Calculus (optimization units)", type:"website", url:"https://www.khanacademy.org/math/multivariable-calculus" },
+      { title:"StatQuest — Gradient Descent", type:"video", url:"https://youtu.be/sDv4f4s2SB8" },
+      { title:"StatQuest — Stochastic Gradient Descent", type:"video", url:"https://youtu.be/vMh0zPT0tLI" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
