@@ -179,6 +179,7 @@ const MODULES = [
     blurb_fa:"توزیع‌ها، امید ریاضی، تخمین و استنتاج آماری — چرا یادگیری ماشین درباره داده‌های ندیده ادعایی می‌کند.",
     ref:true, aud:["student","executive"], prereqs:[],
     resources:[
+      { title:"3Blue1Brown — Chain Rule & Product Rule (Probability)", type:"video", url:"https://www.3blue1brown.com/?lesson=chain-rule-and-product-rule&topic=probability" },
       { title:"Khan Academy — Statistics & Probability", type:"website", url:"https://www.khanacademy.org/math/statistics-probability" },
       { title:"Seeing Theory — visual introduction to probability", type:"website", url:"https://seeing-theory.brown.edu" },
       { title:"StatQuest — Statistics Fundamentals (playlist)", type:"video", url:"https://www.youtube.com/playlist?list=PLblh5JKOoLUK0FLuzwntyYI10UQFUhsY9" },

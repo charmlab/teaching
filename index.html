@@ -155,7 +155,8 @@
     color: var(--text);
   }
   .ing-option:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-card); color: var(--text); }
-  .ing-option .icon { font-size: 24px; }
+  .ing-option .icon { font-size: 24px; display:flex; align-items:center; justify-content:center; }
+  .ing-option .icon .res-logo { width: 26px; height: 26px; border-radius: 5px; object-fit: contain; }
   .ing-option .h { font-weight: 600; font-size: 14.5px; }
   .ing-option .h em { font-style: normal; color: var(--accent-dark); font-weight: 400; font-size: 13px; }
   .ing-option .d { font-size: 12.5px; color: var(--muted); }
@@ -541,6 +542,18 @@ function renderPath() {
 
 /* ---------- popup ---------- */
 const RES_ICON = { video: "\u{1F3A5}", website: "\u{1F310}", pdf: "\u{1F4C4}", book: "\u{1F4D8}" };
+const RES_LOGO_DOMAINS = {
+  "3Blue1Brown": "https://www.google.com/s2/favicons?domain=3blue1brown.com&sz=64",
+  "StatQuest":   "https://www.google.com/s2/favicons?domain=statquest.org&sz=64",
+  "Khan Academy":"https://www.google.com/s2/favicons?domain=khanacademy.org&sz=64",
+};
+function resIcon(r) {
+  for (const [prefix, logo] of Object.entries(RES_LOGO_DOMAINS)) {
+    if (r.title.startsWith(prefix))
+      return `<img src="${logo}" class="res-logo" alt="${prefix}">`;
+  }
+  return RES_ICON[r.type] || RES_ICON.website;
+}
 function openPopup(id) {
   const m = byId[id];
   const lang = getLang();
@@ -561,7 +574,7 @@ function openPopup(id) {
       ${m.resources.map(r => `
         <a class="ing-option" href="${r.url}" target="_blank" rel="noopener"
            onclick="track('resource_click',{module_id:'${m.id}',resource:'${r.url}'})">
-          <span class="icon">${RES_ICON[r.type] || RES_ICON.website}</span>
+          <span class="icon">${resIcon(r)}</span>
           <span><div class="h">${r.title}</div><div class="d">${r.url.replace(/^https?:\/\//, "")}</div></span>
         </a>`).join("")}`;
   } else {
