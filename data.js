@@ -355,14 +355,14 @@ const MODULES = [
     aud:["student"], prereqs:[],
     resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rai", tier:"specializations", short:"RAI", planned:true,
-    title:"Responsible AI", sub:"safety, fairness, robustness, privacy, & explainability",
-    title_fa:"هوش مصنوعی مسئولانه", sub_fa:"انصاف، استحکام، امنیت و تبیین‌پذیری",
-    blurb:"Case studies in responsible AI: fairness and bias, robustness under distribution shift, security against adversarial attacks, explainability, privacy, and accountability. What does it mean to build AI that is safe and trustworthy?",
-    blurb_fa:"مطالعات موردی در هوش مصنوعی مسئولانه: انصاف و تعصب، استحکام در برابر تغییر توزیع، امنیت در برابر حملات، تبیین‌پذیری، حریم خصوصی و پاسخگویی. هوش مصنوعی ایمن و قابل اعتماد یعنی چه؟",
-    aud:["student","executive"], prereqs:[],
+  { id:"x-rai", tier:"foundations", short:"Eth",
+    title:"AI Ethics", sub:"case studies, risks & responsible use",
+    title_fa:"اخلاق هوش مصنوعی", sub_fa:"مطالعات موردی، خطرات و استفاده مسئولانه",
+    blurb:"Real-world case studies on where AI goes wrong — bias, misinformation, privacy violations, job displacement, and more. A practical guide to what AI should and shouldn't be used for, with no technical background required.",
+    blurb_fa:"مطالعات موردی واقعی در موردی که هوش مصنوعی اشتباه می‌رود — تعصب، اطلاعات نادرست، نقض حریم خصوصی، و بیشتر. راهنمای عملی برای اینکه هوش مصنوعی باید و نباید برای چه مواردی استفاده شود.",
+    aud:["public","student","executive"], prereqs:[],
     resources:[],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"planned", play:"planned", build:"planned"} },
 ];
 
 const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
@@ -370,7 +370,7 @@ const byId = Object.fromEntries(MODULES.map(m => [m.id, m]));
 /* One shared layout — x = % of canvas width (card center), y = level (0=bottom) */
 /* Layout: bottom=foundations, middle=concepts blob, top=applications
    Row y-values:
-     0.0  — foundations row 1: AI Literacy | AI Fluency | Responsible AI (bottom entry row)
+     0.0  — foundations row 1: AI Literacy | AI Fluency | AI Ethics (bottom entry row)
      0.9  — foundations row 2: 5 math foundations (reference, students/execs)
      1.75 — concepts row 1: Unsupervised | Supervised | RL
      2.65 — concepts row 2: Deep Learning | Probabilistic AI
@@ -398,7 +398,7 @@ const LAYOUT = {
   // ── Specializations ─────────────────────────────────────────────────
   "s-causal":  { x: 12, y: 5.35 },
   "s-xai":     { x: 37, y: 5.35 },
-  "x-rai":     { x: 63, y: 5.35 },
+  "x-rai":     { x: 85, y: 0    },
   "s-nsai":    { x: 88, y: 5.35 },
   // ── Applications ─────────────────────────────────────────────
   "a-vision":  { x: 15, y: 3.65 },
