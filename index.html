@@ -563,7 +563,7 @@ function openPopup(id) {
   track("module_popup", { module_id: id, audience });
 
   let body;
-  if (m.planned) {
+  if (m.planned && !m.ref) {
     body = `
       <p class="blurb">${blurb}</p>
       <p class="blurb" style="font-style:italic;color:var(--muted)">🚧 This module is planned — content coming soon.</p>`;

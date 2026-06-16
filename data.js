@@ -297,13 +297,15 @@ const MODULES = [
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
 
-  { id:"a-robotics", tier:"applied", short:"Ro", planned:true,
+  { id:"a-robotics", tier:"applied", short:"Ro", planned:true, ref:true,
     title:"Robotics", sub:"perception, planning, control",
     title_fa:"رباتیک", sub_fa:"درک، برنامه‌ریزی، کنترل",
     blurb:"Embodied AI — perception, motion planning, and control in physical environments.",
     blurb_fa:"هوش مصنوعی تجسم‌یافته — درک، برنامه‌ریزی حرکت و کنترل در محیط‌های فیزیکی.",
     aud:["student"], prereqs:["c-nn","x-rl"],
-    resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
+    resources:[
+      { title:"Stanford CS223A — Introduction to Robotics", type:"website", url:"https://see.stanford.edu/Course/CS223A" },
+    ], ing:{listen:"planned", play:"planned", build:"planned"} },
   { id:"a-systems", tier:"applied", short:"Sys",
     title:"AI Systems & MLOps", sub:"models → production",
     title_fa:"سیستم‌های هوش مصنوعی", sub_fa:"مدل‌ها تا تولید",
