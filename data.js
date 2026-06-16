@@ -222,7 +222,7 @@ const MODULES = [
     resources:[],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"c-flu", tier:"foundations", short:"Flu",
+  { id:"c-flu", tier:"foundations", short:"Flu", planned:true,
     title:"AI Fluency", sub:"prompts, tools & workflows",
     title_fa:"مهارت هوش مصنوعی", sub_fa:"پرامپت‌نویسی، ابزارها و گردش‌های کاری",
     blurb:"How to use AI tools effectively: prompting strategies, working with LLMs, integrating AI into real workflows, and evaluating outputs critically.",
@@ -355,7 +355,7 @@ const MODULES = [
     aud:["student"], prereqs:[],
     resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rai", tier:"foundations", short:"Eth",
+  { id:"x-rai", tier:"foundations", short:"Eth", planned:true,
     title:"AI Ethics", sub:"case studies, risks & responsible use",
     title_fa:"اخلاق هوش مصنوعی", sub_fa:"مطالعات موردی، خطرات و استفاده مسئولانه",
     blurb:"Real-world case studies on where AI goes wrong — bias, misinformation, privacy violations, job displacement, and more. A practical guide to what AI should and shouldn't be used for, with no technical background required.",
