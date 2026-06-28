@@ -311,7 +311,7 @@ const MODULES = [
     title_fa:"سیستم‌های هوش مصنوعی", sub_fa:"مدل‌ها تا تولید",
     blurb:"From models to systems: retrieval and RAG, APIs and services, end-to-end evaluation, reliability and observability.",
     blurb_fa:"از مدل‌ها به سیستم‌ها: بازیابی و RAG، API‌ها و سرویس‌ها، ارزیابی انتها به انتها، قابلیت اطمینان و مشاهده‌پذیری.",
-    aud:["student","executive"], prereqs:["a-agents","a-vision"],
+    aud:["executive"], prereqs:["a-agents","a-vision"],
     resources:[],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
