@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linear Regression — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on linear regression: models, losses, optimization, gradient descent, overfitting, and ridge regression.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+
+<a class="backlink" href="../../../index.html">&larr; Back to the AI Learning Map</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 4 &middot; The ML Bible</div>
+  <h1>Linear Regression</h1>
+  <p class="lede">
+    The first parametric model of the course, and the template for every model
+    that follows. We pick a family of functions, we measure how wrong each one
+    is, and we search for the least wrong one. That three-step recipe, model,
+    loss, optimization, is the whole of modern machine learning in miniature.
+    This lesson builds it from scratch: every concept gets an animation, an
+    interactive figure, or a piece of code you can step through line by line.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: four prediction problems</a></li>
+    <li><a href="#sec-reg-vs-class">Regression vs classification</a></li>
+    <li><a href="#sec-modular">The modular view of ML</a></li>
+    <li><a href="#sec-pitch">Linear regression, the high-level pitch</a></li>
+    <li><a href="#sec-highschool">Back to high-school math</a></li>
+    <li><a href="#sec-multiple">Simple vs multiple regression</a></li>
+    <li><a href="#sec-loss">The loss function</a></li>
+    <li><a href="#sec-spaces">Data space vs weight space</a></li>
+    <li><a href="#sec-optimization">Optimization from first principles</a></li>
+    <li><a href="#sec-gd">Gradient descent</a></li>
+    <li><a href="#sec-overfitting">Noise, generalization, regularization</a></li>
+    <li><a href="#sec-misc">Miscellany: why squared error?</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> Four prediction problems</h2>
+
+<p>Before any math, four questions you have probably asked this week:</p>
+
+<div class="hook-grid" id="hook-cards">
+  <div class="hook-card"><div class="hook-emoji">🎬</div><div class="hook-q">What should I watch tonight?</div><div class="hook-a">Netflix predicts a match score for you: <b>91%</b></div></div>
+  <div class="hook-card"><div class="hook-emoji">⭐</div><div class="hook-q">How good is this movie?</div><div class="hook-a">A rating on a continuous scale: <b>7.8 / 10</b></div></div>
+  <div class="hook-card"><div class="hook-emoji">📈</div><div class="hook-q">How many followers will I have next month?</div><div class="hook-a">A count that grows over time: <b>12,400</b></div></div>
+  <div class="hook-card"><div class="hook-emoji">🏠</div><div class="hook-q">What is this house worth?</div><div class="hook-a">A price in dollars: <b>$842,000</b></div></div>
+</div>
+
+<p>
+Look at the answers, not the questions. A match percentage, a rating, a
+follower count, a price. Every one of them is a <em>continuous number</em>.
+Not a category, not a yes or no, a number that can land anywhere on a scale.
+Predicting a continuous number from data is called <strong>regression</strong>,
+and it is one of the two great problem types in supervised learning. The
+other, predicting a discrete category, is <strong>classification</strong>. You
+have already met classifiers in this course: kNN votes on a label, a decision
+tree routes you to a leaf with a class in it. Today the output is a number.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. REGRESSION VS CLASSIFICATION ═══════════════════ -->
+<section id="sec-reg-vs-class">
+<h2><span class="secnum">1.</span> Regression vs classification</h2>
+
+<p>
+The split is about the <em>target</em> <span class="m">$t$</span>, the thing
+you want to predict. If <span class="m">$t$</span> is a real number (a movie
+rating in <span class="m">$[0, 10]$</span>, a follower count, a house price),
+the problem is regression. If <span class="m">$t$</span> is a label from a
+finite set (spam or not, cat or dog or bird), the problem is classification.
+Same inputs, same data-collection story, different output type, and, as you
+will see over the next few lectures, different losses and different models.
+</p>
+
+<p>
+The figure below makes the split physical. The same cloud of points can be
+read both ways. In regression mode, the vertical axis <em>is</em> the target,
+and the model is a line chasing the trend. Flip the switch and the vertical
+axis becomes just another input feature, the targets collapse into two
+colours, and the model becomes a boundary separating them. Watch the morph.
+</p>
+
+<div class="figure" id="fig-regclass">
+  <div class="fig-mount" data-fig="regclass"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> one dataset, two readings. Toggle between regression (fit a line to continuous targets) and classification (separate two classes with a boundary).</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Your bank builds a model that outputs the probability, between 0 and 1, that a transaction is fraudulent, then flags it as fraud whenever the probability exceeds 0.9. Is the final system doing regression or classification?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Regression, because a probability is a continuous number</button>
+    <button data-k="b">Classification, because probabilities are always classification</button>
+    <button data-k="c">The model's raw output is continuous, but the thresholded decision is a discrete label, so the end-to-end system is a classifier</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Close, the intermediate output is continuous. But the question asks about the final system, which emits one of two labels: fraud or not fraud.</div>
+  <div class="quiz-fb" data-k="b">Not quite. Predicting a probability by itself is a regression-flavoured task. It is the thresholding step that makes the output discrete.</div>
+  <div class="quiz-fb" data-k="c">Exactly. The boundary between the two problem types is the type of the <em>final</em> output. Many classifiers are regressors with a threshold bolted on, a trick you will meet again in logistic regression.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. THE MODULAR VIEW OF ML ═══════════════════ -->
+<section id="sec-modular">
+<h2><span class="secnum">2.</span> The modular view of ML</h2>
+
+<p>
+Here is the scaffold this whole lesson hangs on, and honestly, the scaffold
+the whole course hangs on. Every supervised learning method you will ever
+meet decomposes into the same five modules:
+</p>
+
+<div class="figure" id="fig-modular">
+  <svg class="modular-svg" viewBox="0 0 860 300" role="img" aria-label="Five modules of machine learning: model, objective, optimization in a pipeline, with generalization evaluating the result and regularization feeding into the objective">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 1 L 9 5 L 0 9 z" fill="#111"/>
+      </marker>
+    </defs>
+    <!-- pipeline boxes -->
+    <g font-family="Inter, -apple-system, sans-serif">
+      <rect x="20"  y="90" width="220" height="86" rx="10" fill="#fff5ec" stroke="#e8590c" stroke-width="2"/>
+      <text x="130" y="122" text-anchor="middle" font-size="17" font-weight="700" fill="#111">1 &middot; Model</text>
+      <text x="130" y="144" text-anchor="middle" font-size="12.5" fill="#444">a family of functions</text>
+      <text x="130" y="161" text-anchor="middle" font-size="12.5" fill="#444">y(x) = w&#8320; + w&#8321;x</text>
+
+      <rect x="320" y="90" width="220" height="86" rx="10" fill="#eefbf1" stroke="#2f9e44" stroke-width="2"/>
+      <text x="430" y="122" text-anchor="middle" font-size="17" font-weight="700" fill="#111">2 &middot; Objective</text>
+      <text x="430" y="144" text-anchor="middle" font-size="12.5" fill="#444">how wrong is each</text>
+      <text x="430" y="161" text-anchor="middle" font-size="12.5" fill="#444">candidate? J(w)</text>
+
+      <rect x="620" y="90" width="220" height="86" rx="10" fill="#f5f0ff" stroke="#7048e8" stroke-width="2"/>
+      <text x="730" y="122" text-anchor="middle" font-size="17" font-weight="700" fill="#111">3 &middot; Optimization</text>
+      <text x="730" y="144" text-anchor="middle" font-size="12.5" fill="#444">find the w that</text>
+      <text x="730" y="161" text-anchor="middle" font-size="12.5" fill="#444">minimizes J(w)</text>
+
+      <!-- arrows -->
+      <line x1="240" y1="133" x2="312" y2="133" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="540" y1="133" x2="612" y2="133" stroke="#111" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <!-- regularization feeds the objective -->
+      <rect x="320" y="8" width="220" height="52" rx="10" fill="#fff" stroke="#868e96" stroke-width="1.6" stroke-dasharray="6 4"/>
+      <text x="430" y="30" text-anchor="middle" font-size="14.5" font-weight="700" fill="#111">5 &middot; Regularization</text>
+      <text x="430" y="48" text-anchor="middle" font-size="12" fill="#444">keep the model simple: J(w) + &lambda;R(w)</text>
+      <line x1="430" y1="60" x2="430" y2="82" stroke="#868e96" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+      <!-- generalization judges the output -->
+      <rect x="320" y="228" width="220" height="52" rx="10" fill="#fff" stroke="#868e96" stroke-width="1.6" stroke-dasharray="6 4"/>
+      <text x="430" y="250" text-anchor="middle" font-size="14.5" font-weight="700" fill="#111">4 &middot; Generalization</text>
+      <text x="430" y="268" text-anchor="middle" font-size="12" fill="#444">does it work on data it has never seen?</text>
+      <line x1="730" y1="176" x2="545" y2="240" stroke="#868e96" stroke-width="1.8" marker-end="url(#arrow)"/>
+    </g>
+  </svg>
+  <p class="fig-caption"><b>Fig 2.1,</b> the five modules. Pick a model class, score candidates with an objective, optimize to find the best one, check it generalizes, and regularize when it does not.</p>
+</div>
+
+<dl class="deflist">
+  <dt>Model</dt>
+  <dd>A function that represents the relationship between an input <span class="m">$x$</span> and a target <span class="m">$t$</span>. The <em>model class</em> is the family the function is chosen from: kNN, decision trees, linear regression, neural networks. Each family comes with parameters and a learning algorithm.</dd>
+  <dt>Objective function</dt>
+  <dd>Also called the loss, cost, error, or (flipped in sign) utility function. It measures how well a particular candidate model fits the <em>training examples</em>: the pairs <span class="m">$(x^{(i)}, t^{(i)})$</span> for which we already know the answer.</dd>
+  <dt>Optimization</dt>
+  <dd>The search for the parameters that minimize the loss, possibly with a regularizer added. This is where the "learning" in machine learning actually happens.</dd>
+  <dt>Generalization</dt>
+  <dd>How well the trained model predicts held-out data, validation or test, that it never saw during training. Fitting the training set is easy. Generalizing is the whole game.</dd>
+  <dt>Regularization</dt>
+  <dd>Restricting the model's capacity, for example by keeping weights small, so that it generalizes better. You trade a bit of training fit for a lot of test performance.</dd>
+</dl>
+
+<p>
+Keep this picture in your head. kNN and decision trees blurred these modules
+together. Linear regression is the first model where each module is a
+separate, visible, swappable part. When we get to neural networks, nothing in
+this picture changes except the model class.
+</p>
+</section>
+
+<!-- ═══════════════════ 3. THE HIGH-LEVEL PITCH ═══════════════════ -->
+<section id="sec-pitch">
+<h2><span class="secnum">3.</span> Linear regression, the high-level pitch</h2>
+
+<p>
+What it is: a model that predicts a continuous target as a weighted sum of
+the input features, plus a constant. What it does: draws the straight line
+(or plane, or hyperplane) through your data that best matches the trend. Why
+it is useful: it is simple, it is interpretable, every weight tells you how
+much one feature moves the prediction, and it is a strong baseline that more
+complicated models must beat to justify their complexity.
+</p>
+
+<p>
+The classic use case. A realtor prices houses. Each sale she has seen is a
+data point: size in square feet in, sale price out. Over years she
+internalizes the trend, and when a new listing comes along she can price it
+without a spreadsheet. Linear regression is that intuition made explicit: it
+looks at the same scatter of past sales and settles on the trend line, and
+then a new house's price is just the height of the line at that house's size.
+Watch her learn:
+</p>
+
+<div class="figure" id="fig-realtor">
+  <div class="fig-mount" data-fig="realtor"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the realtor's intuition. Past sales appear one by one, the asking line settles toward the trend, and a new listing gets priced by reading the line.</p>
+</div>
+
+<p>
+One honest caveat before the math. The data never sits exactly on a line. We
+assume each observed target was generated by some unknown true function
+<span class="m">$f$</span> plus noise:
+<span class="m">$t = f(x) + \epsilon$</span>. The line is our stand-in for
+<span class="m">$f$</span>, and the noise <span class="m">$\epsilon$</span>
+is everything the line cannot explain: measurement error, missing
+information, plain randomness. We will return to noise in section 10, because
+it is the reason overfitting exists.
+</p>
+</section>
+
+<!-- ═══════════════════ 4. BACK TO HIGH-SCHOOL MATH ═══════════════════ -->
+<section id="sec-highschool">
+<h2><span class="secnum">4.</span> Back to high-school math</h2>
+
+<p>
+You already know this model. In high school it was
+</p>
+$$ y = mx + b $$
+<p>
+a slope <span class="m">$m$</span> and an intercept <span class="m">$b$</span>.
+Machine learning keeps the exact same object and renames the parts, because we
+are about to need many more of them than two:
+</p>
+$$ y(x) = w_0 + w_1 x \;\approx\; t = f(x) + \epsilon $$
+<p>
+<span class="m">$w_0$</span> is the intercept (the old <span class="m">$b$</span>),
+<span class="m">$w_1$</span> is the slope (the old <span class="m">$m$</span>),
+and together they are the <strong>weights</strong> or
+<strong>parameters</strong> of the model, the numbers the machine will learn
+from data. The assumption baked into this model class is mild but real:
+changes in <span class="m">$x$</span> are associated with roughly linear
+changes in <span class="m">$t$</span>. Double the size, roughly double the
+price bump. When that assumption is badly wrong, the model is badly wrong,
+and no amount of clever optimization fixes it.
+</p>
+
+<p>
+Get a feel for the two weights before we let the machine touch them. In the
+playground below, you are the optimizer. Drag the sliders and watch the line,
+the equation, and the fit change together.
+</p>
+
+<div class="figure" id="fig-playground">
+  <div class="fig-mount" data-fig="playground"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the <span class="m">$y = w_0 + w_1 x$</span> playground. Slide the intercept and slope, watch the equation and the fit respond live. Try to make the line hug the points.</p>
+</div>
+
+<p>
+Two things you probably noticed. First, <span class="m">$w_0$</span> lifts
+the whole line up and down while <span class="m">$w_1$</span> pivots it, the
+two weights do different jobs. Second, you can eyeball a decent fit but you
+cannot be sure it is the <em>best</em> fit. "Best" needs a definition. That
+definition is the loss function, and it arrives in section 6. First, let us
+make the model handle more than one input.
+</p>
+</section>
+
+<!-- ═══════════════════ 5. SIMPLE VS MULTIPLE REGRESSION ═══════════════════ -->
+<section id="sec-multiple">
+<h2><span class="secnum">5.</span> Simple vs multiple regression</h2>
+
+<p>
+A house is not just its size. It has a number of bedrooms, an age, a distance
+to downtown. With <span class="m">$D$</span> features,
+<span class="m">$x \in \mathbb{R}^D$</span>, the model grows one weight per
+feature:
+</p>
+$$ y(x) = w_0 + w_1 x_1 + w_2 x_2 + \cdots + w_D x_D = w_0 + \sum_{j=1}^{D} w_j x_j $$
+<p>
+Each weight <span class="m">$w_j$</span> answers a plain question: holding
+everything else fixed, how much does the prediction move when feature
+<span class="m">$j$</span> increases by one unit? That per-feature readability
+is why linear regression survives in economics, medicine, and every field
+that has to explain itself.
+</p>
+
+<p>
+The intercept <span class="m">$w_0$</span> is the awkward one in that sum, it
+has no feature attached. The standard trick: give it one. Prepend a constant
+feature <span class="m">$x_0 = 1$</span> to every example. Then
+</p>
+$$ x = (1, x_1, \dots, x_D)^\top, \quad w = (w_0, w_1, \dots, w_D)^\top, \quad y(x) = w^\top x $$
+<p>
+The whole model collapses into a single dot product. Check the dimensions:
+<span class="m">$x \in \mathbb{R}^{D+1}$</span>,
+<span class="m">$w \in \mathbb{R}^{D+1}$</span>, and their dot product
+<span class="m">$y \in \mathbb{R}$</span> is one number, the prediction.
+</p>
+
+<h3>Loops vs vectorized code</h3>
+
+<p>
+Here is the dot product as a Python beginner would write it, and as a
+practitioner would write it:
+</p>
+
+<div class="code-compare">
+  <div class="code-col">
+    <div class="code-col-title">Naive loop</div>
+    <pre class="code" data-lang="python"><code>y = w[0]
+for j in range(1, D + 1):
+    y += w[j] * x[j]</code></pre>
+  </div>
+  <div class="code-col">
+    <div class="code-col-title">Vectorized</div>
+    <pre class="code" data-lang="python"><code>y = np.dot(w, x)</code></pre>
+  </div>
+</div>
+
+<p>
+Same math, wildly different execution. The loop crawls through Python's
+interpreter one element at a time and assumes sequential processing. The
+vectorized call hands the whole computation to an optimized linear algebra
+library in one step. Vectorizing your code matters for four reasons: it is
+simpler and more readable, it cuts interpreter overhead, it uses linear
+algebra routines tuned over decades, and it exploits parallel hardware,
+GPUs above all. The slide's framing is worth repeating: vectorization is one
+of the reasons AI became scalable at all. Race them yourself:
+</p>
+
+<div class="figure" id="fig-race">
+  <div class="fig-mount" data-fig="race"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the race. Both sides compute the same dot product <span class="m">$y = w^\top x$</span>. The loop processes one component per tick; the vectorized path resolves in a single fused step. Crank <span class="m">$D$</span> and watch the gap explode.</p>
+</div>
+
+<h3>The design matrix</h3>
+
+<p>
+One more packaging step and we are done with notation for the whole lesson.
+To predict for all <span class="m">$N$</span> training examples at once,
+stack them as rows of a matrix <span class="m">$X$</span>, the
+<strong>design matrix</strong>, with the column of 1s built in. One matrix
+multiply computes every prediction simultaneously:
+</p>
+
+<div class="figure" id="fig-design">
+  <svg class="design-svg" viewBox="0 0 780 250" role="img" aria-label="Design matrix X of shape N by D plus 1, times weight vector w of shape D plus 1, equals prediction vector y of shape N">
+    <g font-family="Inter, -apple-system, sans-serif">
+      <!-- X matrix -->
+      <rect x="40" y="40" width="270" height="160" rx="6" fill="#fff5ec" stroke="#e8590c" stroke-width="2"/>
+      <rect x="40" y="40" width="52" height="160" fill="#ffe8d9"/>
+      <text x="66" y="30" text-anchor="middle" font-size="12" fill="#a05a2c" font-weight="600">bias col.</text>
+      <text x="66" y="76"  text-anchor="middle" font-size="14" fill="#333">1</text>
+      <text x="66" y="112" text-anchor="middle" font-size="14" fill="#333">1</text>
+      <text x="66" y="148" text-anchor="middle" font-size="14" fill="#333">&#8942;</text>
+      <text x="66" y="184" text-anchor="middle" font-size="14" fill="#333">1</text>
+      <text x="200" y="76"  text-anchor="middle" font-size="14" fill="#333">x&#8321;&#8317;&#185;&#8318; &#8230; x&#7496;&#8317;&#185;&#8318;</text>
+      <text x="200" y="112" text-anchor="middle" font-size="14" fill="#333">x&#8321;&#8317;&#178;&#8318; &#8230; x&#7496;&#8317;&#178;&#8318;</text>
+      <text x="200" y="148" text-anchor="middle" font-size="14" fill="#333">&#8942;</text>
+      <text x="200" y="184" text-anchor="middle" font-size="14" fill="#333">x&#8321;&#8317;&#7482;&#8318; &#8230; x&#7496;&#8317;&#7482;&#8318;</text>
+      <text x="175" y="228" text-anchor="middle" font-size="14" font-weight="700" fill="#e8590c">X &nbsp; (N &times; (D+1))</text>
+      <text x="20" y="126" text-anchor="middle" font-size="13" fill="#666" transform="rotate(-90 20 126)">N examples (rows)</text>
+
+      <!-- times -->
+      <text x="345" y="128" text-anchor="middle" font-size="24" fill="#111">&times;</text>
+
+      <!-- w vector -->
+      <rect x="380" y="40" width="70" height="160" rx="6" fill="#f5f0ff" stroke="#7048e8" stroke-width="2"/>
+      <text x="415" y="76"  text-anchor="middle" font-size="14" fill="#333">w&#8320;</text>
+      <text x="415" y="112" text-anchor="middle" font-size="14" fill="#333">w&#8321;</text>
+      <text x="415" y="148" text-anchor="middle" font-size="14" fill="#333">&#8942;</text>
+      <text x="415" y="184" text-anchor="middle" font-size="14" fill="#333">w&#7496;</text>
+      <text x="415" y="228" text-anchor="middle" font-size="14" font-weight="700" fill="#7048e8">w &nbsp; ((D+1) &times; 1)</text>
+
+      <!-- equals -->
+      <text x="490" y="128" text-anchor="middle" font-size="24" fill="#111">=</text>
+
+      <!-- y vector -->
+      <rect x="530" y="40" width="80" height="160" rx="6" fill="#eefbf1" stroke="#2f9e44" stroke-width="2"/>
+      <text x="570" y="76"  text-anchor="middle" font-size="14" fill="#333">y&#8317;&#185;&#8318;</text>
+      <text x="570" y="112" text-anchor="middle" font-size="14" fill="#333">y&#8317;&#178;&#8318;</text>
+      <text x="570" y="148" text-anchor="middle" font-size="14" fill="#333">&#8942;</text>
+      <text x="570" y="184" text-anchor="middle" font-size="14" fill="#333">y&#8317;&#7482;&#8318;</text>
+      <text x="570" y="228" text-anchor="middle" font-size="14" font-weight="700" fill="#2f9e44">y = Xw &nbsp; (N &times; 1)</text>
+
+      <!-- annotation -->
+      <text x="680" y="105" font-size="13" fill="#444">every row is one</text>
+      <text x="680" y="123" font-size="13" fill="#444">dot product</text>
+      <text x="680" y="141" font-size="13" fill="#444">w&#8317;&#7511;x&#8317;&#8305;&#8318;, done</text>
+      <text x="680" y="159" font-size="13" fill="#444">all at once</text>
+    </g>
+  </svg>
+  <p class="fig-caption"><b>Fig 5.2,</b> the design matrix. Rows are examples, columns are features, the first column is all 1s so the intercept rides along in <span class="m">$w$</span>. One multiply, <span class="m">$N$</span> predictions.</p>
+</div>
+
+<p>
+A concrete shapes check, because shapes are where every implementation bug
+lives. Say <span class="m">$N = 100$</span> houses and
+<span class="m">$D = 3$</span> features. Then
+<span class="m">$X$</span> is <span class="m">$100 \times 4$</span> (the
+extra column is the 1s), <span class="m">$w$</span> is
+<span class="m">$4 \times 1$</span>, and
+<span class="m">$Xw$</span> is <span class="m">$100 \times 1$</span>: one
+prediction per house. Two more shapes we will need in section 9:
+<span class="m">$X^\top t$</span> is
+<span class="m">$(4 \times 100)(100 \times 1) = 4 \times 1$</span>, and
+<span class="m">$X^\top X$</span> is
+<span class="m">$(4 \times 100)(100 \times 4) = 4 \times 4$</span>.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">With <span class="m">$X \in \mathbb{R}^{N \times (D+1)}$</span> and <span class="m">$w \in \mathbb{R}^{(D+1) \times 1}$</span>, what is the shape of the scalar-or-not quantity <span class="m">$w^\top X^\top X w$</span>?</p>
+  <div class="quiz-opts">
+    <button data-k="a">$(D+1) \times (D+1)$</button>
+    <button data-k="b">$1 \times 1$, a scalar</button>
+    <button data-k="c">$N \times 1$</button>
+    <button data-k="d">$N \times N$</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That is the shape of the middle piece <span class="m">$X^\top X$</span> alone. Keep multiplying: the outer <span class="m">$w^\top (\cdot) w$</span> squeezes it down.</div>
+  <div class="quiz-fb" data-k="b">Right. Chain the shapes: <span class="m">$(1 \times (D{+}1)) \cdot ((D{+}1) \times N) \cdot (N \times (D{+}1)) \cdot ((D{+}1) \times 1) = 1 \times 1$</span>. In fact <span class="m">$w^\top X^\top X w = \lVert Xw \rVert^2$</span>, the squared length of the prediction vector.</div>
+  <div class="quiz-fb" data-k="c">That is the shape of <span class="m">$Xw$</span>, the vector of predictions. Here it gets hit with <span class="m">$X^\top$</span> and then <span class="m">$w^\top$</span> from the left.</div>
+  <div class="quiz-fb" data-k="d">Inner dimensions would not even match up to produce that here. Write each factor's shape and cancel neighbours.</div>
+</div>
+
+<details class="check">
+  <summary>Coding check: multiply two matrices with no built-ins. What does it cost?</summary>
+  <div>
+    <p>Write matrix multiplication for <span class="m">$A \in \mathbb{R}^{n \times m}$</span> and <span class="m">$B \in \mathbb{R}^{m \times p}$</span> using only loops, then state its time complexity.</p>
+<pre class="code" data-lang="python"><code>def matmul(A, B):
+    n, m, p = len(A), len(B), len(B[0])
+    C = [[0.0] * p for _ in range(n)]
+    for i in range(n):          # each output row
+        for j in range(p):      # each output column
+            for k in range(m):  # the dot product
+                C[i][j] += A[i][k] * B[k][j]
+    return C</code></pre>
+    <p>Three nested loops over <span class="m">$n$</span>, <span class="m">$p$</span>, <span class="m">$m$</span>, so the cost is <span class="m">$O(nmp)$</span>, cubic <span class="m">$O(n^3)$</span> for square matrices. <code>np.dot</code> computes exactly this, but in compiled, cache-aware, parallel code, which is why it wins the race in Fig 5.1 by orders of magnitude. The complexity class is the same, the constant factor is not even close.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. THE LOSS FUNCTION ═══════════════════ -->
+<section id="sec-loss">
+<h2><span class="secnum">6.</span> The loss function</h2>
+
+<p>
+Show a fresh, untrained model a scatter plot and it has no intuition at all.
+It cannot squint at the trend the way you did in Fig 4.1. From the model's
+point of view, every candidate line, the good, the bad, and the upside-down,
+is just a different setting of <span class="m">$(w_0, w_1)$</span>, and
+nothing so far tells it which setting to prefer. We owe the machine a
+<em>definition</em> of good. That definition is the
+<strong>loss function</strong>.
+</p>
+
+<p>
+Build it in three moves, and watch each move land in the figure below.
+</p>
+
+<p>
+<b>Move 1: the residual.</b> For one training example, the model predicts
+<span class="m">$y$</span> and the truth is <span class="m">$t$</span>. The
+gap <span class="m">$y - t$</span> is the <strong>residual</strong>, the
+vertical distance from point to line. Small residuals mean the line passes
+close to the point.
+</p>
+
+<p>
+<b>Move 2: square it.</b> Residuals come in both signs, and we do not want
+an error of <span class="m">$+3$</span> cancelling an error of
+<span class="m">$-3$</span>. Squaring kills the sign and, as a bonus,
+punishes big misses more than small ones. The squared error for one example,
+with a factor of one half whose job is purely to make later derivatives
+clean:
+</p>
+$$ L(y, t) = \tfrac{1}{2}\,(y - t)^2 $$
+
+<p>
+<b>Move 3: average over the training set.</b> A line is good if it is close
+to <em>all</em> the points, so we average the squared errors over all
+<span class="m">$N$</span> examples. This is the <strong>empirical
+loss</strong>, and it is the single number we will ask optimization to drive
+down:
+</p>
+$$ J(w) = \frac{1}{2N} \sum_{i=1}^{N} \big( y^{(i)} - t^{(i)} \big)^2
+        = \frac{1}{2N} \sum_{i=1}^{N} \big( w^\top x^{(i)} - t^{(i)} \big)^2 $$
+
+<p>
+The ideal weight vector is the one that minimizes it:
+<span class="m">$w^\star = \arg\min_w J(w)$</span>. Now derive the loss on
+screen instead of on faith. Drag the line, switch on the residuals, square
+them, and watch <span class="m">$J(w)$</span> respond:
+</p>
+
+<div class="figure" id="fig-residuals">
+  <div class="fig-mount" data-fig="residuals"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> deriving the loss. Drag the line, then toggle residuals (vertical gaps) and squares (each square's area is one squared error). <span class="m">$J(w)$</span> is their average, updating live. Minimize it by hand if you can.</p>
+</div>
+
+<p>
+Try to beat the <b>Best fit</b> button. You will get close, humans are good
+at this in 2D, but you will almost never tie it, and in 10 dimensions you
+would not stand a chance. That is precisely the gap optimization exists to
+close.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. DATA SPACE VS WEIGHT SPACE ═══════════════════ -->
+<section id="sec-spaces">
+<h2><span class="secnum">7.</span> Data space vs weight space</h2>
+
+<p>
+This is the most important mental picture in the lesson. Everything we have
+drawn so far lives in <strong>data space</strong>: axes are
+<span class="m">$x$</span> and <span class="m">$t$</span>, points are
+training examples, and a candidate model is a <em>line</em>. Now build a
+second picture. Let the axes be <span class="m">$w_0$</span> and
+<span class="m">$w_1$</span>. In this <strong>weight space</strong>, an
+entire candidate line collapses to a single <em>point</em>: the pair
+<span class="m">$(w_0, w_1)$</span> that defines it. And every point in
+weight space carries a number, its loss <span class="m">$J(w)$</span>.
+</p>
+
+<p>
+So the loss is a <em>landscape</em> over weight space. For squared error that
+landscape is a smooth bowl, and its contour lines are ellipses. Learning has
+a geometric meaning now: find the lowest point of the bowl. The two panels
+below are two views of one reality. Drag the line on the left and you drag a
+point across the loss landscape on the right. The three preset candidates,
+red, green, and yellow, are the lecture's three lines: jump between them,
+see which sits deepest in the bowl, then press <b>Solve</b> to snap to the
+exact bottom.
+</p>
+
+<div class="figure" id="fig-spaces">
+  <div class="fig-mount" data-fig="spaces"></div>
+  <p class="fig-caption"><b>Fig 7.1,</b> the signature picture. Left: data space, where a model is a line. Right: weight space, where the same model is a point on the loss contours. One drag moves both. <b>Solve</b> snaps to the normal-equation optimum at the centre of the ellipses.</p>
+</div>
+
+<p>
+Hold on to this duality. Every optimizer in this course, from the normal
+equation to stochastic gradient descent on a billion-parameter network, is a
+strategy for moving a point through weight space toward low loss. The only
+things that change later are the dimension of the space and the shape of the
+landscape.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. OPTIMIZATION FROM FIRST PRINCIPLES ═══════════════════ -->
+<section id="sec-optimization">
+<h2><span class="secnum">8.</span> Optimization from first principles</h2>
+
+<p>
+How do you find the bottom of a smooth valley without seeing the whole
+landscape? Calculus gives the classical answer: at a minimum of a smooth
+function, the ground is flat. The derivative is zero. Points where the
+derivative vanishes are called <strong>critical points</strong>, and for a
+function shaped like a single valley, the critical point <em>is</em> the
+minimum.
+</p>
+
+<p>A fully worked one-variable example, the one from the lecture:</p>
+$$ f(x) = \frac{x^4}{4} - x, \qquad \frac{df}{dx} = x^3 - 1 \stackrel{!}{=} 0
+   \;\Rightarrow\; x_{\min} = 1, \qquad f(1) = \tfrac14 - 1 = -\tfrac34 $$
+<p>
+Set the derivative to zero, solve, done. (Careful arithmetic matters:
+<span class="m">$f(1)$</span> is <span class="m">$-0.75$</span>, not
+<span class="m">$0.75$</span>.) Feel the idea rather than memorizing it, drag
+the point along the curve and watch the tangent line tilt, flatten, and tilt
+back:
+</p>
+
+<div class="figure" id="fig-critical">
+  <div class="fig-mount" data-fig="critical"></div>
+  <p class="fig-caption"><b>Fig 8.1,</b> critical points. Drag the point along <span class="m">$f(x) = x^4/4 - x$</span>. The tangent's slope is the derivative; it hits exactly zero at <span class="m">$x = 1$</span>, the bottom of the valley.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Warm-up before the main event</div>
+  <p class="quiz-q">Find the minimum of <span class="m">$f(x) = x^2 - 4x + 4$</span>.</p>
+  <div class="quiz-opts">
+    <button data-k="a">Minimum value 2 at $x = 0$</button>
+    <button data-k="b">Minimum value 0 at $x = 2$</button>
+    <button data-k="c">Minimum value 4 at $x = 2$</button>
+    <button data-k="d">No minimum, it decreases forever</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Check by differentiating: <span class="m">$f'(x) = 2x - 4$</span>, which is not zero at <span class="m">$x = 0$</span>.</div>
+  <div class="quiz-fb" data-k="b">Correct. <span class="m">$f'(x) = 2x - 4 = 0$</span> gives <span class="m">$x = 2$</span>, and <span class="m">$f(2) = 4 - 8 + 4 = 0$</span>. You can also spot that <span class="m">$f(x) = (x-2)^2$</span>, a shifted parabola touching zero.</div>
+  <div class="quiz-fb" data-k="c">Right location, wrong value: plug <span class="m">$x = 2$</span> back in. <span class="m">$4 - 8 + 4 = 0$</span>.</div>
+  <div class="quiz-fb" data-k="d">The <span class="m">$x^2$</span> term dominates for large <span class="m">$|x|$</span> in both directions, so the parabola opens upward and must bottom out.</div>
+</div>
+
+<h3>More than one variable: the gradient</h3>
+
+<p>
+Our loss <span class="m">$J(w_0, w_1)$</span> has two knobs, so "derivative"
+becomes one partial derivative per knob, stacked into a vector called the
+<strong>gradient</strong>:
+</p>
+$$ \nabla_w J = \frac{\partial J}{\partial w}
+   = \left( \frac{\partial J}{\partial w_0}, \dots, \frac{\partial J}{\partial w_D} \right)^{\!\top} \in \mathbb{R}^{(D+1) \times 1} $$
+<p>
+The gradient points in the direction of steepest <em>increase</em>, and its
+negation points steepest downhill. "Derivative equals zero" becomes
+"gradient equals the zero vector". The lecture's worked two-parameter
+example:
+</p>
+$$ \min_{w_0, w_1} \; J(w_0, w_1) = (w_0 - 1)^2 + (w_1 - 2)^2, \qquad
+   \nabla_w J = \begin{pmatrix} 2(w_0 - 1) \\ 2(w_1 - 2) \end{pmatrix}
+   \stackrel{!}{=} \begin{pmatrix} 0 \\ 0 \end{pmatrix}
+   \;\Rightarrow\; w^\star = \begin{pmatrix} 1 \\ 2 \end{pmatrix} $$
+<p>
+Same recipe as 1D: set every slope to zero simultaneously, solve. Watch the
+gradient arrow shrink to nothing as you approach the optimum:
+</p>
+
+<div class="figure" id="fig-gradfield">
+  <div class="fig-mount" data-fig="gradfield"></div>
+  <p class="fig-caption"><b>Fig 8.2,</b> the 2D version. Drag the probe over the contours of <span class="m">$(w_0-1)^2 + (w_1-2)^2$</span>. The arrow is the negative gradient, always pointing downhill, vanishing at <span class="m">$w^\star = (1, 2)$</span>.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">What is the relationship between a derivative and a gradient?</p>
+  <div class="quiz-opts">
+    <button data-k="a">They are unrelated concepts from different branches of math</button>
+    <button data-k="b">The gradient is the second derivative</button>
+    <button data-k="c">The gradient generalizes the derivative: for a multi-variable function it stacks all the partial derivatives into one vector</button>
+    <button data-k="d">The derivative is a vector, the gradient is a scalar</button>
+  </div>
+  <div class="quiz-fb" data-k="a">They are the same idea at different dimensions. In 1D the gradient <em>is</em> the derivative.</div>
+  <div class="quiz-fb" data-k="b">Second derivatives measure curvature and belong to Newton's method, a pointer we flag in section 11. The gradient is built from first derivatives.</div>
+  <div class="quiz-fb" data-k="c">Exactly. One slope per parameter, stacked into a vector that points uphill. For <span class="m">$f: \mathbb{R}^n \to \mathbb{R}$</span> the gradient lives in <span class="m">$\mathbb{R}^n$</span>.</div>
+  <div class="quiz-fb" data-k="d">Backwards. The 1D derivative is a scalar slope; the gradient is the vector of all of them.</div>
+</div>
+
+<h3>Two ways to optimize</h3>
+
+<p>
+Everything downstream of "set the gradient to zero" splits into two roads:
+</p>
+<ol class="roads">
+  <li><b>Analytical.</b> Set <span class="m">$\nabla_w J = 0$</span> and solve for <span class="m">$w$</span> in closed form, with algebra, once.</li>
+  <li><b>Iterative.</b> Start somewhere, repeatedly nudge <span class="m">$w$</span> to reduce <span class="m">$J$</span>, stop when it flattens out.</li>
+</ol>
+<p>
+Linear regression is special: it is one of the few models where the
+analytical road exists. Most of modern ML, neural networks included, has no
+closed form and lives entirely on the iterative road. We will walk both,
+analytical first.
+</p>
+
+<h3>The analytical solution in 1D</h3>
+
+<p>
+For the simple model <span class="m">$y = w_0 + w_1 x$</span>, setting both
+partial derivatives of <span class="m">$J$</span> to zero and solving the
+two resulting equations gives closed-form answers. With
+<span class="m">$\bar{x}$</span> and <span class="m">$\bar{t}$</span>
+denoting the means of the inputs and targets:
+</p>
+$$ w_1^\star = \frac{\sum_i (x^{(i)} - \bar{x})(t^{(i)} - \bar{t})}
+                    {\sum_i (x^{(i)} - \bar{x})^2}, \qquad
+   w_0^\star = \bar{t} - w_1^\star \bar{x} $$
+<p>
+Read them as sentences. The slope is how much <span class="m">$x$</span> and
+<span class="m">$t$</span> vary <em>together</em>, divided by how much
+<span class="m">$x$</span> varies alone. The intercept then shifts the line
+so it passes through the centre of mass
+<span class="m">$(\bar{x}, \bar{t})$</span> of the data.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: three points, full arithmetic</div>
+  <p>Data: <span class="m">$(1, 2),\; (2, 3),\; (3, 5)$</span>.</p>
+  <p><b>Means.</b> <span class="m">$\bar{x} = \frac{1+2+3}{3} = 2$</span>, <span class="m">$\;\bar{t} = \frac{2+3+5}{3} = \frac{10}{3} \approx 3.333$</span>.</p>
+  <p><b>Slope numerator</b> (co-variation):</p>
+  $$ (1-2)(2 - \tfrac{10}{3}) + (2-2)(3 - \tfrac{10}{3}) + (3-2)(5 - \tfrac{10}{3})
+     = (-1)(-\tfrac43) + 0 + (1)(\tfrac53) = \tfrac43 + \tfrac53 = 3 $$
+  <p><b>Slope denominator</b> (spread of <span class="m">$x$</span>):</p>
+  $$ (1-2)^2 + (2-2)^2 + (3-2)^2 = 1 + 0 + 1 = 2 $$
+  <p><b>Weights.</b> <span class="m">$w_1^\star = \frac{3}{2} = 1.5$</span>, and <span class="m">$w_0^\star = \frac{10}{3} - 1.5 \times 2 = \frac{10}{3} - 3 = \frac{1}{3} \approx 0.333$</span>.</p>
+  <p><b>Sanity check.</b> The fitted line <span class="m">$y = \frac13 + \frac32 x$</span> predicts <span class="m">$1.833,\; 3.333,\; 4.833$</span> for the three inputs, residuals <span class="m">$-0.167,\; +0.333,\; -0.167$</span>. They do not cancel to zero by luck: least squares always makes residuals sum to zero when an intercept is present. The loss is
+  <span class="m">$J = \frac{1}{2 \cdot 3}(0.0278 + 0.1111 + 0.0278) \approx 0.0278$</span>, and no other line does better.</p>
+</div>
+
+<h3>The analytical solution in general: the normal equation</h3>
+
+<p>
+With the design matrix in hand, the same derivation runs in any dimension.
+Write the loss in matrix form, take the gradient, set it to zero:
+</p>
+$$ J(w) = \tfrac{1}{2} \lVert Xw - t \rVert_2^2, \qquad
+   \nabla_w J = X^\top X w - X^\top t \stackrel{!}{=} 0
+   \;\Rightarrow\; w^\star = (X^\top X)^{-1} X^\top t $$
+<p>
+That is the <strong>normal equation</strong>, the entire training procedure
+in one line of algebra. (The gradient identity is Eq. 84 of the Matrix
+Cookbook; deriving it yourself is homework, and the shapes check below is
+the guard rail for that derivation.) In code, prefer
+<code>solve</code> to an explicit inverse, it is faster and numerically
+safer:
+</p>
+
+<pre class="code" data-lang="python"><code>w = np.linalg.solve(X.T @ X, X.T @ t)   # never np.linalg.inv(X.T @ X) @ X.T @ t</code></pre>
+
+<p>
+Dimensions check with our running shapes, <span class="m">$N = 100$</span>,
+<span class="m">$D = 3$</span>: <span class="m">$X^\top X$</span> is
+<span class="m">$4 \times 4$</span>, <span class="m">$X^\top t$</span> is
+<span class="m">$4 \times 1$</span>, so we solve a
+<span class="m">$4 \times 4$</span> linear system for the
+<span class="m">$4 \times 1$</span> weight vector. The training set size
+<span class="m">$N$</span> has vanished from the system's size, it only
+shaped the ingredients.
+</p>
+
+<p>So why does the rest of ML not just use this? Two problems:</p>
+<ul>
+  <li><b>Few models are so lucky.</b> The closed form exists because linear regression's loss is a perfect quadratic bowl. Change the model even slightly (logistic regression, any neural network) and no closed form exists at all.</li>
+  <li><b>It scales badly in <span class="m">$D$</span>.</b> Solving the system costs <span class="m">$O(D^3)$</span>, and <span class="m">$X^\top X$</span> may not even be invertible. With <span class="m">$D$</span> in the millions, as in modern models, <span class="m">$D^3$</span> is fantasy.</li>
+</ul>
+<p>Which brings us to the road everything else in ML travels.</p>
+</section>
+
+<!-- ═══════════════════ 9. GRADIENT DESCENT ═══════════════════ -->
+<section id="sec-gd">
+<h2><span class="secnum">9.</span> Gradient descent</h2>
+
+<p>
+The iterative idea fits in one sentence: stand somewhere on the loss
+landscape, feel which way is downhill, take a small step that way, repeat.
+"Feel which way is downhill" is exactly what the gradient gives us, it
+points uphill, so we step against it. Initialize <span class="m">$w$</span>
+somewhere (zeros work here), then loop:
+</p>
+$$ w_j \leftarrow w_j - \alpha \frac{\partial J}{\partial w_j}
+   \qquad \text{or, all coordinates at once,} \qquad
+   w \leftarrow w - \alpha \frac{\partial J}{\partial w} $$
+<p>
+The scalar <span class="m">$\alpha > 0$</span> is the
+<strong>learning rate</strong>, the step size, and it is a
+<strong>hyperparameter</strong>: you choose it, the model does not learn it.
+Larger <span class="m">$\alpha$</span> moves faster; typical values are
+small, like <span class="m">$0.01$</span> or <span class="m">$0.0001$</span>.
+(One bookkeeping note: if you minimize the <em>total</em> loss instead of the
+average, every gradient is <span class="m">$N$</span> times bigger, so use a
+correspondingly smaller <span class="m">$\alpha' = \alpha / N$</span>. Same
+algorithm, rescaled step.)
+</p>
+
+<p>
+Why does stepping against the gradient work? See it cleanly in 1D, where the
+gradient is just a slope. If <span class="m">$\nabla J > 0$</span>, the
+ground rises to the right, so go left: decreasing <span class="m">$w$</span>
+decreases <span class="m">$J$</span>. If <span class="m">$\nabla J < 0$</span>,
+the ground falls to the right, so go right. In both cases,
+<em>the sign of the gradient points the way downhill</em>, and the update
+rule obeys it automatically because of the minus sign.
+</p>
+
+<p>For linear regression specifically, the gradient of <span class="m">$J$</span> works out to an average of residual-weighted inputs, giving the specialized update:</p>
+$$ w \leftarrow w - \frac{\alpha}{N} \sum_{i=1}^{N}
+   \big( w^\top x^{(i)} - t^{(i)} \big)\, x^{(i)} $$
+<p>
+Read it as a story: each training example pushes on the weights with a force
+proportional to how wrong the model is on it (the residual), in the
+direction of its own features. Points the model overshoots push one way,
+points it undershoots push the other, and the line settles where the pushes
+balance.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one gradient-descent step, real numbers</div>
+  <p>Two points, <span class="m">$(1, 2)$</span> and <span class="m">$(2, 3)$</span>. Start at <span class="m">$w = (w_0, w_1) = (0, 0)$</span> with <span class="m">$\alpha = 0.5$</span>. With augmented inputs <span class="m">$x^{(1)} = (1, 1)$</span>, <span class="m">$x^{(2)} = (1, 2)$</span>:</p>
+  <p><b>Predict.</b> Both predictions are <span class="m">$0$</span>, so the residuals are <span class="m">$y - t = -2$</span> and <span class="m">$-3$</span>.</p>
+  <p><b>Gradient.</b>
+  <span class="m">$\frac{\partial J}{\partial w_0} = \frac{1}{2}\big[(-2)(1) + (-3)(1)\big] = -2.5$</span>,
+  <span class="m">$\;\frac{\partial J}{\partial w_1} = \frac{1}{2}\big[(-2)(1) + (-3)(2)\big] = -4$</span>.</p>
+  <p><b>Step.</b> <span class="m">$w_0 \leftarrow 0 - 0.5 \times (-2.5) = 1.25$</span>, <span class="m">$\;w_1 \leftarrow 0 - 0.5 \times (-4) = 2$</span>.</p>
+  <p><b>Did it help?</b> The loss drops from <span class="m">$J = \frac{1}{4}(4 + 9) = 3.25$</span> to <span class="m">$\frac{1}{4}(1.5625 + 5.0625) \approx 1.66$</span>, roughly halved in one step. The negative gradient said "raise the intercept, raise the slope", the model was undershooting everything, and it was right.</p>
+</div>
+
+<h3>Step through the algorithm, line by line</h3>
+
+<p>
+Here is the full training loop, five lines of real Python, wired to a live
+diagram. Press <b>Step</b> to execute one highlighted line at a time and
+watch what it does to the line in data space, or press <b>Play</b> and watch
+training happen. The numbers on the right are the actual values in the
+program's variables, computed live.
+</p>
+
+<div class="figure" id="fig-stepper">
+  <div class="fig-mount" data-fig="stepper"></div>
+  <p class="fig-caption"><b>Fig 9.1,</b> gradient descent, executed. Each highlighted line runs against the real dataset on the right: predictions flash, residuals appear, the gradient is assembled, and the update visibly moves the line. Every printed number is computed, not staged.</p>
+</div>
+
+<h3>The loss bowl in 3D</h3>
+
+<p>
+Since our loss has two weights, the landscape
+<span class="m">$J(w_0, w_1)$</span> is a surface over the plane, and for
+squared error it is a <strong>bowl</strong>: a paraboloid with a single
+bottom. Gradient descent is a ball rolling down it in discrete steps. The
+figure below is the real loss surface for the dataset shown, not a stock
+image. Rotate it, drop the ball where you like, and pay attention to what
+the learning rate does:
+</p>
+
+<div class="figure" id="fig-bowl">
+  <div class="fig-mount" data-fig="bowl"></div>
+  <p class="fig-caption"><b>Fig 9.2,</b> the loss bowl. Drag to rotate. Choose <span class="m">$\alpha$</span>, step or play, and toggle batch vs stochastic. Small <span class="m">$\alpha$</span> crawls, large <span class="m">$\alpha$</span> overshoots and diverges, stochastic steps are cheap but noisy. The inset shows the 1D sign-of-the-gradient rule driving every step.</p>
+</div>
+
+<p>Three behaviours worth burning into memory, all reproducible in the figure:</p>
+<ul>
+  <li><b>Crawling.</b> <span class="m">$\alpha$</span> too small: every step is safe and microscopic. You will converge sometime next semester.</li>
+  <li><b>Diverging.</b> <span class="m">$\alpha$</span> too large: each step overshoots the valley and lands higher than it started. The loss explodes. This is the single most common training bug in practice.</li>
+  <li><b>Noisy but cheap.</b> Stochastic mode estimates the gradient from one random example instead of all <span class="m">$N$</span>. Each step costs <span class="m">$1/N$</span> as much, and the path jitters yet still finds the valley. Full-batch uses all examples per step; mini-batches sit in between.</li>
+</ul>
+
+<h3>Now you fix it</h3>
+
+<p>
+Two rescue missions, Khan-Academy style. The computer got stuck; you know
+enough to finish the job. Your answers are checked against the true optimum,
+computed by the normal equation, within a small tolerance.
+</p>
+
+<div class="figure" id="fig-fixit">
+  <div class="fig-mount" data-fig="fixit"></div>
+  <p class="fig-caption"><b>Fig 9.3,</b> correct the visual. Mission 1: a badly fit line, drag it to the least-squares optimum. Mission 2: a ball stranded on the bowl's wall, walk it to the bottom with gradient steps. Immediate feedback on both.</p>
+</div>
+
+<h3>Why gradient descent wins anyway</h3>
+
+<p>
+It seems absurd to trade a one-line exact formula for a loop of guesses. The
+trade is the best deal in machine learning:
+</p>
+<ul>
+  <li><b>It is easier to implement</b> than direct solutions, five lines beat a linear-system solver.</li>
+  <li><b>It works when no closed form exists</b>, which is nearly always. This is the only reason deep learning is trainable at all.</li>
+  <li><b>It is cheaper in high dimensions.</b> The normal equation pays <span class="m">$O(D^3)$</span> for the solve. One gradient-descent step costs <span class="m">$O(ND)$</span>, so <span class="m">$t$</span> steps cost <span class="m">$O(tND)$</span>, and stochastic steps cost even less. When <span class="m">$D$</span> is huge, iteration wins by an enormous margin.</li>
+</ul>
+<p>And the honest caveats, each of which becomes a lecture later in the course:</p>
+<ul>
+  <li>It needs <span class="m">$J$</span> to be <b>differentiable</b>, no gradients, no descent.</li>
+  <li>It is <b>sensitive to the initialization</b> and to the choice of <span class="m">$\alpha$</span>.</li>
+  <li>It carries <b>no guarantee of finding the global minimum</b> in general. It follows the local slope, so it can settle into a local dip. The rescue here: a function is <strong>convex</strong> if it curves upward everywhere, a bowl with no side pockets, and for convex losses every local minimum is global. Our squared loss is convex, it is a sum of convex functions, so gradient descent with a sane <span class="m">$\alpha$</span> is safe for linear regression. Deep networks get no such promise.</li>
+</ul>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Gradient descent converged on some loss function. Under which condition are you <em>guaranteed</em> it found a global minimum?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Whenever the learning rate was small enough</button>
+    <button data-k="b">When the loss is convex, because then any local minimum is global</button>
+    <button data-k="c">Always, gradient descent provably finds global minima</button>
+    <button data-k="d">Never, gradient descent gives no information about optimality</button>
+  </div>
+  <div class="quiz-fb" data-k="a">A small <span class="m">$\alpha$</span> prevents overshooting but does nothing about the landscape's shape. On a two-valley loss, a careful walker still ends up in whichever valley it started above.</div>
+  <div class="quiz-fb" data-k="b">Right. Convexity means the landscape has one basin, so the local dip you settle into must be the global one. Squared-error linear regression is convex; neural network losses are not, which is why initialization folklore exists.</div>
+  <div class="quiz-fb" data-k="c">Counterexample: <span class="m">$f(w) = w^4 - 2w^2$</span> has two minima, and gradient descent finds whichever is downhill of its start.</div>
+  <div class="quiz-fb" data-k="d">Too pessimistic. Structure of the loss buys guarantees, and convexity is the classic structure that does.</div>
+</div>
+
+<details class="check">
+  <summary>Check: closed form vs gradient descent, when do you pick which?</summary>
+  <div>
+    <p>List the trade-offs between solving the normal equation and running gradient descent for linear regression. Then decide: <span class="m">$D = 10$</span> features and <span class="m">$N = 10{,}000$</span> examples, which do you use? What about <span class="m">$D = 10^6$</span>?</p>
+    <p><b>Answer.</b> The normal equation is exact, has no hyperparameters, and needs no iteration babysitting, but it costs <span class="m">$O(D^3)$</span> to solve, requires <span class="m">$X^\top X$</span> to be invertible, and only exists for special models. Gradient descent is approximate and needs <span class="m">$\alpha$</span> chosen well, but each step is <span class="m">$O(ND)$</span> or less, it never forms a <span class="m">$D \times D$</span> system, and it generalizes to any differentiable model. At <span class="m">$D = 10$</span>, a <span class="m">$11 \times 11$</span> solve is instant: use the normal equation. At <span class="m">$D = 10^6$</span>, a <span class="m">$10^6 \times 10^6$</span> matrix does not even fit in memory: gradient descent, almost certainly stochastic, is the only option.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 10. NOISE, GENERALIZATION, REGULARIZATION ═══════════════════ -->
+<section id="sec-overfitting">
+<h2><span class="secnum">10.</span> Noise, generalization, regularization</h2>
+
+<p>
+Time to cash the cheque from section 3: data is
+<span class="m">$t = f(x) + \epsilon$</span>, truth plus noise. Where does
+<span class="m">$\epsilon$</span> come from? Four places, and every real
+dataset has all four:
+</p>
+<ul>
+  <li><b>Input noise</b>: the features are measured imprecisely. The listed square footage is off by a hundred.</li>
+  <li><b>Label noise</b>: the targets are wrong or inconsistent. The sale price was typed with a missing zero.</li>
+  <li><b>Missing or latent variables</b>: factors that matter, renovation quality, the neighbour's dog, are simply not in the data.</li>
+  <li><b>Model mismatch</b>: the model class is too simple for the true pattern. No line fits a curve.</li>
+</ul>
+
+<p>
+That last item tempts us toward more powerful models. Here is the elegant
+way to get power without abandoning linear regression:
+<strong>basis functions</strong>. Feed the model transformed copies of the
+input. With powers of <span class="m">$x$</span> as the new features, an
+<span class="m">$M$</span>-th order polynomial:
+</p>
+$$ y(x, w) = w_0 + w_1 x + w_2 x^2 + \cdots + w_M x^M = \sum_{j=0}^{M} w_j x^j $$
+<p>
+Read the indices carefully: here <span class="m">$x^j$</span> is the
+<span class="m">$j$</span>-th <em>power</em> of <span class="m">$x$</span>,
+not the <span class="m">$j$</span>-th data point. The crucial observation:
+this is <em>still linear regression</em>. The model is linear in the
+weights <span class="m">$w$</span>, which is all the normal equation and
+gradient descent ever cared about. Same loss, same optimizers, the design
+matrix just has columns <span class="m">$1, x, x^2, \dots, x^M$</span>. The
+curve through data space bends, the machinery does not. (The figure lineage
+here is Bishop's PRML, the most famous overfitting plot in the field.)
+</p>
+
+<p>
+So crank <span class="m">$M$</span> up and fit anything? Try it. The figure
+below fits a polynomial to noisy samples from a true curve, and splits off
+held-out test points the model never trains on:
+</p>
+
+<div class="figure" id="fig-poly">
+  <div class="fig-mount" data-fig="poly"></div>
+  <p class="fig-caption"><b>Fig 10.1,</b> overfitting, live. Left: the data, the true curve (dashed), and the degree-<span class="m">$M$</span> fit. Right: train and test loss vs <span class="m">$M$</span>. Push <span class="m">$M$</span> to 9 and watch the wiggle; add data with the <span class="m">$N$</span> control and watch the wiggle die; open the weights table and watch the coefficients explode.</p>
+</div>
+
+<p>What you just saw, named:</p>
+<ul>
+  <li>At <span class="m">$M = 9$</span> with few points, the curve threads every training dot, including the noise. That is <strong>overfitting</strong>: the model memorized <span class="m">$\epsilon$</span>.</li>
+  <li>Train loss falls monotonically as <span class="m">$M$</span> grows, it must, more capacity can only fit training data better. But test loss falls, bottoms out, and turns back up: the classic U-shaped generalization curve. The gap between the two curves is the price of memorizing noise.</li>
+  <li>More data helps. At <span class="m">$M = 9$</span> with <span class="m">$N = 100$</span> points, the same capacity has too many witnesses to lie to, and the fit calms down. But you cannot always get more data.</li>
+  <li>The weights table shows the mechanism: to chase noise, the fitted weights balloon to absurd magnitudes that nearly cancel. Huge weights mean a few input directions dominate the prediction, which is fragile far beyond this plot.</li>
+</ul>
+
+<h3>L2 regularization, ridge regression</h3>
+
+<p>
+That last bullet is the lever. Overfit models have huge weights, so punish
+huge weights. Add to the loss a penalty on the squared length of
+<span class="m">$w$</span>:
+</p>
+$$ \tilde{J}(w) = J(w) + \lambda R(w)
+   = \sum_{i=1}^{N} \big( w^\top x^{(i)} - t^{(i)} \big)^2 + \lambda\, w^\top w $$
+<p>
+The hyperparameter <span class="m">$\lambda \ge 0$</span> sets the exchange
+rate in a genuinely multi-objective trade: fit the data, but keep the
+weights small, and <span class="m">$\lambda$</span> decides how much fit one
+unit of weight-size is worth. Statisticians call the squared-weight penalty
+<strong>ridge regression</strong>; the deep learning community calls it
+<strong>weight decay</strong>. Same object, two fields, one idea.
+</p>
+
+<p>Both training roads absorb the penalty with one-line changes. Gradient descent:</p>
+$$ w \leftarrow w - \alpha \left( \frac{\partial J}{\partial w} + \lambda w \right)
+   = (1 - \alpha \lambda)\, w - \alpha \frac{\partial J}{\partial w} $$
+<p>
+The rewritten form explains the "decay" name: every step first shrinks the
+weights by the factor <span class="m">$(1 - \alpha\lambda)$</span>, then
+applies the usual gradient push. The weights literally decay unless the data
+argues to keep them. And the closed form just grows a
+<span class="m">$\lambda$</span> on its diagonal:
+</p>
+$$ w = (X^\top X + \lambda I)^{-1} X^\top t $$
+
+<pre class="code" data-lang="python"><code>w = np.linalg.solve(X.T @ X + lam * np.eye(d), X.T @ t)   # ridge, one changed line</code></pre>
+
+<p>
+As a bonus, the <span class="m">$+\lambda I$</span> makes the matrix
+invertible even when <span class="m">$X^\top X$</span> alone is not, healing
+the other failure mode of the normal equation. Now take the disaster from
+Fig 10.1, keep <span class="m">$M = 9$</span>, and dial in the cure:
+</p>
+
+<div class="figure" id="fig-ridge">
+  <div class="fig-mount" data-fig="ridge"></div>
+  <p class="fig-caption"><b>Fig 10.2,</b> ridge regression. Slide <span class="m">$\lambda$</span>: the degree-9 fit relaxes toward smoothness, the weight bars shrink, and test loss falls, bottoms out, then rises again when <span class="m">$\lambda$</span> is so big the model underfits. The sweet spot is startlingly small.</p>
+</div>
+
+<p>
+Notice how tiny the good <span class="m">$\lambda$</span> is, the lecture's
+example uses <span class="m">$\lambda = e^{-18}$</span>, and even that is
+enough to tame the degree-9 monster. How do you choose
+<span class="m">$\lambda$</span> in practice? Not by looking at the test
+set, that is cheating you can only do once. You hold out a validation split
+and pick the <span class="m">$\lambda$</span> that generalizes best to it:
+<strong>cross-validation</strong>, coming in its own right later in the
+course.
+</p>
+</section>
+
+<!-- ═══════════════════ 11. MISCELLANY ═══════════════════ -->
+<section id="sec-misc">
+<h2><span class="secnum">11.</span> Miscellany: why squared error?</h2>
+
+<p>
+Of all the ways to punish a residual <span class="m">$r = y - t$</span>, why
+square it? Run the alternatives through their failure modes, and watch each
+one fail in the figure:
+</p>
+<ul>
+  <li><span class="m">$L = y - t$</span>: signed errors <em>cancel</em>. A model that misses by <span class="m">$+5$</span> and <span class="m">$-5$</span> scores a perfect zero. Useless.</li>
+  <li><span class="m">$L = |y - t|$</span>: fixes the sign, but has a kink at zero where the derivative does not exist, which complicates gradient-based optimization. (It is used in practice, as robust "L1 loss", but it costs you the clean calculus.)</li>
+  <li><span class="m">$L = (y - t)^3$</span>: odd power, so it is signed like the raw residual and cancels the same way. Worse, it rewards errors of one sign.</li>
+  <li><span class="m">$L = (y - t)^{2n}$</span> for large <span class="m">$n$</span>: even and smooth, but it distorts the fit. Residuals smaller than 1 get crushed toward zero and effectively ignored, while the single largest residual dominates everything, so the fit chases outliers.</li>
+</ul>
+
+<div class="figure" id="fig-losses">
+  <div class="fig-mount" data-fig="losses"></div>
+  <p class="fig-caption"><b>Fig 11.1,</b> loss shapes. The candidates as functions of the residual. Toggle each curve: see the sign problem of the odd powers, the kink in <span class="m">$|r|$</span> at zero, and how <span class="m">$r^{2n}$</span> flattens tiny residuals into invisibility while exploding on big ones.</p>
+</div>
+
+<p>
+Squared error is the sweet spot: always non-negative, smooth everywhere,
+convex, admits a closed form, and, when you get to probabilistic ML, it is
+exactly the loss that maximum likelihood hands you under Gaussian noise.
+Every box ticked.
+</p>
+
+<p>
+One pointer before we close, flagged in lecture but not derived: gradient
+descent uses only the first derivative. You can go further and use the
+second derivative, the curvature, to take smarter steps. That is
+<strong>Newton's method</strong>, and it will come back when we discuss
+optimization more deeply.
+</p>
+</section>
+
+<!-- ═══════════════════ 12. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">12.</span> Summary and method card</h2>
+
+<p>
+Three steps to a prediction. Choose a <b>model class</b>. Define a
+<b>loss</b>. <b>Optimize</b> the parameters, analytically when the model is
+kind enough to allow it, iteratively otherwise. Assess the result by its
+<b>generalization</b> to held-out data, improve generalization with
+<b>regularization</b>, and choose the regularization strength by
+cross-validation. That recipe is not the linear regression recipe. It is
+the machine learning recipe, and it reappears intact in classification,
+neural networks, and deep learning.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Linear regression</div>
+  <table>
+    <tr><th>Model</th><td><span class="m">$y = w^\top x$</span>, with <span class="m">$x_0 = 1$</span> absorbing the intercept. Linear in <span class="m">$w$</span>, features may be basis-expanded (polynomials).</td></tr>
+    <tr><th>Loss</th><td>Mean squared error <span class="m">$J(w) = \frac{1}{2N}\sum_i (w^\top x^{(i)} - t^{(i)})^2$</span>. Convex.</td></tr>
+    <tr><th>Optimizer, exact</th><td>Normal equation <span class="m">$w^\star = (X^\top X)^{-1} X^\top t$</span>. Cost <span class="m">$O(D^3)$</span>. Use <code>np.linalg.solve</code>.</td></tr>
+    <tr><th>Optimizer, iterative</th><td>Gradient descent <span class="m">$w \leftarrow w - \frac{\alpha}{N}\sum_i (w^\top x^{(i)} - t^{(i)}) x^{(i)}$</span>. Cost <span class="m">$O(ND)$</span> per step, stochastic variant cheaper.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Learning rate <span class="m">$\alpha$</span>, polynomial degree <span class="m">$M$</span>, ridge strength <span class="m">$\lambda$</span>.</td></tr>
+    <tr><th>Failure modes</th><td>Nonlinear truth (model mismatch), overfitting at high <span class="m">$M$</span> or low <span class="m">$N$</span>, divergence when <span class="m">$\alpha$</span> too big.</td></tr>
+    <tr><th>Regularizer</th><td>Ridge <span class="m">$+\lambda w^\top w$</span>: closed form <span class="m">$(X^\top X + \lambda I)^{-1} X^\top t$</span>, update <span class="m">$(1-\alpha\lambda)w - \alpha \nabla J$</span>. Pick <span class="m">$\lambda$</span> by cross-validation.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: similarity (kNN), then rules (decision
+trees), and now parametric functions, model families, losses, optimization,
+regularization. Next we point the same machinery at discrete targets:
+classification, then differentiable classifiers, margins and kernels,
+ensembles, neural networks, deep models, CNNs, language models, sequence
+models, transformers. The recipe you learned today never changes again.
+Only the model class does.
+</p>
+</section>
+
+<!-- ═══════════════════ END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">13.</span> End-of-lesson quiz</h2>
+
+<p>
+Four quick checks, then four transfer questions that ask you to <em>use</em>
+the ideas, not recite them. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">Fitting a degree-4 polynomial to exactly 5 data points. What happens to train and test error?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both will be high, the model is too simple</button>
+    <button data-k="b">Both will be near zero, more capacity is always better</button>
+    <button data-k="c">Train error hits essentially zero (5 coefficients can interpolate 5 points), test error will likely be terrible</button>
+  </div>
+  <div class="quiz-fb" data-k="a">A degree-4 polynomial has 5 free coefficients, plenty for 5 points, so it will not underfit the training set.</div>
+  <div class="quiz-fb" data-k="b">The first half is right for training data only. The interpolating curve swings wildly between the points, and test data lives between the points.</div>
+  <div class="quiz-fb" data-k="c">Exactly. Five coefficients against five points means perfect interpolation, noise and all. This is the M = 9 disaster of Fig 10.1 in miniature: memorization, not learning.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">Your gradient-descent loss goes 10, 45, 380, 6200, ... What is the diagnosis and the fix?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Learning rate too large, each step overshoots the valley; decrease $\alpha$</button>
+    <button data-k="b">Learning rate too small; increase $\alpha$</button>
+    <button data-k="c">The loss is not convex; switch models</button>
+    <button data-k="d">Not enough data; collect more</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. Exploding loss is the signature of divergence: each step lands on the far wall of the bowl, higher than it started. You saw it live in Fig 9.2.</div>
+  <div class="quiz-fb" data-k="b">Too-small <span class="m">$\alpha$</span> produces the opposite signature: the loss creeps down painfully slowly, it does not explode.</div>
+  <div class="quiz-fb" data-k="c">Non-convexity risks bad valleys, not explosions, and our squared loss is convex anyway.</div>
+  <div class="quiz-fb" data-k="d">Dataset size does not cause divergence. The step size does.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a loss that is robust to outliers</summary>
+  <div>
+    <p>Squared error chases outliers because the penalty grows quadratically. Propose a loss that behaves like squared error for small residuals but is gentler on huge ones, and describe its gradient.</p>
+    <p><b>Answer.</b> Use a loss that is quadratic near zero and linear in the tails, the classic construction is the Huber loss: for residual <span class="m">$r$</span> and threshold <span class="m">$\delta$</span>, take <span class="m">$\frac12 r^2$</span> when <span class="m">$|r| \le \delta$</span> and <span class="m">$\delta(|r| - \frac{\delta}{2})$</span> otherwise. Its gradient is <span class="m">$r$</span> in the quadratic zone (identical to squared error) and a constant <span class="m">$\pm\delta$</span> in the tails, so an outlier's pull is capped: it pushes with bounded force instead of quadratically growing force. It is differentiable everywhere, including the seam, unlike <span class="m">$|r|$</span> at zero. The cost: no closed form, and a new hyperparameter <span class="m">$\delta$</span> to validate.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): derive the ridge update from the plain update</summary>
+  <div>
+    <p>Starting from <span class="m">$w \leftarrow w - \alpha \frac{\partial J}{\partial w}$</span>, derive the update for <span class="m">$\tilde J(w) = J(w) + \lambda w^\top w$</span> (using the convention where the penalty's gradient is <span class="m">$\lambda w$</span>, absorbing the 2).</p>
+    <p><b>Answer.</b> Differentiate the new loss: <span class="m">$\nabla \tilde J = \nabla J + \lambda w$</span>. Substitute into the update:
+    <span class="m">$w \leftarrow w - \alpha(\nabla J + \lambda w) = w - \alpha\lambda w - \alpha \nabla J = (1 - \alpha\lambda)w - \alpha \nabla J$</span>.
+    The regularizer contributes a multiplicative shrink of the weights before the usual data-driven step, which is exactly why ML people call it weight decay.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): turn batch GD into stochastic GD</summary>
+  <div>
+    <p>Modify the batch update <span class="m">$w \leftarrow w - \frac{\alpha}{N}\sum_{i=1}^N (w^\top x^{(i)} - t^{(i)})x^{(i)}$</span> into stochastic gradient descent, and compare the cost per step.</p>
+    <p><b>Answer.</b> Replace the average over all <span class="m">$N$</span> examples with a single randomly drawn example <span class="m">$i$</span>:
+    <span class="m">$w \leftarrow w - \alpha\,(w^\top x^{(i)} - t^{(i)})\,x^{(i)}$</span>, drawing a fresh <span class="m">$i$</span> each step (in practice, shuffling and sweeping the dataset). Cost per step falls from <span class="m">$O(ND)$</span> to <span class="m">$O(D)$</span>, a factor of <span class="m">$N$</span>. The single-example gradient is a noisy but unbiased estimate of the full gradient, its expectation over <span class="m">$i$</span> is exactly the batch gradient, so the path jitters (Fig 9.2's stochastic toggle) but heads to the same valley, and you buy far more steps for the same compute. Mini-batches interpolate between the extremes.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 6 (transfer): 5 points, degree-4 polynomial, predict the errors</summary>
+  <div>
+    <p>A colleague fits <span class="m">$M = 4$</span> to <span class="m">$N = 5$</span> noisy points and reports zero training error, claiming a perfect model. Predict the test error and justify your prediction. What two remedies do you offer?</p>
+    <p><b>Answer.</b> Test error will almost certainly be large. Five coefficients can interpolate five points exactly, so zero train error is guaranteed regardless of noise, the model has absorbed <span class="m">$\epsilon$</span> into its weights, and between the training points the curve oscillates with no data to discipline it. Zero training error here is evidence of memorization, not skill. Remedies, straight from section 10: (1) more data, at <span class="m">$N \gg 5$</span> the same capacity can no longer thread every point; (2) ridge regularization, penalizing <span class="m">$w^\top w$</span> tames the ballooning coefficients, with <span class="m">$\lambda$</span> chosen on a validation split, never on the test set.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is linear regression, end to end: a model you can read, a loss you derived on screen, two optimizers you executed by hand and by code, and the first honest look at the enemy, overfitting, along with the first weapon against it. Next lecture the target becomes discrete and the same recipe builds a classifier.</p>
+</div>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../../../index.html">The AI Learning Map</a> &middot; Lecture 4 &middot; Linear Regression</div>
+</footer>
+
+<script>
+// KaTeX auto-render once DOM + KaTeX are ready
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>
