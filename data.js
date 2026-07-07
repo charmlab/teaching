@@ -244,9 +244,12 @@ const MODULES = [
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
-      { title:"★ ECE 657 Course Home — all interactive lessons", type:"website", url:"modules/c-ml/index.html" },
+      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–11)", type:"website", url:"modules/c-ml/index.html" },
       { title:"★ Interactive Lesson — k-Nearest Neighbours (Lecture 2)", type:"website", url:"modules/c-ml/knn/index.html" },
+      { title:"★ Interactive Lesson — Decision Trees (Lecture 3)", type:"website", url:"modules/c-ml/decision-trees/index.html" },
       { title:"★ Interactive Lesson — Linear Regression (Lecture 4)", type:"website", url:"modules/c-ml/linear-regression/index.html" },
+      { title:"★ Interactive Lesson — Bias, Variance & Ensembles (Lecture 7)", type:"website", url:"modules/c-ml/bias-variance-ensembles/index.html" },
+      { title:"★ Interactive Lesson — Support Vector Machines (Lecture 8)", type:"website", url:"modules/c-ml/svm/index.html" },
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
@@ -258,6 +261,10 @@ const MODULES = [
     blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
     aud:["student","executive"], prereqs:["c-ml"],
     resources:[
+      { title:"★ Interactive Lesson — Linear Classification (Lecture 5)", type:"website", url:"modules/c-ml/linear-classification/index.html" },
+      { title:"★ Interactive Lesson — Logistic Regression (Lecture 6)", type:"website", url:"modules/c-ml/logistic-regression/index.html" },
+      { title:"★ Interactive Lesson — Neural Networks (Lecture 9)", type:"website", url:"modules/c-ml/neural-networks/index.html" },
+      { title:"★ Interactive Lesson — Backpropagation (Lecture 10)", type:"website", url:"modules/c-ml/backpropagation/index.html" },
       { title:"3Blue1Brown — Neural Networks", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
       { title:"StatQuest — Maximum Likelihood", type:"video", url:"https://youtu.be/XepXtl9YKwc" },
@@ -273,7 +280,9 @@ const MODULES = [
     blurb:"CNNs and feature hierarchies, convolution / pooling / normalization, transfer learning, data augmentation, evaluation.",
     blurb_fa:"CNN‌ها و سلسله مراتب ویژگی، کانولوشن / پولینگ / نرمال‌سازی، انتقال یادگیری، بهبود داده، ارزیابی.",
     aud:["student","executive"], prereqs:["c-nn"],
-    resources:[],
+    resources:[
+      { title:"★ Interactive Lesson — Convolutional Neural Networks (Lecture 11)", type:"website", url:"modules/c-ml/cnn/index.html" },
+    ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   { id:"a-nlp", tier:"applied", short:"LM",
