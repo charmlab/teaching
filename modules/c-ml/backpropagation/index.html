@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Backpropagation — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on backpropagation: the chain rule on a computation graph, error signals, SGD, and the training tricks that make deep networks work.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 10 &middot; The ML Bible</div>
+  <h1>Backpropagation</h1>
+  <p class="lede">
+    Last lecture built a multilayer perceptron and then hit a wall: the network
+    has thousands of weights, and we have no way to set them. This lecture
+    knocks the wall down. The answer is not a new learning rule, it is the
+    chain rule you already know, reorganized so brilliantly that one forward
+    pass and one backward pass deliver the derivative of the loss with respect
+    to every single parameter. That algorithm is backpropagation, and it
+    trains essentially every neural network in use today.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: a million knobs, one method</a></li>
+    <li><a href="#sec-scale">Gradient descent at scale</a></li>
+    <li><a href="#sec-chain">The chain rule, reorganized</a></li>
+    <li><a href="#sec-graph">The computation graph</a></li>
+    <li><a href="#sec-algorithm">The backpropagation algorithm</a></li>
+    <li><a href="#sec-sgd">Batch, mini-batch, and SGD</a></li>
+    <li><a href="#sec-tricks">Training tricks</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> A million knobs, one method</h2>
+
+<p>
+Picture the network from last lecture, scaled up to something useful: a few
+hidden layers, a few hundred units each. Count the weights. Every unit in one
+layer connects to every unit in the next, so the parameters multiply out to
+hundreds of thousands, and real networks carry millions. Every one of those
+numbers is a knob, and the network only works when all of them are set
+right. Nobody can tune a million knobs by hand. We need gradient descent, and
+gradient descent needs one thing from us: the derivative of the loss with
+respect to every parameter, recomputed at every step.
+</p>
+
+<p>
+So why is that hard? Here is the trap. You could estimate each derivative
+numerically: nudge one weight up a little, rerun the whole network, and see
+how the loss moves. That works, but it costs a full forward pass per nudge,
+two if you nudge both directions, so a million-parameter network pays roughly
+two million forward passes for a single gradient. Per step. Differentiating
+the loss as one giant formula by hand is worse: the expression for a deep
+network fills pages, and most of its pieces repeat.
+<!-- addition beyond source: the finite-difference cost framing, added to motivate
+     "efficient, systematic" from the source's big idea -->
+</p>
+
+<p>
+The big idea of this lecture kills both problems at once.
+<strong>Backpropagation is an efficient, systematic application of the chain
+rule on a computation graph.</strong> Run the network forward once to get the
+loss. Then walk backward through the same graph once, and by the time you
+reach the inputs you hold the exact derivative for every parameter, all of
+them, for about the cost of one extra forward pass. The idea is old and the
+people behind it were finally, spectacularly recognized: Geoffrey Hinton, the
+"Godfather of Deep Learning," and John Hopfield of Hopfield-network fame
+shared the 2024 Nobel Prize in Physics for this line of work. This lecture is
+that prize, from scratch.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. GRADIENT DESCENT AT SCALE ═══════════════════ -->
+<section id="sec-scale">
+<h2><span class="secnum">1.</span> Gradient descent at scale</h2>
+
+<p>
+Nothing about the learning rule changes. An MLP is a learned transformation
+<span class="m">$y = \phi_\theta(x)$</span> whose parameters are all the
+weights and biases of all the layers collected into one bag:
+</p>
+
+$$ \theta = \{ W^{(1)}, b^{(1)}, \dots, W^{(L)}, b^{(L)} \} $$
+
+<p>
+Training is the same gradient descent this course has used since linear
+regression, just with a much bigger <span class="m">$\theta$</span>:
+</p>
+
+$$ \theta^{(t+1)} \leftarrow \theta^{(t)} - \alpha \, \nabla_\theta J(\theta) $$
+
+<p>
+Pick a loss <span class="m">$J$</span>, compute its gradient with respect to
+every parameter, step against the gradient, repeat. One honest warning
+before we start descending: a network is a highly nonlinear function of its
+parameters, so the loss landscape <span class="m">$J(\theta)$</span> is
+usually <strong>non-convex</strong>. There is no single bowl with one bottom
+like least squares gave us; there are valleys, plateaus, and multiple minima.
+Gradient descent still works remarkably well in practice, but it comes with
+no global-optimum guarantee anymore. That trade is the price of expressive
+models, and we pay it.
+</p>
+
+<p>
+So the whole problem reduces to one question: how do we compute
+<span class="m">$\nabla_\theta J$</span> for a million parameters without a
+million recomputations? That question has a beautiful answer, and it starts
+with a function small enough to hold in your head.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. THE CHAIN RULE, REORGANIZED ═══════════════════ -->
+<section id="sec-chain">
+<h2><span class="secnum">2.</span> The chain rule, reorganized</h2>
+
+<p>
+Take the smallest model that still has all the moving parts: one input, one
+weight, one bias, a sigmoid, a squared error. Call it logistic least
+squares:
+</p>
+
+$$ z = wx + b, \qquad y = \sigma(z), \qquad L = \tfrac{1}{2}(y - t)^2 $$
+
+<p>
+Here <span class="m">$x$</span> is the input, <span class="m">$t$</span> is
+the target, <span class="m">$\sigma$</span> is the sigmoid from the logistic
+regression lecture, and we want <span class="m">$\partial L / \partial w$</span>
+and <span class="m">$\partial L / \partial b$</span> so we can descend. The
+brute-force route is to substitute everything into one expression,
+<span class="m">$L = \tfrac{1}{2}(\sigma(wx+b) - t)^2$</span>, and
+differentiate the whole thing. It works here. It does not survive contact
+with a real network, and worse, it hides the structure that saves us.
+</p>
+
+<p>
+The better route: differentiate <em>part by part</em>. Each equation in the
+model is simple, so each has a trivial derivative with respect to its own
+direct input. I call these <strong>local derivatives</strong>, because each
+one only knows about a single arrow of the model, nothing else:
+</p>
+
+$$ \frac{dz}{dw} = x, \qquad \frac{dy}{dz} = \sigma'(z), \qquad \frac{dL}{dy} = y - t $$
+
+<p>
+The chain rule then snaps the pieces together. The effect of
+<span class="m">$w$</span> on <span class="m">$L$</span> flows through
+<span class="m">$z$</span> and then through <span class="m">$y$</span>, so
+the derivatives multiply along the path:
+</p>
+
+$$ \frac{\partial L}{\partial w}
+   = \frac{\partial L}{\partial y}\frac{\partial y}{\partial z}\frac{\partial z}{\partial w}
+   = (y - t)\,\sigma'(z)\,x $$
+
+<p>
+Nothing new mathematically, this is first-year calculus. What is new is the
+bookkeeping discipline: never expand, always multiply local pieces. Notice
+what the pieces are made of: <span class="m">$y - t$</span> and
+<span class="m">$\sigma'(z)$</span> only use values the forward computation
+already produced. For the sigmoid this is especially tidy, since
+<span class="m">$\sigma'(z) = \sigma(z)\,(1 - \sigma(z)) = y(1-y)$</span>,
+so the derivative is free once you know <span class="m">$y$</span>.
+<!-- addition beyond source: the explicit sigma' = sigma(1-sigma) identity, carried
+     over from the logistic-regression lesson; the source uses sigma'(z) directly -->
+Let me make all of this concrete with real numbers, because we are about to
+reuse them for the rest of the lesson.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the forward pass</div>
+  <p>Take <span class="m">$x = 2$</span>, <span class="m">$w = 0.5$</span>, <span class="m">$b = -0.5$</span>, target <span class="m">$t = 1$</span>. Compute each node in order:</p>
+  $$ z = wx + b = (0.5)(2) - 0.5 = 0.5 $$
+  $$ y = \sigma(0.5) = \frac{1}{1 + e^{-0.5}} = 0.6225 $$
+  $$ L = \tfrac{1}{2}(y - t)^2 = \tfrac{1}{2}(0.6225 - 1)^2 = \tfrac{1}{2}(-0.3775)^2 = 0.0713 $$
+  <p>The prediction is 0.6225, the target is 1, the loss is 0.0713. Every derivative we compute next is built from these three numbers plus the inputs. Hold onto them.</p>
+</div>
+</section>
+
+<!-- ═══════════════════ 3. THE COMPUTATION GRAPH ═══════════════════ -->
+<section id="sec-graph">
+<h2><span class="secnum">3.</span> The computation graph</h2>
+
+<p>
+Now draw the model instead of writing it. A <strong>computation graph</strong>
+is a diagram whose nodes are the inputs and every computed quantity, and
+whose edges are the functional dependencies: an arrow from
+<span class="m">$w$</span> to <span class="m">$z$</span> means
+<span class="m">$z$</span> is computed directly from
+<span class="m">$w$</span>. Our model becomes six nodes:
+<span class="m">$x, w, b$</span> feed <span class="m">$z$</span>, which feeds
+<span class="m">$y$</span>, which joins <span class="m">$t$</span> to produce
+<span class="m">$L$</span>. The <strong>forward pass</strong> is exactly what
+the worked example just did: sweep left to right, computing every node's
+value from its parents.
+</p>
+
+<p>
+The payoff of drawing the graph is the backward sweep. Give every node
+<span class="m">$v$</span> an <strong>error signal</strong>, written with
+<strong>bar notation</strong>:
+</p>
+
+$$ \bar{v} \;=\; \frac{\partial L}{\partial v} $$
+
+<p>
+Read <span class="m">$\bar{v}$</span> as "how much the loss changes per unit
+nudge of <span class="m">$v$</span>." The trick that makes everything
+efficient is to compute these in <em>reverse</em> order, loss first, inputs
+last, because each error signal is just the previous one times a local
+derivative:
+</p>
+
+$$ \bar{y} = \frac{\partial L}{\partial y} = y - t, \qquad
+   \bar{z} = \bar{y}\,\sigma'(z), \qquad
+   \bar{w} = \bar{z}\,x, \qquad \bar{b} = \bar{z} $$
+
+<p>
+Look at what got reused. The product <span class="m">$(y-t)\,\sigma'(z)$</span>
+appears inside both <span class="m">$\bar{w}$</span> and
+<span class="m">$\bar{b}$</span>, and the backward ordering computes it once,
+names it <span class="m">$\bar{z}$</span>, and hands it to both. In a deep
+network this sharing is the entire ballgame: every error signal is computed
+once and feeds every parameter behind it. This is the <strong>backward
+pass</strong>. Watch it run:
+</p>
+
+<div class="figure" id="fig-graph">
+  <div class="fig-mount" data-fig="graph"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the signature picture of the lesson. Step the forward pass left to right to fill in values, then step the backward pass right to left and watch each error signal get built from the one before it times a local derivative. Every number is computed live from the sliders; nothing is staged.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the backward pass</div>
+  <p>Same numbers as before: <span class="m">$x=2$</span>, <span class="m">$w=0.5$</span>, <span class="m">$b=-0.5$</span>, <span class="m">$t=1$</span>, which gave <span class="m">$z = 0.5$</span>, <span class="m">$y = 0.6225$</span>. First the one local derivative that needs computing, using <span class="m">$\sigma'(z) = y(1-y)$</span>:</p>
+  $$ \sigma'(0.5) = (0.6225)(1 - 0.6225) = (0.6225)(0.3775) = 0.2350 $$
+  <p>Now sweep right to left:</p>
+  $$ \bar{y} = y - t = 0.6225 - 1 = -0.3775 $$
+  $$ \bar{z} = \bar{y}\,\sigma'(z) = (-0.3775)(0.2350) = -0.0887 $$
+  $$ \bar{w} = \bar{z}\,x = (-0.0887)(2) = -0.1774, \qquad \bar{b} = \bar{z} = -0.0887 $$
+  <p>Sanity check the honest way: nudge <span class="m">$w$</span> numerically. With <span class="m">$\varepsilon = 10^{-6}$</span>, <span class="m">$\big(L(w{+}\varepsilon) - L(w{-}\varepsilon)\big)/2\varepsilon = -0.177447$</span>, which matches <span class="m">$\bar{w}$</span> to six decimals. Fig 4.2 lets you run this check yourself for any inputs.</p>
+  <p>Finally, use the gradient. One step with <span class="m">$\alpha = 1$</span>: <span class="m">$w \leftarrow 0.5 - (-0.1774) = 0.6774$</span> and <span class="m">$b \leftarrow -0.5 - (-0.0887) = -0.4113$</span>. Rerun the forward pass and the prediction rises to <span class="m">$y = 0.7198$</span>, closer to the target of 1, and the loss falls from 0.0713 to 0.0392. The machinery works.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Run the backward pass yourself: <span class="m">$x = 1$</span>, <span class="m">$w = 0$</span>, <span class="m">$b = 0$</span>, <span class="m">$t = 0$</span>. What are <span class="m">$\bar{w}$</span> and <span class="m">$\bar{b}$</span>?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both 0.5: the error signal <span class="m">$y - t = 0.5$</span> passes straight through</button>
+    <button data-k="b">Both 0.125: <span class="m">$\bar{z} = (0.5)(0.25) = 0.125$</span>, then <span class="m">$\bar{w} = \bar{z}\cdot 1$</span> and <span class="m">$\bar{b} = \bar{z}$</span></button>
+    <button data-k="c">Both 0: the weights are zero, so no gradient can flow</button>
+  </div>
+  <div class="quiz-fb" data-k="a">You skipped the sigmoid. The error signal must pass through <span class="m">$\sigma'(z)$</span> on the way from <span class="m">$y$</span> to <span class="m">$z$</span>, and <span class="m">$\sigma'(0) = 0.25$</span>.</div>
+  <div class="quiz-fb" data-k="b">Right. Forward: <span class="m">$z = 0$</span>, <span class="m">$y = \sigma(0) = 0.5$</span>. Backward: <span class="m">$\bar{y} = 0.5 - 0 = 0.5$</span>, <span class="m">$\sigma'(0) = (0.5)(0.5) = 0.25$</span>, so <span class="m">$\bar{z} = 0.125$</span>, and since <span class="m">$x = 1$</span>, <span class="m">$\bar{w} = \bar{b} = 0.125$</span>. Reproduce it in Fig 3.1 by setting the sliders.</div>
+  <div class="quiz-fb" data-k="c">Zero weights do not block gradients; they just mean the current prediction is <span class="m">$\sigma(0) = 0.5$</span>. The gradient depends on the error and the local derivatives, and both are nonzero here.</div>
+</div>
+
+<h3>Every edge carries one local derivative</h3>
+
+<p>
+A useful way to internalize the backward pass: each <em>edge</em> of the
+graph owns exactly one local derivative, the derivative of its head with
+respect to its tail. The backward pass never does anything more clever than
+walking backward and multiplying the running error signal by each edge's
+local derivative as it crosses it. Backprop is the chain rule, reused, one
+edge at a time. Convince yourself by inspecting the edges:
+</p>
+
+<div class="figure" id="fig-inspector">
+  <div class="fig-mount" data-fig="inspector"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> the local-derivative inspector. Hover or select any edge to see the one derivative it owns (<span class="m">$\partial z/\partial w = x$</span>, <span class="m">$\partial y/\partial z = \sigma'(z)$</span>, <span class="m">$\partial L/\partial y = y - t$</span>) and exactly how it multiplies into the running error signal, with the live numbers.</p>
+</div>
+
+<details class="check">
+  <summary>Check: rerun the whole backward pass with the target flipped</summary>
+  <div>
+    <p>Keep <span class="m">$x = 2$</span>, <span class="m">$w = 0.5$</span>, <span class="m">$b = -0.5$</span> but set <span class="m">$t = 0$</span>. Compute <span class="m">$\bar{y}, \bar{z}, \bar{w}, \bar{b}$</span> by hand, then check in Fig 3.1.</p>
+    <p><b>Answer.</b> The forward pass is unchanged: <span class="m">$z = 0.5$</span>, <span class="m">$y = 0.6225$</span>, <span class="m">$\sigma'(z) = 0.2350$</span>. Only the error at the top changes: <span class="m">$\bar{y} = y - t = 0.6225$</span>, now positive because the prediction is too high. Then <span class="m">$\bar{z} = (0.6225)(0.2350) = 0.1463$</span>, <span class="m">$\bar{w} = (0.1463)(2) = 0.2926$</span>, <span class="m">$\bar{b} = 0.1463$</span>. Same magnitudes of machinery, opposite sign of intent: gradient descent will now push <span class="m">$w$</span> and <span class="m">$b$</span> <em>down</em> to lower the prediction. The local derivatives did not change at all; only the error signal driving them did.</p>
+  </div>
+</details>
+
+<h3>Fan-out: when one node feeds two children</h3>
+
+<p>
+One rule is still missing. What if a node influences the loss along
+<em>two</em> paths? Calculus already answers this: for a function of several
+intermediate variables, the total derivative sums over the paths. This is
+the multivariate chain rule:
+</p>
+
+$$ \frac{d}{dt} f\big(x(t),\, y(t)\big)
+   = \frac{\partial f}{\partial x}\frac{dx}{dt}
+   + \frac{\partial f}{\partial y}\frac{dy}{dt} $$
+
+<p>
+On a graph, a node that feeds several children is said to have
+<strong>fan-out</strong> greater than 1, and its error signal is the
+<em>sum</em> of the contributions flowing back from all of its children. The
+cleanest real example is L2-regularized regression: penalize large weights by
+adding <span class="m">$R = \tfrac{1}{2}w^2$</span> to the loss, so the total
+is <span class="m">$L_{\text{reg}} = L + \lambda R$</span>. Now
+<span class="m">$w$</span> has two children, <span class="m">$z$</span> and
+<span class="m">$R$</span>, and both send gradient back to it:
+</p>
+
+$$ \bar{w} = \bar{z}\,x + \bar{R}\,w, \qquad \text{where } \bar{R} = \lambda $$
+
+<p>Watch the two contributions arrive and add up:</p>
+
+<div class="figure" id="fig-fanout">
+  <div class="fig-mount" data-fig="fanout"></div>
+  <p class="fig-caption"><b>Fig 3.3,</b> fan-out made concrete. The weight <span class="m">$w$</span> feeds both the prediction path (through <span class="m">$z$</span>) and the regularizer <span class="m">$R$</span>. Step the backward pass and both contributions, <span class="m">$\bar{z}\,x$</span> and <span class="m">$\bar{R}\,w$</span>, flow back and sum into <span class="m">$\bar{w}$</span>. Slide <span class="m">$\lambda$</span> to change how loudly the regularizer argues.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why does a node with two children <em>sum</em> its two backward contributions, rather than take the larger one or multiply them?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It is a convention chosen to keep gradients from shrinking</button>
+    <button data-k="b">Because the loss is a sum of terms, and sums differentiate term by term</button>
+    <button data-k="c">Because nudging the node perturbs the loss along both paths at once, and to first order the total change is the sum of the per-path changes: that is exactly the multivariate chain rule</button>
+  </div>
+  <div class="quiz-fb" data-k="a">It is not a convention, it is a theorem. Get it wrong and the computed gradient simply is not the derivative, which the finite-difference check in Fig 4.2 would expose immediately.</div>
+  <div class="quiz-fb" data-k="b">Close, but the rule holds even when the children do not enter the loss additively. In Fig 3.3 the two paths do combine in a sum, but fan-out summing also applies inside products and compositions.</div>
+  <div class="quiz-fb" data-k="c">Exactly. Nudge <span class="m">$w$</span> by <span class="m">$\varepsilon$</span> and the loss moves by <span class="m">$\varepsilon\,\bar{z}\,x$</span> through one path and <span class="m">$\varepsilon\,\bar{R}\,w$</span> through the other; first-order effects add. That is <span class="m">$\frac{d}{dt}f(x(t),y(t)) = \frac{\partial f}{\partial x}\frac{dx}{dt} + \frac{\partial f}{\partial y}\frac{dy}{dt}$</span> wearing a graph costume.</div>
+</div>
+
+<p>
+One more piece of vocabulary and the picture is complete. Computing
+derivatives mechanically from the computation rule itself, rather than from a
+hand-derived formula, is called <strong>automatic differentiation</strong>.
+Backpropagation is the special case that modern frameworks implement: run the
+loss forward through the graph, then propagate gradients backward. When
+PyTorch or JAX "just knows" your gradients, this graph walk is what it is
+doing.
+</p>
+</section>
+
+<!-- ═══════════════════ 4. THE ALGORITHM ═══════════════════ -->
+<section id="sec-algorithm">
+<h2><span class="secnum">4.</span> The backpropagation algorithm</h2>
+
+<p>
+Everything so far generalizes to any graph in three lines. Let
+<span class="m">$v_1, \dots, v_N$</span> be a <strong>topological
+ordering</strong> of the nodes, meaning every parent comes before its
+children, with <span class="m">$v_N = L$</span> the final loss.
+</p>
+
+<ol>
+  <li><b>Forward pass.</b> For <span class="m">$i = 1, \dots, N$</span>, compute <span class="m">$v_i = f_i(\text{Parents}(v_i))$</span>.</li>
+  <li><b>Backward pass.</b> Initialize <span class="m">$\bar{v}_N = \frac{\partial L}{\partial L} = 1$</span>, then for <span class="m">$i = N{-}1, \dots, 1$</span>:
+  $$ \bar{v}_i = \sum_{j \,\in\, \text{Children}(v_i)} \bar{v}_j\, \frac{\partial v_j}{\partial v_i} $$
+  </li>
+  <li><b>Gradient step.</b> For every trainable parameter, <span class="m">$w_j^{(t+1)} \leftarrow w_j^{(t)} - \alpha\, \frac{\partial J}{\partial w_j}$</span>.</li>
+</ol>
+
+<p>
+Read the backward formula slowly, because it contains the whole lesson. Each
+node collects one term per child: the child's already-computed error signal
+times the local derivative of that child with respect to this node. One child
+means one product, exactly the chain rule of section 2. Several children
+means a sum, exactly the fan-out rule of Fig 3.3. Initializing
+<span class="m">$\bar{L} = 1$</span> just says the loss changes one-for-one
+with itself. That is the entire algorithm; everything else is applying it.
+</p>
+
+<h3>Applied to a real network</h3>
+
+<p>
+Apply the recipe to the two-layer MLP from last lecture: inputs
+<span class="m">$x_j$</span>, hidden pre-activations
+<span class="m">$z_i = \sum_j w_{ij}^{(1)} x_j + b_i^{(1)}$</span>, hidden
+activations <span class="m">$h_i = \sigma(z_i)$</span>, outputs
+<span class="m">$y_k$</span> built from the <span class="m">$h_i$</span>,
+then a loss. The backward pass falls straight out of the sum-over-children
+formula. Each hidden unit feeds every output, fan-out again, so:
+</p>
+
+$$ \bar{h}_i = \sum_k \bar{y}_k\, w_{ki}^{(2)}, \qquad
+   \bar{z}_i = \bar{h}_i\, \sigma'(z_i), \qquad
+   \bar{w}_{ij}^{(1)} = \bar{z}_i\, x_j $$
+
+<p>
+The same three moves as the scalar case: sum the children's error signals
+through the weights, squeeze through the activation's local derivative,
+multiply by the input that fed the weight. Layer by layer, right to left,
+each layer's error signals computed once and reused by everything behind
+them. Step through it on a live network:
+</p>
+
+<div class="figure" id="fig-mlp">
+  <div class="fig-mount" data-fig="mlp"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> backprop on a 2-3-1 MLP with fixed, visible weights. Forward steps light up activations layer by layer; backward steps flow the error signals <span class="m">$\bar{y} \to \bar{h}_i \to \bar{z}_i \to \bar{w}_{ij}$</span> with every product shown numerically. The narration prints the exact instance of <span class="m">$\bar{h}_i = \sum_k \bar{y}_k w_{ki}$</span> being computed.</p>
+</div>
+
+<p>
+In code, the backward pass is barely longer than the math. This function
+reuses the forward pass from the neural-networks lesson and returns the
+gradient of the loss with respect to every parameter:
+</p>
+
+<pre class="code" data-lang="python"><code>def backward(x, t, W1, b1, w2, b2):
+    z = W1 @ x + b1              # forward pass, values saved
+    h = sigmoid(z)
+    y = w2 @ h + b2
+    y_bar  = y - t               # dL/dy for L = 0.5*(y-t)**2
+    w2_bar = y_bar * h           # each w2_i sees  y_bar * h_i
+    b2_bar = y_bar
+    h_bar  = y_bar * w2          # fan-in reversed: h_bar_i = y_bar * w2_i
+    z_bar  = h_bar * h * (1 - h) # through sigma'(z) = h(1-h)
+    W1_bar = np.outer(z_bar, x)  # w_bar_ij = z_bar_i * x_j
+    b1_bar = z_bar
+    return W1_bar, b1_bar, w2_bar, b2_bar</code></pre>
+
+<p>
+Never trust a backward pass you have not tested. The universal test is the
+one from the worked example: compare against finite differences. It is too
+slow to train with, but perfect as a unit test. Run it live:
+</p>
+
+<div class="figure" id="fig-backex">
+  <div class="fig-mount" data-fig="backex"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> the backward pass as a code exercise. The <code>backward()</code> shown really executes on the logistic-least-squares graph with your inputs, and every run is verified against central finite differences <span class="m">$\big(L(w{+}\varepsilon)-L(w{-}\varepsilon)\big)/2\varepsilon$</span>. The agreement to ten decimal places is the proof that backprop computes true derivatives, not approximations.</p>
+</div>
+
+<details class="check">
+  <summary>Check (coding): complete the missing backward lines</summary>
+  <div>
+    <p>A classmate wrote the two-layer backward pass but left two lines blank. Fill them in:</p>
+    <pre class="code" data-lang="python"><code>y_bar  = y - t
+w2_bar = y_bar * h
+h_bar  = ______            # line 1: error signal of the hidden activations
+z_bar  = ______            # line 2: push it through the sigmoid
+W1_bar = np.outer(z_bar, x)</code></pre>
+    <p><b>Answer.</b> Line 1: <code>h_bar = y_bar * w2</code>, which is <span class="m">$\bar{h}_i = \sum_k \bar{y}_k w_{ki}$</span> with a single output, each hidden unit inheriting the output error scaled by the weight connecting them. Line 2: <code>z_bar = h_bar * h * (1 - h)</code>, the local derivative <span class="m">$\sigma'(z_i) = h_i(1 - h_i)$</span> applied elementwise. Swap the order of these two lines and the gradient is wrong; the error must pass through the weight before the nonlinearity, because that is the order the graph's edges impose.</p>
+  </div>
+</details>
+
+<h3>Close the loop: backprop actually trains something</h3>
+
+<p>
+Gradients are only the means. The end is step 3 of the algorithm, run
+thousands of times: forward, backward, step, repeat, until the network's
+decision boundary bends itself around the data. Here is a small MLP learning
+an XOR-style problem that no linear model can touch, driven by exactly the
+backward pass above:
+</p>
+
+<div class="figure" id="fig-trainer">
+  <div class="fig-mount" data-fig="trainer"></div>
+  <p class="fig-caption"><b>Fig 4.3,</b> backprop-driven gradient descent, live. A 2-6-1 MLP starts from small random weights and learns the XOR-pattern data; the decision boundary reshapes and the loss falls with every step, all computed by the shared backward pass. Try a learning rate that is too hot and watch the loss curve tell on you.</p>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. BATCH, MINI-BATCH, SGD ═══════════════════ -->
+<section id="sec-sgd">
+<h2><span class="secnum">5.</span> Batch, mini-batch, and stochastic gradient descent</h2>
+
+<p>
+One question remains before this scales to real datasets: gradients of
+<em>what</em>, exactly? The training cost is the average loss over the
+dataset, and because differentiation is linear, the gradient is the average
+of the per-example gradients:
+</p>
+
+$$ J(\theta) = \frac{1}{N}\sum_{i=1}^{N} L^{(i)}(\theta), \qquad
+   \nabla J(\theta) = \frac{1}{N}\sum_{i=1}^{N} \nabla L^{(i)}(\theta) $$
+
+<p>
+So one honest gradient costs <span class="m">$N$</span> backprop runs, one
+per example. When <span class="m">$N$</span> is a million, that is a million
+backprops for a single parameter update. This is <strong>batch gradient
+descent</strong>: exact, and painfully expensive per step. The alternative
+sounds reckless: update from <em>one random example</em>,
+</p>
+
+$$ \theta \leftarrow \theta - \alpha\, \nabla L^{(i)}(\theta),
+   \qquad i \sim \mathrm{Unif}\{1, \dots, N\} $$
+
+<p>
+This is <strong>stochastic gradient descent (SGD)</strong>, and it is less
+reckless than it looks, because the random single-example gradient is an
+<strong>unbiased</strong> estimate of the full gradient. Averaging over the
+random index recovers the true gradient exactly:
+</p>
+
+$$ \mathbb{E}_{i \sim \mathrm{Unif}\{1,\dots,N\}}\!\left[\nabla L^{(i)}(\theta)\right]
+   = \frac{1}{N}\sum_{i=1}^{N}\nabla L^{(i)}(\theta) = \nabla J(\theta) $$
+
+<p>
+Each step points in the right direction <em>on average</em>; individual steps
+jitter around that direction. Between the extremes lives the workhorse.
+<strong>Mini-batch gradient descent</strong> averages over a random batch
+<span class="m">$S$</span> of examples:
+</p>
+
+$$ \hat{g}_S(\theta) = \frac{1}{|S|}\sum_{i \in S} \nabla L^{(i)}(\theta) $$
+
+<p>
+Still unbiased, and for independently drawn examples the variance of each
+gradient coordinate shrinks in proportion to the batch size,
+<span class="m">$\operatorname{Var}[\hat{g}_{S,j}] = \frac{1}{S}\operatorname{Var}\big[\partial L^{(i)}/\partial \theta_j\big]$</span>.
+Bigger batches buy smoother gradients, at a price of more computation per
+update. Smaller batches are noisier but cheaper. That trade-off is the whole
+design space, and you should feel it before believing it:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one SGD step vs one batch step</div>
+  <p>Tiny model <span class="m">$y = wx$</span> with squared loss <span class="m">$L^{(i)} = \tfrac{1}{2}(w x^{(i)} - t^{(i)})^2$</span>, so <span class="m">$\nabla L^{(i)} = (w x^{(i)} - t^{(i)})\,x^{(i)}$</span>. Dataset of three: <span class="m">$(1, 2), (2, 3), (3, 5)$</span>. At <span class="m">$w = 1$</span> the three per-example gradients are:</p>
+  $$ \nabla L^{(1)} = (1 - 2)(1) = -1, \quad
+     \nabla L^{(2)} = (2 - 3)(2) = -2, \quad
+     \nabla L^{(3)} = (3 - 5)(3) = -6 $$
+  <p><b>Batch step</b> (<span class="m">$\alpha = 0.1$</span>): the full gradient is the average, <span class="m">$\nabla J = \tfrac{1}{3}(-1 - 2 - 6) = -3$</span>, so <span class="m">$w \leftarrow 1 - (0.1)(-3) = 1.3$</span>. Cost: three backprops.</p>
+  <p><b>SGD step</b>: sample one example, say the third. <span class="m">$w \leftarrow 1 - (0.1)(-6) = 1.6$</span>. Cost: one backprop. A different draw gives 1.1 or 1.2, so the step is noisy. But average the three possible SGD steps and you get <span class="m">$w = 1.3$</span>, the batch step, exactly. Unbiased, in one line of arithmetic.</p>
+</div>
+
+<p>In code, the two steps differ only in how many examples they touch:</p>
+
+<pre class="code" data-lang="python"><code>def sgd_step(theta, X, T, alpha, rng):
+    i = rng.integers(len(X))               # one random example
+    return theta - alpha * grad_L(theta, X[i], T[i])
+
+def minibatch_step(theta, X, T, alpha, S, rng):
+    idx = rng.choice(len(X), size=S, replace=False)
+    g = np.mean([grad_L(theta, X[i], T[i]) for i in idx], axis=0)
+    return theta - alpha * g               # S = len(X) gives batch GD</code></pre>
+
+<p>
+One pass through the whole training set, however you slice it into updates,
+is called an <strong>epoch</strong>. Counting floating-point operations per
+epoch is revealing: 100 updates at batch size 1 cost the same FLOPs as 1
+update at batch size 100. But the 100 sequential updates are not equivalent
+to the 1 big one, because each small update computes its gradient at
+<em>fresher</em> parameters, already improved by the updates before it. If
+wall-clock time were proportional to FLOPs, tiny batches would win outright.
+In practice they do not, because hardware runs a batch of 100 in parallel for
+nearly the cost of 1, which is why moderate mini-batches dominate real
+training. Now race the three:
+</p>
+
+<div class="figure" id="fig-sgdrace">
+  <div class="fig-mount" data-fig="sgdrace"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the same quadratic loss surface, three optimizers, real per-example gradients from a real 40-point dataset. Full-batch descends smoothly, SGD jitters but keeps aiming at the minimum on average, and the mini-batch path morphs between them as you slide the batch size. The right panel shows the loss curves growing bumpier as the batch shrinks.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why is the single-example gradient an unbiased estimate of the batch gradient, and what do you pay when you shrink the batch from 100 to 1?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It is unbiased because every example has the same loss; shrinking the batch costs accuracy in the final model</button>
+    <button data-k="b">Its expectation over the uniformly random index is the average of all per-example gradients, which is <span class="m">$\nabla J$</span> itself; shrinking the batch multiplies the gradient variance by about 100, so steps jitter more even though they still point right on average</button>
+    <button data-k="c">It is unbiased only when the loss surface is convex; shrinking the batch makes convergence impossible</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Examples have different losses and very different gradients; the worked example above had per-example gradients of −1, −2, and −6. Unbiasedness is about the average over the random draw, not about the examples agreeing.</div>
+  <div class="quiz-fb" data-k="b">Right on both counts. <span class="m">$\mathbb{E}[\nabla L^{(i)}] = \frac{1}{N}\sum_i \nabla L^{(i)} = \nabla J$</span> because each index is drawn with probability <span class="m">$1/N$</span>, and variance scales as <span class="m">$1/S$</span>, so <span class="m">$S: 100 \to 1$</span> is a 100-fold variance increase. You buy 100 times more updates per epoch with that noise.</div>
+    <div class="quiz-fb" data-k="c">Unbiasedness is a property of the sampling, not the surface; the expectation computation never mentions convexity. And SGD converges fine in practice, noise and all, often to better solutions.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. TRAINING TRICKS ═══════════════════ -->
+<section id="sec-tricks">
+<h2><span class="secnum">6.</span> Training tricks</h2>
+
+<p>
+Backprop plus SGD will happily minimize training loss all the way into
+overfitting. Why does overfitting happen at all? Because data contains both
+real regularities and junk: sampling noise, and <em>accidental</em>
+regularities specific to the sample you happened to collect. The lecture's
+example is worth remembering: collect car images for a classifier but forget
+to balance across seasons, and the network may learn that snow means truck.
+A big network has the capacity to memorize all of it. The standard fixes
+each attack a different part of the problem.
+</p>
+
+<h3>Trick 1: data augmentation</h3>
+
+<p>
+The cheapest way to get more training data is to manufacture it. Transform
+the examples you have, translate, flip, rotate, warp smoothly, add noise, and
+each transform of a training image is a new training image with the same
+label. Two rules keep it honest. Only the training data may be warped, never
+the test data, because the test set's job is to represent reality untouched.
+And the valid transformations depend on the task: a horizontal flip of a car
+is still a car, but a horizontal flip of a handwritten digit is not a digit
+anymore:
+</p>
+
+<div class="figure" id="fig-augment">
+  <div class="fig-mount" data-fig="augment"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the augmentation gallery. One training digit, four augmented clones per resample; toggle shift, rotation, and noise, all label-preserving. Then switch on the mirror and notice the figure objecting: a flipped 7 is no longer a 7. What counts as label-preserving is a property of the task, not of the transform.</p>
+</div>
+
+<h3>Trick 2: parameter reduction</h3>
+
+<p>
+Fewer parameters, less capacity to memorize noise. Use fewer layers or fewer
+units per layer, or insert a <strong>linear bottleneck</strong>: a narrow
+linear layer between two nonlinear ones. A linear layer adds no expressive
+power at all, two linear maps compose into one, yet the narrow waist can cut
+the parameter count dramatically, and that alone can improve generalization.
+Capacity you do not have is capacity you cannot waste on noise.
+</p>
+
+<h3>Trick 3: weight decay</h3>
+
+<p>
+The L2 regularization from the logistic-regression lecture, now viewed
+through the update rule. Penalize the squared weights:
+</p>
+
+$$ J_{\text{reg}} = J + \frac{\lambda}{2}\sum_j w_j^2 $$
+
+<p>
+Backprop through the penalty (fan-out again, exactly Fig 3.3) adds
+<span class="m">$\lambda w$</span> to every weight's gradient, and the
+gradient step rearranges into something you can read:
+</p>
+
+$$ w \leftarrow w - \alpha\!\left(\frac{\partial J}{\partial w} + \lambda w\right)
+   = (1 - \alpha\lambda)\,w - \alpha\frac{\partial J}{\partial w} $$
+
+<p>
+Before the data gets a word in, every weight is multiplied by
+<span class="m">$(1 - \alpha\lambda)$</span>, a number slightly below 1. With
+<span class="m">$\alpha = 0.1$</span> and <span class="m">$\lambda = 0.5$</span>
+each weight literally decays by a factor of 0.95 every step, hence the name
+<strong>weight decay</strong>. Why do small weights fight overfitting?
+Remember what an overfit polynomial looks like: wild oscillations that
+require enormous coefficients to produce. Keep the coefficients small and the
+wildness is not expressible:
+</p>
+
+<div class="figure" id="fig-decay">
+  <div class="fig-mount" data-fig="decay"></div>
+  <p class="fig-caption"><b>Fig 6.2,</b> weight decay taming a degree-9 polynomial fit on 10 noisy points. Slide <span class="m">$\lambda$</span> up and watch the fitted coefficients in the table shrink from the thousands to single digits while the curve calms from wild interpolation to a sane fit. The <span class="m">$(1-\alpha\lambda)$</span> shrink factor is printed for the current <span class="m">$\lambda$</span>.</p>
+</div>
+
+<details class="check">
+  <summary>Check: derive the shrink factor, and connect it back to L2 regularization</summary>
+  <div>
+    <p>Starting from <span class="m">$J_{\text{reg}} = J + \frac{\lambda}{2}\sum_j w_j^2$</span>, derive the update and explain the connection to the L2-regularized logistic regression from earlier in the course.</p>
+    <p><b>Answer.</b> Differentiate the penalty: <span class="m">$\frac{\partial}{\partial w}\big(\frac{\lambda}{2}w^2\big) = \lambda w$</span>, so <span class="m">$\frac{\partial J_{\text{reg}}}{\partial w} = \frac{\partial J}{\partial w} + \lambda w$</span>. Substitute into gradient descent: <span class="m">$w \leftarrow w - \alpha\frac{\partial J}{\partial w} - \alpha\lambda w = (1-\alpha\lambda)w - \alpha\frac{\partial J}{\partial w}$</span>. The first term shrinks the weight multiplicatively every step regardless of the data; the second is the ordinary descent step. It is the same L2 penalty we added to logistic regression, nothing new in the objective; what is new is reading it as a per-step decay inside the update, which is how deep learning practitioners actually implement and tune it. Note the equilibrium intuition: a weight survives only if the data gradient consistently pushes it up harder than the decay pulls it down, so only weights that earn their size keep it.</p>
+  </div>
+</details>
+
+<h3>Trick 4: early stopping</h3>
+
+<p>
+Start from small random weights and just stop training at the right moment.
+This works for a reason specific to sigmoidal networks: with small weights,
+each sigmoid operates in its nearly linear middle region, so the whole
+network starts out roughly linear, low capacity, honest. As training grows
+the weights, the units saturate into their nonlinear regimes and the
+network's effective capacity rises. Training time becomes a capacity dial.
+So watch the validation error: it falls while the network learns real
+structure, then turns and rises as the network starts memorizing noise. Stop
+at the turn. It is dramatically cheaper than retraining across many weight
+decay settings, and it makes initialization matter: start too big and you
+begin already nonlinear, with no linear phase to pass through. Try to stop
+this real training run at the right moment:
+</p>
+
+<div class="figure" id="fig-earlystop">
+  <div class="fig-mount" data-fig="earlystop"></div>
+  <p class="fig-caption"><b>Fig 6.3,</b> a genuinely trained 1-16-1 network on noisy data, losses recorded every 240 epochs. Drag the stop line to where you believe validation loss bottoms out, watch the right panel show the actual fitted curve at your chosen epoch, then lock it in and get judged against the true minimum. Too early underfits, too late memorizes noise.</p>
+</div>
+
+<h3>Trick 5: ensembling</h3>
+
+<p>
+Train several networks and combine their predictions. Vary the random
+initialization, or the architecture, or train each on a different subset of
+the data, which is exactly the bagging idea from the ensembles lecture.
+Ensembles frequently top benchmark leaderboards, and they cost what you would
+expect: several times the training and inference compute, and a combined
+model that is harder to interpret than any single network.
+</p>
+
+<h3>Always watch the training run</h3>
+
+<p>
+Whatever tricks you use, monitor two curves during every training run: the
+training loss and the validation accuracy. They are your only instruments
+for catching a learning rate that is too hot, a bug in the backward pass, or
+the onset of overfitting. And do not panic when the training loss bounces:
+with mini-batches, every update measures the loss on a different random
+subset, so the curve is bumpy by construction. The trend is the signal; the
+bumps are the batch noise you chose in section 5.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">7.</span> Summary and method card</h2>
+
+<p>
+Backpropagation efficiently computes the gradients that gradient descent
+needs: run the loss forward through the computation graph, then sweep
+backward, building each node's error signal from its children's error
+signals times local derivatives, summing when a node fans out. It is a
+special case of automatic differentiation, and it is not an approximation;
+it produces exact derivatives, which is why one finite-difference check can
+certify an implementation. Around that core, stochastic and mini-batch
+gradient descent trade gradient noise for update frequency using unbiased
+estimates, and a toolbox of tricks, augmentation, parameter reduction,
+weight decay, early stopping, ensembling, keeps the minimization aimed at
+generalization instead of memorization. Gradient descent with backprop
+trains the overwhelming majority of neural networks in use today, including
+every model in the rest of this course.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Backpropagation + SGD</div>
+  <table>
+    <tr><th>Problem solved</th><td>Compute <span class="m">$\nabla_\theta J$</span> for all parameters of a network at once, so gradient descent can run at scale.</td></tr>
+    <tr><th>Core idea</th><td>The chain rule on a computation graph: forward pass computes values, backward pass computes error signals <span class="m">$\bar{v} = \partial L/\partial v$</span> in reverse topological order, <span class="m">$\bar{v}_i = \sum_{j \in \text{Ch}(v_i)} \bar{v}_j\, \partial v_j / \partial v_i$</span>.</td></tr>
+    <tr><th>Cost</th><td>One forward plus one backward pass per example, roughly twice a forward pass, for <em>all</em> gradients; versus two forward passes <em>per parameter</em> for finite differences.</td></tr>
+    <tr><th>Update rules</th><td>Batch: exact gradient, expensive. SGD: one example, unbiased but noisy. Mini-batch of size <span class="m">$S$</span>: unbiased, variance <span class="m">$\propto 1/S$</span>. One pass over the data = one epoch.</td></tr>
+    <tr><th>Caveats</th><td>The loss landscape is non-convex, so no global-optimum guarantee; gradients must be verified (finite differences); loss curves are bumpy under mini-batch noise.</td></tr>
+    <tr><th>Generalization aids</th><td>Data augmentation (train set only, task-appropriate transforms), parameter reduction and linear bottlenecks, weight decay <span class="m">$(1-\alpha\lambda)w$</span>, early stopping from small weights, ensembling.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Learning rate <span class="m">$\alpha$</span>, batch size <span class="m">$S$</span>, weight decay <span class="m">$\lambda$</span>, stopping epoch; all tuned on validation data, never on training loss.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: we now have machinery that can train
+<em>any</em> differentiable architecture, which frees us to design
+architectures for structure in the data. Next lecture does exactly that for
+images, where sharing weights across spatial positions turns the MLP into a
+convolutional network, and backprop trains it without changing a single line
+of this lesson's algorithm.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">8.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to use the
+machinery, not recite it. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">Your network has 500,000 parameters. Compared with central finite differences, how does backprop change the cost of getting one full gradient?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It is the same cost but more accurate</button>
+    <button data-k="b">Backprop is faster per parameter but still needs one pass per parameter</button>
+    <button data-k="c">Finite differences need about 1,000,000 forward passes (two per parameter); backprop needs one forward and one backward pass total, because the backward sweep computes every error signal once and shares it with all downstream parameters</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The costs are wildly different. Finite differences rerun the whole network per parameter; backprop reuses one backward sweep for all of them. (Backprop is also exact, while finite differences approximate.)</div>
+  <div class="quiz-fb" data-k="b">That would already be an improvement, but backprop does better: the sum-over-children recursion computes each node's error signal once, and every parameter reads its gradient off the error signal next to it. No per-parameter passes at all.</div>
+  <div class="quiz-fb" data-k="c">Right. That ratio, about a million passes versus roughly two, is the entire reason deep learning is computationally feasible, and why Fig 4.2 uses finite differences only as a spot check.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">You quadruple your mini-batch size from 16 to 64, keeping everything else fixed. What happens to the gradient estimate and the cost?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The estimate stays unbiased, its per-coordinate variance drops by about 4× (standard deviation halves), and each update costs 4× the FLOPs, so you get 4× fewer updates per epoch</button>
+    <button data-k="b">The estimate becomes biased toward the common examples, but the noise drops</button>
+    <button data-k="c">Nothing changes on average, so the two settings train identically</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Exactly the <span class="m">$\operatorname{Var} \propto 1/S$</span> trade: smoother steps, fewer of them per epoch. Whether that is a good deal depends on hardware parallelism, which is why moderate batch sizes win in practice.</div>
+  <div class="quiz-fb" data-k="b">Averaging more independent samples never introduces bias; expectation is linear. Every batch size gives an unbiased estimate of <span class="m">$\nabla J$</span>.</div>
+  <div class="quiz-fb" data-k="c">The means match but the variances do not, and the number of updates per epoch differs by 4×. Fig 5.1 shows the paths behaving very differently step by step.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): draw the graph, then backprop a new expression</summary>
+  <div>
+    <p>Consider <span class="m">$L = w\,\sigma(wx)$</span> with <span class="m">$w = 1$</span>, <span class="m">$x = 1$</span>. Draw the computation graph, note the fan-out, and compute <span class="m">$\bar{w}$</span>.</p>
+    <p><b>Answer.</b> Nodes: <span class="m">$z = wx$</span>, <span class="m">$h = \sigma(z)$</span>, <span class="m">$L = w \cdot h$</span>. The weight <span class="m">$w$</span> has fan-out 2: one edge into <span class="m">$z$</span> and one edge directly into <span class="m">$L$</span>. Backward pass: <span class="m">$\bar{L} = 1$</span>; <span class="m">$\bar{h} = \bar{L}\,\frac{\partial L}{\partial h} = w = 1$</span>; <span class="m">$\bar{z} = \bar{h}\,\sigma'(z) = \sigma'(1) = (0.7311)(0.2689) = 0.1966$</span>. Now sum <span class="m">$w$</span>'s two contributions: through the direct edge, <span class="m">$\bar{L}\,\frac{\partial L}{\partial w} = h = 0.7311$</span>; through <span class="m">$z$</span>, <span class="m">$\bar{z}\,x = 0.1966$</span>. Total <span class="m">$\bar{w} = 0.7311 + 0.1966 = 0.9277$</span>. Forget the fan-out sum and you get 0.7311 or 0.1966, both wrong, and a finite-difference check (which gives 0.9277) catches it instantly.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): the bumpy loss curve</summary>
+  <div>
+    <p>A friend shows you their training loss curve: trending down but wobbling wildly from update to update. They suspect a bug. What do you check, and how could the curve be smoothed?</p>
+    <p><b>Answer.</b> First ask the batch size. Under mini-batch or stochastic gradient descent, each update reports the loss on a different random subset, so the curve wobbles by construction: the gradient estimate is unbiased but has variance proportional to <span class="m">$1/S$</span>, and so does the reported loss. A downward trend with bounded wobble is healthy SGD, not a bug. To smooth it: increase the batch size (variance falls as <span class="m">$1/S$</span>), lower the learning rate so each noisy step is smaller, or simply plot a running average of the loss and judge the trend. A real bug looks different: the loss trending up (learning rate too hot, or a sign error in the update), or gradients that fail a finite-difference check. Check the gradient once with finite differences and the backward pass is either certified or convicted.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): when does early stopping substitute for weight decay?</summary>
+  <div>
+    <p>Argue when early stopping can play the role of weight decay, and when it cannot.</p>
+    <p><b>Answer.</b> Both are capacity controls that keep weights small. Weight decay does it explicitly, shrinking every weight by <span class="m">$(1-\alpha\lambda)$</span> per step forever. Early stopping does it implicitly: starting from small weights, a sigmoidal network begins in its nearly linear low-capacity regime, and weights (hence capacity) grow with training time, so stopping early caps how large the weights ever get. When training is the expensive resource, early stopping is the better deal: one run with a validation curve replaces retraining across many <span class="m">$\lambda$</span> values, and you get a stopping epoch for free. Where the substitution fails: it needs the small-weights starting point (initialize large and there is no low-capacity phase to stop in), it ties regularization strength to the optimization trajectory rather than to the objective, so you cannot tune it independently of the learning rate or continue training later without losing the effect, and if you need training loss driven very low <em>and</em> small weights simultaneously, only the explicit penalty delivers both. In practice the two are often combined.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is backpropagation: values forward, error signals backward, local derivatives multiplied along edges and summed at fan-outs, exact gradients for every parameter at the cost of about one extra pass. Add unbiased mini-batch noise for speed and a handful of tricks for generalization, and you have the training loop behind essentially all of modern deep learning. Next lecture we point it at images.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../neural-networks/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 9: Neural Networks</div>
+  </a>
+  <a href="../cnn/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 11: Convolutional Neural Networks</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 10 &middot; Backpropagation</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>
