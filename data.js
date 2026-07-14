@@ -244,7 +244,7 @@ const MODULES = [
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
-      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–11)", type:"website", url:"modules/c-ml/index.html" },
+      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–15)", type:"website", url:"modules/c-ml/index.html" },
       { title:"★ Interactive Lesson — k-Nearest Neighbours (Lecture 2)", type:"website", url:"modules/c-ml/knn/index.html" },
       { title:"★ Interactive Lesson — Decision Trees (Lecture 3)", type:"website", url:"modules/c-ml/decision-trees/index.html" },
       { title:"★ Interactive Lesson — Linear Regression (Lecture 4)", type:"website", url:"modules/c-ml/linear-regression/index.html" },
@@ -282,6 +282,7 @@ const MODULES = [
     aud:["student","executive"], prereqs:["c-nn"],
     resources:[
       { title:"★ Interactive Lesson — Convolutional Neural Networks (Lecture 11)", type:"website", url:"modules/c-ml/cnn/index.html" },
+      { title:"★ Interactive Lesson — CNNs in Practice (Lecture 12)", type:"website", url:"modules/c-ml/cnn-part-2/index.html" },
     ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
@@ -292,6 +293,9 @@ const MODULES = [
     blurb_fa:"مدل‌های دنباله، تعبیه‌ها، توجه، ترانسفورمرها، پیش‌آموزش و تنظیم دقیق، رمزگشایی. از n-gram تا LLM.",
     aud:["student","executive"], prereqs:["c-nn"],
     resources:[
+      { title:"★ Interactive Lesson — Language Models (Lecture 13)", type:"website", url:"modules/c-ml/language-models/index.html" },
+      { title:"★ Interactive Lesson — Sequence Models (Lecture 14)", type:"website", url:"modules/c-ml/sequence-models/index.html" },
+      { title:"★ Interactive Lesson — Attention and Transformers (Lecture 15)", type:"website", url:"modules/c-ml/attention-transformers/index.html" },
       { title:"Lena Voita — NLP Course for You", type:"website", url:"https://lena-voita.github.io/nlp_course.html#main_page_content" },
       { title:"Jay Alammar — The Illustrated Transformer", type:"website", url:"https://jalammar.github.io/illustrated-transformer/" },
       { title:"3Blue1Brown — Neural Networks (attention & transformers chapters)", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
