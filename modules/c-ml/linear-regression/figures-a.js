@@ -25,7 +25,7 @@
     const bReg = LR.button(group, "Regression", () => setMode(0), "on");
     const bCls = LR.button(group, "Classification", () => setMode(1));
     const hint = LR.el("span", "", "");
-    hint.style.cssText = "font-weight:400;color:#555;";
+    hint.style.cssText = "font-weight:400;color:#555555;";
     bar.appendChild(hint);
 
     const { cv, ctx, W, H } = LR.canvas(mount, 820, 400, {
@@ -70,7 +70,7 @@
       const b = Math.round(lerp(c0[2], c1[2], u));
       return "rgb(" + r + "," + g + "," + b + ")";
     }
-    const BLACK = [17, 17, 17], GREEN = [47, 158, 68], PURPLE = [112, 72, 232];
+    const BLACK = [17, 17, 17], GREEN = [102, 102, 102], PURPLE = [150, 150, 150];
 
     function draw() {
       ctx.clearRect(0, 0, W, H);
@@ -231,7 +231,7 @@
           ctx.font = "700 13px Inter, sans-serif";
           const tw = ctx.measureText(label).width;
           const bx = sx(NEWX) - tw - 26, by = sy(py) - 44;
-          ctx.fillStyle = "#fff";
+          ctx.fillStyle = "#ffffff";
           ctx.strokeStyle = C.green; ctx.lineWidth = 1.6;
           roundRect(ctx, bx - 10, by - 17, tw + 20, 28, 8);
           ctx.fill(); ctx.stroke();
@@ -250,7 +250,7 @@
     function drawHouse(px, py, color, isNew) {
       ctx.save();
       ctx.translate(px, py);
-      ctx.fillStyle = isNew ? "#fff" : color;
+      ctx.fillStyle = isNew ? "#ffffff" : color;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.8;
       // body
@@ -325,7 +325,7 @@
       ctx.beginPath(); ctx.rect(P.x0, P.y0, P.w, P.h); ctx.clip();
 
       // intercept marker
-      LR.dot(ctx, sx(0), sy(state.w0), 5.5, "#fff", C.purple);
+      LR.dot(ctx, sx(0), sy(state.w0), 5.5, "#ffffff", C.purple);
       ctx.font = "700 11.5px Inter, sans-serif";
       ctx.fillStyle = C.purple; ctx.textAlign = "left";
       ctx.fillText("w₀", sx(0) + 9, sy(state.w0) - 8);
@@ -432,7 +432,7 @@
       for (let c = 0; c < cells; c++) {
         const doneCells = Math.floor(k / per);
         ctx.fillStyle = c < doneCells ? C.orange : "#f1f1f1";
-        ctx.strokeStyle = "#ddd";
+        ctx.strokeStyle = "#dddddd";
         ctx.fillRect(LX + c * cw, stripY, cw - 1, stripH);
       }
       // partial sum, really accumulated
@@ -453,9 +453,9 @@
       const vDone = done;
       ctx.fillStyle = vDone ? C.green : "#f1f1f1";
       ctx.fillRect(RX, stripY, colW, stripH);
-      ctx.strokeStyle = "#ddd"; ctx.strokeRect(RX, stripY, colW, stripH);
+      ctx.strokeStyle = "#dddddd"; ctx.strokeRect(RX, stripY, colW, stripH);
       if (vDone) {
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = "#ffffff";
         ctx.font = "700 13px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("one fused, parallel step", RX + colW / 2, stripY + 22);
@@ -601,8 +601,8 @@
           const side = Math.abs(sy(p.t) - sy(yhat));
           const top = Math.min(sy(p.t), sy(yhat));
           const dir = i % 2 === 0 ? 1 : -1; // alternate sides to cut overlap
-          ctx.fillStyle = "rgba(232, 89, 12, 0.16)";
-          ctx.strokeStyle = "rgba(232, 89, 12, 0.55)";
+          ctx.fillStyle = "rgba(26,26,26, 0.16)";
+          ctx.strokeStyle = "rgba(26,26,26, 0.55)";
           ctx.lineWidth = 1;
           const xx = dir > 0 ? sx(p.x) : sx(p.x) - side;
           ctx.fillRect(xx, top, side, side);
@@ -633,7 +633,7 @@
 
       // handles
       for (let i = 0; i < 2; i++) {
-        LR.dot(ctx, sx(HX[i]), sy(hy[i]), 8, "#fff", C.orange);
+        LR.dot(ctx, sx(HX[i]), sy(hy[i]), 8, "#ffffff", C.orange);
         LR.dot(ctx, sx(HX[i]), sy(hy[i]), 3.2, C.orange);
       }
 

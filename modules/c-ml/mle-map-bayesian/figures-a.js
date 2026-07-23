@@ -121,7 +121,7 @@
       }
       ctx.lineTo(sx(1), sy(0));
       ctx.closePath();
-      ctx.fillStyle = "rgba(232, 89, 12, 0.10)";
+      ctx.fillStyle = "rgba(26,26,26, 0.10)";
       ctx.fill();
       curve(ctx, sx, sy, (x) => Math.min(EST.betaPdf(x, pa, pb), ymax), 0, 1, C.orange, 2.6);
 
@@ -348,7 +348,7 @@
         ctx.lineTo(sx(m), sy(EST.logLik(m, nh, nt)));
         ctx.stroke();
         ctx.setLineDash([]);
-        LR.dot(ctx, sx(m), sy(EST.logLik(m, nh, nt)), 5, C.green, "#fff");
+        LR.dot(ctx, sx(m), sy(EST.logLik(m, nh, nt)), 5, C.green, "#ffffff");
         ctx.fillStyle = C.green;
         ctx.font = "700 11px Inter, sans-serif";
         ctx.textAlign = "center";
@@ -357,7 +357,7 @@
 
       // draggable handle
       const ly = EST.logLik(theta, nh, nt);
-      LR.dot(ctx, sx(theta), sy(Math.max(ymin, ly)), 8, C.orange, "#fff");
+      LR.dot(ctx, sx(theta), sy(Math.max(ymin, ly)), 8, C.orange, "#ffffff");
       ctx.fillStyle = C.orange;
       ctx.font = "700 11.5px Inter, sans-serif";
       ctx.textAlign = "center";
@@ -443,7 +443,7 @@
       curve(ctx, sx, sy, (x) => Math.min(EST.gaussPdf(x, mu, sigma), P.ymax), P.xmin, P.xmax, C.orange, 2.6);
 
       // data points on the axis, with per-point density stems
-      ctx.strokeStyle = "rgba(232,89,12,0.35)";
+      ctx.strokeStyle = "rgba(26,26,26,0.35)";
       ctx.lineWidth = 1.2;
       xs.forEach(function (x) {
         ctx.beginPath();

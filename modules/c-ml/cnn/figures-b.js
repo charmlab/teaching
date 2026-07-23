@@ -105,7 +105,7 @@
           return inPad ? "#f3f3f3" : CNN.gray(v);
         },
         num: (v) => (ci >= 22 ? CNN.fmtV(v) : null),
-        numColor: (v) => (v > 0.5 ? "#fff" : "#adadad"),
+        numColor: (v) => (v > 0.5 ? "#ffffff" : "#adadad"),
       });
       // kernel box
       ctx.strokeStyle = C.orange; ctx.lineWidth = 3;
@@ -305,7 +305,7 @@
         opt.value = o; opt.textContent = o;
         sel.appendChild(opt);
       });
-      sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
+      sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
       sel.setAttribute("aria-label", labelText);
       sel.addEventListener("change", function () { oninput(sel.value); });
       lab.appendChild(sel);
@@ -367,7 +367,7 @@
       CNN.grid(ctx, 20, 34, CI, IMG6, {
         fill: (v) => CNN.gray(v / 9),
         num: (v) => String(v),
-        numColor: (v) => (v > 4 ? "#fff" : "#9a9a9a"),
+        numColor: (v) => (v > 4 ? "#ffffff" : "#9a9a9a"),
       });
       if (res) {
         const vmax = Math.max(CNN.maxAbs(res), 1e-9);
@@ -717,7 +717,7 @@
           fill: function (v, r, c2) {
             const rg = reg[L];
             if (rg && r >= rg.ri[0] && r <= rg.ri[1] && c2 >= rg.rj[0] && c2 <= rg.rj[1]) {
-              return L === sel.layer ? "rgba(232,89,12,0.75)" : L === 0 ? "rgba(232,89,12,0.28)" : "rgba(240,162,2,0.30)";
+              return L === sel.layer ? "rgba(26,26,26,0.75)" : L === 0 ? "rgba(26,26,26,0.28)" : "rgba(173,173,173,0.30)";
             }
             return "#fbfbfb";
           },

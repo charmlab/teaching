@@ -33,8 +33,8 @@
     heatColor: function (v, vmax) {
       const m = Math.min(1, Math.abs(v) / (vmax || 1));
       return v >= 0
-        ? "rgba(232, 89, 12, " + (0.08 + 0.85 * m).toFixed(3) + ")"
-        : "rgba(112, 72, 232, " + (0.08 + 0.85 * m).toFixed(3) + ")";
+        ? "rgba(26,26,26, " + (0.08 + 0.85 * m).toFixed(3) + ")"
+        : "rgba(150,150,150, " + (0.08 + 0.85 * m).toFixed(3) + ")";
     },
 
     /* build a DOM heat strip; returns {set(values)} */
@@ -351,7 +351,7 @@
     function drawCell(r, label, active, ghost) {
       ctx.save();
       if (ghost !== undefined) ctx.globalAlpha = ghost;
-      ctx.fillStyle = active ? "#fff5ec" : "#fff";
+      ctx.fillStyle = active ? "#f5f5f5" : "#ffffff";
       ctx.strokeStyle = active ? C.orange : C.axis;
       ctx.lineWidth = active ? 2.4 : 1.6;
       const rr = 10;
@@ -460,7 +460,7 @@
         drawCell(r, "t = " + (i + 1), i === step - 1, u);
         if (u > 0.85) {
           // input arrow + value
-          LR.arrow(ctx, r.x + r.w / 2, r.y + r.h + 40, r.x + r.w / 2, r.y + r.h + 6, i < step ? C.green : "#bbb", 2);
+          LR.arrow(ctx, r.x + r.w / 2, r.y + r.h + 40, r.x + r.w / 2, r.y + r.h + 6, i < step ? C.green : "#bbbbbb", 2);
           ctx.fillStyle = i < step ? C.text : C.faint;
           ctx.font = "700 12px JetBrains Mono, Menlo, monospace";
           ctx.textAlign = "center";
@@ -577,12 +577,12 @@
       const bw = Math.min(34, (P.w / xs.length) * 0.5);
       for (let i = 1; i <= t; i++) {
         const x = sx(i) - bw / 2;
-        ctx.fillStyle = i === t ? C.orange : "rgba(232,89,12,0.45)";
+        ctx.fillStyle = i === t ? C.orange : "rgba(26,26,26,0.45)";
         const y0 = sy(0), y1 = sy(hs[i]);
         ctx.fillRect(x, Math.min(y0, y1), bw, Math.abs(y0 - y1));
       }
       // running-sum markers
-      for (let i = 1; i <= t; i++) LR.dot(ctx, sx(i), sy(sums[i]), 4.5, "#fff", C.green);
+      for (let i = 1; i <= t; i++) LR.dot(ctx, sx(i), sy(sums[i]), 4.5, "#ffffff", C.green);
       // legend
       ctx.font = "600 11.5px Inter, sans-serif";
       ctx.textAlign = "left";
@@ -803,7 +803,7 @@
       const bw = (P.w / lm.V) * 0.62;
       for (let i = 0; i < lm.V; i++) {
         const x = sx(i + 0.5) - bw / 2;
-        ctx.fillStyle = i === top ? C.orange : "rgba(232,89,12,0.35)";
+        ctx.fillStyle = i === top ? C.orange : "rgba(26,26,26,0.35)";
         ctx.fillRect(x, sy(probs[i]), bw, sy(0) - sy(probs[i]));
         if (i === trueId) {
           ctx.strokeStyle = C.green;

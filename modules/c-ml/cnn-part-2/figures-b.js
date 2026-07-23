@@ -140,7 +140,7 @@
         sel.appendChild(opt);
       });
       sel.value = String(value);
-      sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
+      sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
       sel.setAttribute("aria-label", labelText);
       sel.addEventListener("change", function () { oninput(sel.value); });
       lab.appendChild(sel);
@@ -286,7 +286,7 @@
       LR.arrow(ctx, 322, dy, 424, dy, C.axis, 1.8);
       // plus node
       ctx.beginPath(); ctx.arc(440, dy, 13, 0, Math.PI * 2);
-      ctx.fillStyle = skips ? "rgba(47,158,68,0.14)" : "#f2f2f2"; ctx.fill();
+      ctx.fillStyle = skips ? "rgba(102,102,102,0.14)" : "#f2f2f2"; ctx.fill();
       ctx.strokeStyle = skips ? C.green : "#c0c0c0"; ctx.lineWidth = 2; ctx.stroke();
       ctx.fillStyle = skips ? C.green : "#b5b5b5";
       ctx.fillText("+", 440, dy + 5);
@@ -328,11 +328,11 @@
         const plain = Math.pow(g, k);
         const withSkip = 1; // the identity path delivers the signal undiminished
         const v = skips ? withSkip : plain;
-        ctx.fillStyle = skips ? "rgba(47,158,68,0.75)" : "rgba(232,89,12,0.8)";
+        ctx.fillStyle = skips ? "rgba(102,102,102,0.75)" : "rgba(26,26,26,0.8)";
         ctx.fillRect(sx(k) - bwid / 2, sy(v), bwid, sy(0) - sy(v));
         if (!skips) {
           // ghost of the skip case for contrast
-          ctx.strokeStyle = "rgba(47,158,68,0.5)";
+          ctx.strokeStyle = "rgba(102,102,102,0.5)";
           ctx.lineWidth = 1.4;
           ctx.setLineDash([3, 3]);
           ctx.strokeRect(sx(k) - bwid / 2, sy(1), bwid, sy(0) - sy(1));
@@ -546,18 +546,18 @@
         }
     }
     function eye(g) {
-      g.fillStyle = "#e8dcc8"; g.fillRect(0, 0, SW, SW);
-      g.fillStyle = "#fff";
+      g.fillStyle = "#dddddd"; g.fillRect(0, 0, SW, SW);
+      g.fillStyle = "#ffffff";
       g.beginPath(); g.ellipse(SW / 2, SW / 2, 24, 13, 0, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = "#4a3a2a"; g.lineWidth = 2; g.stroke();
-      g.fillStyle = "#5a4632";
+      g.strokeStyle = "#3c3c3c"; g.lineWidth = 2; g.stroke();
+      g.fillStyle = "#494949";
       g.beginPath(); g.arc(SW / 2, SW / 2, 8, 0, Math.PI * 2); g.fill();
-      g.fillStyle = "#111";
+      g.fillStyle = "#111111";
       g.beginPath(); g.arc(SW / 2, SW / 2, 3.5, 0, Math.PI * 2); g.fill();
     }
     function wheel(g) {
       g.fillStyle = "#d8d8d8"; g.fillRect(0, 0, SW, SW);
-      g.strokeStyle = "#222"; g.lineWidth = 5;
+      g.strokeStyle = "#222222"; g.lineWidth = 5;
       g.beginPath(); g.arc(SW / 2, SW / 2, 22, 0, Math.PI * 2); g.stroke();
       g.lineWidth = 2.5;
       for (let a = 0; a < 6; a++) {
@@ -566,22 +566,22 @@
         g.lineTo(SW / 2 + 20 * Math.cos((a * Math.PI) / 3), SW / 2 + 20 * Math.sin((a * Math.PI) / 3));
         g.stroke();
       }
-      g.fillStyle = "#222";
+      g.fillStyle = "#222222";
       g.beginPath(); g.arc(SW / 2, SW / 2, 4, 0, Math.PI * 2); g.fill();
     }
     function face(g) {
-      g.fillStyle = "#e3d3c3"; g.fillRect(0, 0, SW, SW);
-      g.fillStyle = "#c9a882";
+      g.fillStyle = "#d5d5d5"; g.fillRect(0, 0, SW, SW);
+      g.fillStyle = "#acacac";
       g.beginPath(); g.ellipse(SW / 2, SW / 2 + 2, 20, 25, 0, 0, Math.PI * 2); g.fill();
-      g.fillStyle = "#222";
+      g.fillStyle = "#222222";
       g.beginPath(); g.arc(SW / 2 - 8, SW / 2 - 6, 3, 0, Math.PI * 2); g.fill();
       g.beginPath(); g.arc(SW / 2 + 8, SW / 2 - 6, 3, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = "#222"; g.lineWidth = 2;
+      g.strokeStyle = "#222222"; g.lineWidth = 2;
       g.beginPath(); g.arc(SW / 2, SW / 2 + 8, 8, 0.25 * Math.PI, 0.75 * Math.PI); g.stroke();
     }
     function feather(g) {
-      g.fillStyle = "#dfe8df"; g.fillRect(0, 0, SW, SW);
-      g.strokeStyle = "#3a6b3a"; g.lineWidth = 2;
+      g.fillStyle = "#e5e5e5"; g.fillRect(0, 0, SW, SW);
+      g.strokeStyle = "#5d5d5d"; g.lineWidth = 2;
       g.beginPath(); g.moveTo(10, 54); g.quadraticCurveTo(SW / 2, SW / 2, 54, 10); g.stroke();
       g.lineWidth = 1.4;
       for (let t = 0.12; t < 0.95; t += 0.09) {
@@ -599,16 +599,16 @@
           { name: "45° edge", draw: (g) => grating(g, Math.PI / 4, 0.6, "#111111", "#f2f2f2"), excite: "diagonal boundaries: rooflines, shadows, a cat's ear outline" },
           { name: "horizontal edge", draw: (g) => grating(g, Math.PI / 2, 0.6, "#111111", "#f2f2f2"), excite: "horizons, shelf edges, closed eyelids" },
           { name: "fine grating", draw: (g) => grating(g, 0.35, 1.5, "#222222", "#e8e8e8"), excite: "high-frequency stripes: fabric weave, blinds, fur" },
-          { name: "colour contrast", draw: (g) => grating(g, Math.PI / 4, 0.35, "#e8590c", "#2f9e44"), excite: "opponent-colour boundaries: red fruit against leaves" },
-          { name: "colour gradient", draw: (g) => grating(g, Math.PI / 2, 0.18, "#7048e8", "#f0a202"), excite: "smooth colour transitions: sky at sunset, curved shaded surfaces" },
+          { name: "colour contrast", draw: (g) => grating(g, Math.PI / 4, 0.35, "#1a1a1a", "#666666"), excite: "opponent-colour boundaries: red fruit against leaves" },
+          { name: "colour gradient", draw: (g) => grating(g, Math.PI / 2, 0.18, "#969696", "#adadad"), excite: "smooth colour transitions: sky at sunset, curved shaded surfaces" },
         ],
       },
       {
         label: "middle layers · textures and motifs (larger receptive fields)",
         items: [
           { name: "checker texture", draw: (g) => checker(g, 8, "#3a3a3a", "#d9d9d9"), excite: "regular grids: windows on a building, tiles, waffle patterns" },
-          { name: "dot texture", draw: (g) => dots(g, "#e8e0d0", "#7a5c3a"), excite: "repeated blobs: leopard spots, berries, gravel" },
-          { name: "concentric rings", draw: (g) => rings(g, "#204060", "#d0e0ea"), excite: "circular structure: eyes, wheels, cups seen from above" },
+          { name: "dot texture", draw: (g) => dots(g, "#e1e1e1", "#606060"), excite: "repeated blobs: leopard spots, berries, gravel" },
+          { name: "concentric rings", draw: (g) => rings(g, "#3c3c3c", "#dddddd"), excite: "circular structure: eyes, wheels, cups seen from above" },
           { name: "cross-hatch", draw: (g) => { grating(g, 0.3, 0.9, "#333333", "#eeeeee"); g.globalAlpha = 0.5; grating(g, 0.3 + Math.PI / 2, 0.9, "#333333", "#eeeeee"); g.globalAlpha = 1; }, excite: "woven textures: baskets, fences, mesh" },
         ],
       },
@@ -844,7 +844,7 @@
         if (pr[i] > 0.06) {
           ctx.save();
           ctx.font = "700 11.5px Inter, sans-serif";
-          ctx.fillStyle = "#fff";
+          ctx.fillStyle = "#ffffff";
           ctx.textAlign = "left";
           ctx.fillText(c.name + " " + Math.round(pr[i] * 100) + "%", xacc + 8, by + 15.5);
           ctx.restore();
@@ -880,12 +880,12 @@
     );
 
     const KLASSES = [
-      { name: "sky", photo: "#c9dcea", mask: "#ced4da" },
-      { name: "sun", photo: "#f2c14e", mask: "#f0a202" },
-      { name: "tree", photo: "#4a7a4a", mask: "#2f9e44" },
-      { name: "house", photo: "#c9704a", mask: "#e8590c" },
-      { name: "road", photo: "#8a8a8a", mask: "#7048e8" },
-      { name: "grass", photo: "#9ab87a", mask: "#94d3a2" },
+      { name: "sky", photo: "#d9d9d9", mask: "#d3d3d3" },
+      { name: "sun", photo: "#c3c3c3", mask: "#adadad" },
+      { name: "tree", photo: "#6c6c6c", mask: "#666666" },
+      { name: "house", photo: "#808080", mask: "#1a1a1a" },
+      { name: "road", photo: "#8a8a8a", mask: "#969696" },
+      { name: "grass", photo: "#adadad", mask: "#cfcfcf" },
     ];
 
     // analytic scene: class index at normalized coords (u, v) in [0,1]
@@ -948,9 +948,9 @@
         }
       // photo-only decoration: window + door so it reads as a scene
       if (!asMask) {
-        ctx.fillStyle = "#7a4a32";
+        ctx.fillStyle = "#525252";
         ctx.fillRect(x0 + 0.3 * PW, PY + 0.56 * PH, 0.05 * PW, 0.16 * PH); // door
-        ctx.fillStyle = "#e8e0c8";
+        ctx.fillStyle = "#e0e0e0";
         ctx.fillRect(x0 + 0.19 * PW, PY + 0.5 * PH, 0.06 * PW, 0.07 * PH); // window
       }
       ctx.strokeStyle = "#c9c9c9";
@@ -972,7 +972,7 @@
       const tw = ctx.measureText(chip).width;
       ctx.fillStyle = "rgba(17,17,17,0.85)";
       ctx.fillRect(LX + 10, PY + 10, tw + 20, 28);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#ffffff";
       ctx.textAlign = "left";
       ctx.fillText(chip, LX + 20, PY + 29);
       ctx.restore();

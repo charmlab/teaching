@@ -141,9 +141,9 @@
     ramp: function (v) {
       // v in [0,1] → white → orange
       const t = Math.max(0, Math.min(1, v));
-      const r = Math.round(255 + (232 - 255) * t);
-      const g = Math.round(255 + (89 - 255) * t);
-      const b = Math.round(255 + (12 - 255) * t);
+      const r = Math.round(255 + (26 - 255) * t);
+      const g = Math.round(255 + (26 - 255) * t);
+      const b = Math.round(255 + (26 - 255) * t);
       return "rgb(" + r + "," + g + "," + b + ")";
     },
     rampSigned: function (v, vmax) {
@@ -151,17 +151,17 @@
       const t = Math.max(-1, Math.min(1, v / (vmax || 1)));
       if (t >= 0) return AT.ramp(t);
       const u = -t;
-      const r = Math.round(255 + (112 - 255) * u);
-      const g = Math.round(255 + (72 - 255) * u);
-      const b = Math.round(255 + (232 - 255) * u);
+      const r = Math.round(255 + (150 - 255) * u);
+      const g = Math.round(255 + (150 - 255) * u);
+      const b = Math.round(255 + (150 - 255) * u);
       return "rgb(" + r + "," + g + "," + b + ")";
     },
     txtOn: function (bg) {
       // readable text colour for a ramp background
       const m = bg.match(/(\d+),(\d+),(\d+)/);
-      if (!m) return "#111";
+      if (!m) return "#111111";
       const lum = 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3];
-      return lum > 150 ? "#111" : "#fff";
+      return lum > 150 ? "#111111" : "#ffffff";
     },
 
     /* ── matrix table renderer ──────────────────────────────── */
@@ -283,8 +283,8 @@
         b.classList.toggle("sel", j === qi);
         b.setAttribute("aria-pressed", j === qi ? "true" : "false");
         if (j === qi) {
-          b.style.background = "#111";
-          b.style.color = "#fff";
+          b.style.background = "#111111";
+          b.style.color = "#ffffff";
           b.removeAttribute("data-w");
           b.setAttribute("aria-label", AT.SENT[j] + ": the current query word");
         } else {

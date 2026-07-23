@@ -88,7 +88,7 @@
     ramp: function (v, vmax) {
       if (!vmax) return "#ffffff";
       const a = Math.min(1, Math.abs(v) / vmax) * 0.85;
-      return v >= 0 ? "rgba(232,89,12," + a.toFixed(3) + ")" : "rgba(112,72,232," + a.toFixed(3) + ")";
+      return v >= 0 ? "rgba(26,26,26," + a.toFixed(3) + ")" : "rgba(150,150,150," + a.toFixed(3) + ")";
     },
 
     fmtV: function (v) {
@@ -358,7 +358,7 @@
       ctx.fillStyle = C.muted;
       ctx.fillText("filter " + (sel + 1) + " of " + I, 322, 192);
       ctx.restore();
-      LR.arrow(ctx, 344, 190, BX - 8, 190, "rgba(232,89,12,0.55)", 2);
+      LR.arrow(ctx, 344, 190, BX - 8, 190, "rgba(26,26,26,0.55)", 2);
 
       // selected output channel, large
       CNN2.label(ctx, BX, BY - 26, "output channel " + (sel + 1) + " (6 × 6)");
@@ -505,9 +505,9 @@
       } else if (key === "cifar10" || key === "cifar100") {
         // 3×2 tiles of chunky low-res colour blocks
         const pals = [
-          ["#a8c6df", "#5a7d5a", "#c9a36b"], ["#c98a5a", "#8a5a3a", "#e0d6bc"],
-          ["#6b8fae", "#b0b8a8", "#4a5d4a"], ["#b85c4a", "#d9c9a3", "#7a8a99"],
-          ["#5d7a8c", "#c2b28f", "#8f6b4a"], ["#7d9c6b", "#b8ccd9", "#5a4a3a"],
+          ["#c1c1c1", "#737373", "#a7a7a7"], ["#949494", "#626262", "#d6d6d6"],
+          ["#8a8a8a", "#b5b5b5", "#585858"], ["#6e6e6e", "#cacaca", "#888888"],
+          ["#757575", "#b3b3b3", "#707070"], ["#929292", "#c9c9c9", "#4c4c4c"],
         ];
         for (let t = 0; t < 6; t++) {
           const x = 6 + (t % 3) * 54, y = 6 + Math.floor(t / 3) * 52;
@@ -526,11 +526,11 @@
         for (let t = 0; t < 2; t++) {
           const x = 6 + t * 82, y = 8, w2 = 74, h2 = 96;
           const grad = g.createLinearGradient(0, y, 0, y + h2);
-          grad.addColorStop(0, t === 0 ? "#bcd3e6" : "#e6d3bc");
-          grad.addColorStop(1, t === 0 ? "#e8eef2" : "#f2e8de");
+          grad.addColorStop(0, t === 0 ? "#cfcfcf" : "#d5d5d5");
+          grad.addColorStop(1, t === 0 ? "#ededed" : "#e9e9e9");
           g.fillStyle = grad;
           g.fillRect(x, y, w2, h2);
-          g.fillStyle = t === 0 ? "#5a7d5a" : "#8a6b4a";
+          g.fillStyle = t === 0 ? "#737373" : "#6f6f6f";
           g.beginPath();
           g.moveTo(x, y + h2);
           g.lineTo(x, y + h2 - 22 - rand() * 12);
@@ -686,7 +686,7 @@
       // shade the val–train gap at the current compute onward
       const here = comps(logD, logN, logC);
       ctx.save();
-      ctx.fillStyle = "rgba(224,49,49,0.08)";
+      ctx.fillStyle = "rgba(61,61,61,0.08)";
       ctx.beginPath();
       let first = true;
       for (let lc = 0; lc <= 4.001; lc += 0.05) {
@@ -702,8 +702,8 @@
       ctx.restore();
 
       // marker at current compute
-      LR.dot(ctx, sx(logC), sy(here.val), 6.5, C.orange, "#fff");
-      LR.dot(ctx, sx(logC), sy(here.train), 5.5, C.green, "#fff");
+      LR.dot(ctx, sx(logC), sy(here.val), 6.5, C.orange, "#ffffff");
+      LR.dot(ctx, sx(logC), sy(here.train), 5.5, C.green, "#ffffff");
       ctx.setLineDash([3, 3]);
       ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(sx(logC), sy(0)); ctx.lineTo(sx(logC), sy(here.val)); ctx.stroke();
@@ -804,8 +804,8 @@
       });
       A.forEach(function (d, i) {
         const x = xOf(d.year);
-        LR.dot(ctx, x, TY, i === sel ? 9 : 6.5, i === sel ? C.orange : "#ffffff", i === sel ? "#fff" : C.text);
-        if (i !== sel) LR.dot(ctx, x, TY, 6.5, "#fff", C.text);
+        LR.dot(ctx, x, TY, i === sel ? 9 : 6.5, i === sel ? C.orange : "#ffffff", i === sel ? "#ffffff" : C.text);
+        if (i !== sel) LR.dot(ctx, x, TY, 6.5, "#ffffff", C.text);
         ctx.font = (i === sel ? "800 12.5px" : "600 11.5px") + " Inter, sans-serif";
         ctx.fillStyle = i === sel ? C.orange : C.text;
         ctx.textAlign = "center";
@@ -841,7 +841,7 @@
       withP.forEach(function (d) {
         const i = A.indexOf(d);
         const x = sx(d.year), y = sy(Math.log10(d.params));
-        LR.dot(ctx, x, y, i === sel ? 8 : 6, i === sel ? C.orange : C.purple, "#fff");
+        LR.dot(ctx, x, y, i === sel ? 8 : 6, i === sel ? C.orange : C.purple, "#ffffff");
         ctx.font = "700 11.5px 'JetBrains Mono', Menlo, monospace";
         ctx.fillStyle = C.text;
         ctx.textAlign = d.key === "googlenet" ? "left" : "center";

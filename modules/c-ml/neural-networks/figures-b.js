@@ -12,7 +12,7 @@
   const NN = LR.nn;
 
   const POS = C.green, NEG = C.purple;
-  const POS_SOFT = "rgba(47,158,68,0.16)", NEG_SOFT = "rgba(112,72,232,0.13)";
+  const POS_SOFT = "rgba(102,102,102,0.16)", NEG_SOFT = "rgba(150,150,150,0.13)";
 
   /* ════════════════════════════════════════════════════════════
      Fig 4.1 — network builder / forward pass (signature)
@@ -103,7 +103,7 @@
 
     function heatFill(a) {
       // activation in [0,1] → white to orange
-      return "rgba(232,89,12," + (0.06 + 0.66 * a).toFixed(3) + ")";
+      return "rgba(26,26,26," + (0.06 + 0.66 * a).toFixed(3) + ")";
     }
 
     function draw() {
@@ -114,7 +114,7 @@
 
       // edges input→hidden
       function edge(p1, p2, w, lit) {
-        ctx.strokeStyle = (w >= 0 ? "rgba(47,158,68," : "rgba(224,49,49,") + (lit ? 0.85 : 0.3) + ")";
+        ctx.strokeStyle = (w >= 0 ? "rgba(102,102,102," : "rgba(61,61,61,") + (lit ? 0.85 : 0.3) + ")";
         ctx.lineWidth = 1 + 2.4 * Math.min(Math.abs(w), 2.5) / 2.5;
         ctx.beginPath(); ctx.moveTo(p1.x + R, p1.y); ctx.lineTo(p2.x - R, p2.y); ctx.stroke();
       }
@@ -128,13 +128,13 @@
       function node(p, label, val, lit, sub) {
         ctx.beginPath();
         ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
-        ctx.fillStyle = lit ? heatFill(val) : "#fff";
+        ctx.fillStyle = lit ? heatFill(val) : "#ffffff";
         ctx.fill();
-        ctx.strokeStyle = lit ? C.orange : "#bbb";
+        ctx.strokeStyle = lit ? C.orange : "#bbbbbb";
         ctx.lineWidth = 2;
         ctx.stroke();
         ctx.font = "700 13px 'JetBrains Mono', Menlo, monospace";
-        ctx.fillStyle = lit && val > 0.55 ? "#fff" : C.text;
+        ctx.fillStyle = lit && val > 0.55 ? "#ffffff" : C.text;
         ctx.textAlign = "center";
         ctx.fillText(lit ? LR.fmtF(val, 2) : "·", p.x, p.y + 4.5);
         ctx.font = "600 12px Inter, sans-serif";
@@ -370,9 +370,9 @@
       ctx.strokeStyle = C.text; ctx.lineWidth = 1.4; ctx.setLineDash([4, 4]);
       ctx.beginPath(); ctx.moveTo(sx(z), P.y0); ctx.lineTo(sx(z), P.y0 + P.h); ctx.stroke();
       ctx.setLineDash([]);
-      LR.dot(ctx, sx(z), sy(NN.sigmoid(z)), 6, C.orange, "#fff");
-      LR.dot(ctx, sx(z), sy(NN.tanh(z)), 6, C.purple, "#fff");
-      if (NN.relu(z) <= P.ymax) LR.dot(ctx, sx(z), sy(NN.relu(z)), 6, C.green, "#fff");
+      LR.dot(ctx, sx(z), sy(NN.sigmoid(z)), 6, C.orange, "#ffffff");
+      LR.dot(ctx, sx(z), sy(NN.tanh(z)), 6, C.purple, "#ffffff");
+      if (NN.relu(z) <= P.ymax) LR.dot(ctx, sx(z), sy(NN.relu(z)), 6, C.green, "#ffffff");
       ctx.restore();
 
       // legend
@@ -540,7 +540,7 @@
 
       const SC = LR.plot(ctx, P);
       data.forEach(function (p) {
-        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), p.flip ? 6.5 : 5, p.t ? POS : NEG, p.flip ? C.red : "#fff");
+        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), p.flip ? 6.5 : 5, p.t ? POS : NEG, p.flip ? C.red : "#ffffff");
       });
 
       ctx.font = "600 11.5px Inter, sans-serif";
@@ -643,11 +643,11 @@
 
       function node(p, name, role, bias, val, lit) {
         ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
-        ctx.fillStyle = lit ? (val > 0.5 ? C.orange : "#fff") : "#fff";
+        ctx.fillStyle = lit ? (val > 0.5 ? C.orange : "#ffffff") : "#ffffff";
         ctx.fill();
-        ctx.strokeStyle = lit ? C.orange : "#bbb"; ctx.lineWidth = 2; ctx.stroke();
+        ctx.strokeStyle = lit ? C.orange : "#bbbbbb"; ctx.lineWidth = 2; ctx.stroke();
         ctx.font = "700 13px 'JetBrains Mono', Menlo, monospace";
-        ctx.fillStyle = lit && val > 0.5 ? "#fff" : C.text;
+        ctx.fillStyle = lit && val > 0.5 ? "#ffffff" : C.text;
         ctx.textAlign = "center";
         ctx.fillText(lit ? String(val) : "·", p.x, p.y + 4.5);
         ctx.font = "700 12px Inter, sans-serif"; ctx.fillStyle = C.text;
@@ -764,7 +764,7 @@
       if (inp[0] === 1 && inp[1] === 0) o.selected = true;
       sel.appendChild(o);
     });
-    sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
+    sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
     sel.addEventListener("change", function () { xin = sel.value.split(",").map(Number); });
     xLab.appendChild(sel);
     controls.appendChild(xLab);

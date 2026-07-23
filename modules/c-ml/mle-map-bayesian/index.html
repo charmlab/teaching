@@ -18,7 +18,7 @@
 .num-input {
   font-family: var(--mono); font-size: 13px; font-weight: 700;
   width: 64px; padding: 4px 8px; border: 1.5px solid var(--line);
-  border-radius: 6px; background: #fff; color: var(--text);
+  border-radius: 6px; background: #ffffff; color: var(--text);
 }
 .num-input:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 1px; }
 .flip-strip {
@@ -28,7 +28,7 @@
 .flip-chip {
   font-family: var(--mono); font-size: 13px; font-weight: 800;
   width: 28px; height: 28px; line-height: 26px; text-align: center;
-  border-radius: 50%; border: 1.5px solid var(--line); background: #fff;
+  border-radius: 50%; border: 1.5px solid var(--line); background: #ffffff;
 }
 .flip-chip.h { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .flip-chip.t { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
@@ -266,7 +266,7 @@ crosses zero:
 
 <div class="figure" id="fig-maximizer">
   <div class="fig-mount" data-fig="maximizer"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the likelihood maximizer. Drag the orange <span class="m">$\theta$</span> handle along the log-likelihood curve <span class="m">$\ell(\theta) = N_H\log\theta + N_T\log(1-\theta)$</span> (arrow keys work too) and watch <span class="m">$\ell(\theta)$</span> update; the green marker sits at the analytic peak <span class="m">$N_H/(N_H+N_T)$</span>. Edit <span class="m">$N_H$</span> and <span class="m">$N_T$</span>: more flips at the same ratio keep the peak still but sharpen the curve around it, which is the "how sure are you?" question becoming visible. The defaults reproduce the 55/45 example.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the likelihood maximizer. Drag the black <span class="m">$\theta$</span> handle along the log-likelihood curve <span class="m">$\ell(\theta) = N_H\log\theta + N_T\log(1-\theta)$</span> (arrow keys work too) and watch <span class="m">$\ell(\theta)$</span> update; the grey marker sits at the analytic peak <span class="m">$N_H/(N_H+N_T)$</span>. Edit <span class="m">$N_H$</span> and <span class="m">$N_T$</span>: more flips at the same ratio keep the peak still but sharpen the curve around it, which is the "how sure are you?" question becoming visible. The defaults reproduce the 55/45 example.</p>
 </div>
 
 <h3>The code</h3>
@@ -332,7 +332,7 @@ turn out to be maximum likelihood estimates.
 
 <div class="figure" id="fig-gaussfit">
   <div class="fig-mount" data-fig="gaussfit"></div>
-  <p class="fig-caption"><b>Fig 2.2,</b> maximizing a likelihood is fitting a curve to points. The dots are the ten temperatures; drag horizontally to move <span class="m">$\mu$</span> and vertically to widen or narrow <span class="m">$\sigma$</span> (sliders work too). The readout shows the live log-likelihood of the data under your bell, and the dashed green curve is the MLE fit <span class="m">$\hat\mu = 15$</span>, <span class="m">$\hat\sigma \approx 2.449$</span>. No hand position beats it, and the Snap button proves the point.</p>
+  <p class="fig-caption"><b>Fig 2.2,</b> maximizing a likelihood is fitting a curve to points. The dots are the ten temperatures; drag horizontally to move <span class="m">$\mu$</span> and vertically to widen or narrow <span class="m">$\sigma$</span> (sliders work too). The readout shows the live log-likelihood of the data under your bell, and the dashed grey curve is the MLE fit <span class="m">$\hat\mu = 15$</span>, <span class="m">$\hat\sigma \approx 2.449$</span>. No hand position beats it, and the Snap button proves the point.</p>
 </div>
 
 <h3>The general recipe, and when calculus fails</h3>
@@ -547,7 +547,7 @@ on data is bookkeeping. See the algebra as shapes:
 
 <div class="figure" id="fig-conjugacy">
   <div class="fig-mount" data-fig="conjugacy"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> conjugate means the posterior stays in the family. The purple curve is the Beta prior, the grey curve is the Bernoulli likelihood (normalized for display so the shapes are comparable), and the orange curve is their product, renormalized: the posterior. It is exactly <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span>, with parameters printed live. Slide the prior and the counts and watch a Beta times a Bernoulli remain a Beta, every time.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> conjugate means the posterior stays in the family. The palest curve is the Beta prior, the mid-grey curve is the Bernoulli likelihood (normalized for display so the shapes are comparable), and the black curve is their product, renormalized: the posterior. It is exactly <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span>, with parameters printed live. Slide the prior and the counts and watch a Beta times a Bernoulli remain a Beta, every time.</p>
 </div>
 
 <p>
@@ -561,7 +561,7 @@ Priors are training wheels: load-bearing at the start, irrelevant at scale.
 
 <div class="figure" id="fig-betaupdate">
   <div class="fig-mount" data-fig="betaupdate"></div>
-  <p class="fig-caption"><b>Fig 4.2,</b> the prior-to-posterior updater, the signature figure of this lesson. Choose a prior with the <span class="m">$a, b$</span> sliders, then stream in flips from a hidden coin with true bias 0.7 (single flips or bursts of 10 and 100). The posterior <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span> re-renders live, with the MLE (green), the MAP mode (orange), and the posterior-predictive mean (purple) marked on the same axis so the three estimators stay visually distinct. Watch the prior wash out: by a few hundred flips, every reasonable prior lands the posterior in the same place, and the three markers converge toward the true bias.</p>
+  <p class="fig-caption"><b>Fig 4.2,</b> the prior-to-posterior updater, the signature figure of this lesson. Choose a prior with the <span class="m">$a, b$</span> sliders, then stream in flips from a hidden coin with true bias 0.7 (single flips or bursts of 10 and 100). The posterior <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span> re-renders live, with the MLE (mid-grey), the MAP mode (black), and the posterior-predictive mean (palest) marked on the same axis so the three estimators stay visually distinct. Watch the prior wash out: by a few hundred flips, every reasonable prior lands the posterior in the same place, and the three markers converge toward the true bias.</p>
 </div>
 
 <h3>MAP: the most probable parameter</h3>

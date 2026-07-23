@@ -236,7 +236,7 @@
           const bw = Math.max(o.leafMinW || 30, Math.min(colW - 4, tw + 14));
           const col = o.leafColor ? o.leafColor(nd) : C.green;
           T.rr(ctx, x - bw / 2, y - boxH / 2, bw, boxH, 7);
-          ctx.fillStyle = o.leafFill ? o.leafFill(nd) : "#fff";
+          ctx.fillStyle = o.leafFill ? o.leafFill(nd) : "#ffffff";
           ctx.fill();
           ctx.strokeStyle = inHi || isSel ? C.orange : col;
           ctx.lineWidth = inHi || isSel ? 2.6 : 1.6;
@@ -252,7 +252,7 @@
           const tw = ctx.measureText(txt).width;
           const bw = tw + 18;
           T.rr(ctx, x - bw / 2, y - boxH / 2, bw, boxH, 7);
-          ctx.fillStyle = inHi ? "#fff2e8" : "#fff";
+          ctx.fillStyle = inHi ? "#f4f4f4" : "#ffffff";
           ctx.fill();
           ctx.strokeStyle = inHi || isSel ? C.orange : C.axis;
           ctx.lineWidth = inHi || isSel ? 2.6 : 1.5;
@@ -272,9 +272,9 @@
 
     /* ── the citrus sorting dataset (deterministic) ────────── */
     citrus: null,
-    CC: { lemon: "#e6b800", orange: "#e8590c" },
-    CCsoft: { lemon: "rgba(230,184,0,0.16)", orange: "rgba(232,89,12,0.11)" },
-    CCstrong: { lemon: "rgba(230,184,0,0.38)", orange: "rgba(232,89,12,0.30)" },
+    CC: { lemon: "#bdbdbd", orange: "#1a1a1a" },
+    CCsoft: { lemon: "rgba(189,189,189,0.16)", orange: "rgba(26,26,26,0.11)" },
+    CCstrong: { lemon: "rgba(189,189,189,0.38)", orange: "rgba(26,26,26,0.30)" },
     // plot window shared by every citrus figure
     WIN: { wmin: 4.2, wmax: 8.8, hmin: 5.4, hmax: 10.6 },
   });
@@ -305,7 +305,7 @@
   function drawFruits(ctx, SC, pts, opts) {
     opts = opts || {};
     pts.forEach(function (p) {
-      LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), opts.r || 5.5, T.CC[p.cls], "#fff");
+      LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), opts.r || 5.5, T.CC[p.cls], "#ffffff");
     });
   }
 
@@ -579,7 +579,7 @@
       let barHtml = "";
       if (n) {
         barHtml =
-          "<span style='display:inline-flex;width:90px;height:10px;border-radius:5px;overflow:hidden;border:1px solid #ddd'>" +
+          "<span style='display:inline-flex;width:90px;height:10px;border-radius:5px;overflow:hidden;border:1px solid #dddddd'>" +
           "<span style='width:" + (100 * o) / n + "%;background:" + T.CC.orange + "'></span>" +
           "<span style='width:" + (100 * l) / n + "%;background:" + T.CC.lemon + "'></span></span>";
       }
@@ -722,7 +722,7 @@
         ctx.beginPath(); ctx.moveTo(sx(c.p), sy(0)); ctx.lineTo(sx(c.p), sy(hp)); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(sx(0), sy(hp)); ctx.lineTo(sx(c.p), sy(hp)); ctx.stroke();
         ctx.setLineDash([]);
-        LR.dot(ctx, sx(c.p), sy(hp), 9, c.color, "#fff");
+        LR.dot(ctx, sx(c.p), sy(hp), 9, c.color, "#ffffff");
         ctx.font = "700 12px Inter, sans-serif";
         ctx.fillStyle = c.color;
         ctx.textAlign = "center";

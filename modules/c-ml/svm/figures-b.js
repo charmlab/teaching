@@ -210,7 +210,7 @@
           ctx.lineWidth = 1;
           ctx.beginPath(); ctx.moveTo(g.px, g.py); ctx.lineTo(q.px, q.py); ctx.stroke();
         }
-        LR.dot(ctx, q.px, q.py, 5, T_COLOR[p.t], "#fff");
+        LR.dot(ctx, q.px, q.py, 5, T_COLOR[p.t], "#ffffff");
       };
       const below = pts.filter((p) => liftT * p.r2 * ZS < zc);
       const above = pts.filter((p) => liftT * p.r2 * ZS >= zc);
@@ -229,14 +229,14 @@
         const corners = [
           proj(-E, -E, zc), proj(E, -E, zc), proj(E, E, zc), proj(-E, E, zc),
         ];
-        ctx.fillStyle = "rgba(232,89,12," + 0.13 * alpha + ")";
-        ctx.strokeStyle = "rgba(232,89,12," + 0.75 * alpha + ")";
+        ctx.fillStyle = "rgba(26,26,26," + 0.13 * alpha + ")";
+        ctx.strokeStyle = "rgba(26,26,26," + 0.75 * alpha + ")";
         ctx.lineWidth = 1.8;
         ctx.beginPath();
         corners.forEach((q, i) => (i === 0 ? ctx.moveTo(q.px, q.py) : ctx.lineTo(q.px, q.py)));
         ctx.closePath();
         ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "rgba(232,89,12," + alpha + ")";
+        ctx.fillStyle = "rgba(26,26,26," + alpha + ")";
         ctx.font = "700 12px Inter, sans-serif";
         ctx.fillText("z = " + LR.fmtF(cPlane, 2), corners[1].px - 66, corners[1].py - 8);
       }
@@ -304,8 +304,8 @@
       SC = LR.plot(ctx, P);
       const { sx, sy } = SC;
 
-      LR.dot(ctx, sx(X.x), sy(X.y), 8, C.orange, "#fff");
-      LR.dot(ctx, sx(Y.x), sy(Y.y), 8, C.purple, "#fff");
+      LR.dot(ctx, sx(X.x), sy(X.y), 8, C.orange, "#ffffff");
+      LR.dot(ctx, sx(Y.x), sy(Y.y), 8, C.purple, "#ffffff");
       ctx.font = "700 13px Inter, sans-serif";
       ctx.fillStyle = C.orange; ctx.textAlign = "left";
       ctx.fillText("x = (" + LR.fmt(X.x, 2) + ", " + LR.fmt(X.y, 2) + ")", sx(X.x) + 11, sy(X.y) - 8);
@@ -436,8 +436,8 @@
           const inMargin = Math.abs(f) < 1;
           offCtx.fillStyle =
             f >= 0
-              ? "rgba(47,158,68," + (inMargin ? 0.08 : 0.18) + ")"
-              : "rgba(112,72,232," + (inMargin ? 0.07 : 0.16) + ")";
+              ? "rgba(102,102,102," + (inMargin ? 0.08 : 0.18) + ")"
+              : "rgba(150,150,150," + (inMargin ? 0.07 : 0.16) + ")";
           offCtx.fillRect(px, py, BLK, BLK);
         }
       }
@@ -455,7 +455,7 @@
         const f = fit.decide(p);
         if (f * p.t > 0) correct++;
         const isSv = svSet.has(i);
-        LR.dot(ctx, sx(p.x), sy(p.y), isSv ? 6.5 : 5, T_COLOR[p.t], isSv ? C.orange : "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), isSv ? 6.5 : 5, T_COLOR[p.t], isSv ? C.orange : "#ffffff");
       });
       const acc = correct / pts.length;
 
@@ -595,12 +595,12 @@
       const correct = Math.max(c1, c2);
 
       XOR.forEach(function (p) {
-        LR.dot(ctx, sx(p.x), sy(p.y), 9, T_COLOR[p.t], "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), 9, T_COLOR[p.t], "#ffffff");
         ctx.font = "600 11px Inter, sans-serif";
         ctx.fillStyle = C.muted; ctx.textAlign = "center";
         ctx.fillText("(" + p.x + "," + p.y + ")", sx(p.x), sy(p.y) - 14);
       });
-      [e1, e2].forEach((e) => LR.dot(ctx, sx(e.x), sy(e.y), 6, "#fff", C.orange));
+      [e1, e2].forEach((e) => LR.dot(ctx, sx(e.x), sy(e.y), 6, "#ffffff", C.orange));
 
       ro.set(
         "correct",
@@ -625,8 +625,8 @@
       // plane x₃ = 0 as a translucent quad with a light grid
       const E = 1.6;
       const corners = [proj(-E, -E, 0), proj(E, -E, 0), proj(E, E, 0), proj(-E, E, 0)];
-      ctx.fillStyle = "rgba(232,89,12,0.10)";
-      ctx.strokeStyle = "rgba(232,89,12,0.7)";
+      ctx.fillStyle = "rgba(26,26,26,0.10)";
+      ctx.strokeStyle = "rgba(26,26,26,0.7)";
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       corners.forEach((q, i) => (i === 0 ? ctx.moveTo(q.px, q.py) : ctx.lineTo(q.px, q.py)));
@@ -649,7 +649,7 @@
           ctx.setLineDash([3, 3]);
           ctx.beginPath(); ctx.moveTo(o.g.px, o.g.py); ctx.lineTo(o.q.px, o.q.py); ctx.stroke();
           ctx.setLineDash([]);
-          LR.dot(ctx, o.q.px, o.q.py, 8.5, T_COLOR[o.p.t], "#fff");
+          LR.dot(ctx, o.q.px, o.q.py, 8.5, T_COLOR[o.p.t], "#ffffff");
           ctx.font = "600 11px Inter, sans-serif";
           ctx.fillStyle = C.muted; ctx.textAlign = "left";
           ctx.fillText("x₁x₂ = " + (o.p.x * o.p.y > 0 ? "+1" : "−1"), o.q.px + 11, o.q.py + 4);
@@ -696,7 +696,7 @@
         opt.value = i; opt.textContent = o;
         sel.appendChild(opt);
       });
-      sel.style.cssText = "font-family:var(--mono);font-size:12.5px;padding:2px 6px;border-radius:6px;border:1px solid #ccc;max-width:340px";
+      sel.style.cssText = "font-family:var(--mono);font-size:12.5px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc;max-width:340px";
       sel.addEventListener("change", () => onchange(parseInt(sel.value, 10)));
       lab.appendChild(sel);
       controls.appendChild(lab);
