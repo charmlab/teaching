@@ -244,7 +244,7 @@ const MODULES = [
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
-      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–15)", type:"website", url:"modules/c-ml/index.html" },
+      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–19)", type:"website", url:"modules/c-ml/index.html" },
       { title:"★ Interactive Lesson — k-Nearest Neighbours (Lecture 2)", type:"website", url:"modules/c-ml/knn/index.html" },
       { title:"★ Interactive Lesson — Decision Trees (Lecture 3)", type:"website", url:"modules/c-ml/decision-trees/index.html" },
       { title:"★ Interactive Lesson — Linear Regression (Lecture 4)", type:"website", url:"modules/c-ml/linear-regression/index.html" },
@@ -338,7 +338,10 @@ const MODULES = [
     blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
     blurb_fa:"یادگیری احتمالی، مدل‌سازی بیزی، کمی‌سازی عدم قطعیت و استدلال علّی.",
     aud:["student"], prereqs:["c-ml"],
-    resources:[],
+    resources:[
+      { title:"★ Interactive Lesson — MLE, MAP & Bayesian Prediction (Lecture 16)", type:"website", url:"modules/c-ml/mle-map-bayesian/index.html" },
+      { title:"★ Interactive Lesson — Gaussian Bayes Models (Lecture 17)", type:"website", url:"modules/c-ml/gaussian-bayes/index.html" },
+    ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"x-unsup", tier:"concepts", short:"Un",
@@ -348,6 +351,8 @@ const MODULES = [
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
     aud:["student"], prereqs:["junc-f2c"],
     resources:[
+      { title:"★ Interactive Lesson — Principal Component Analysis (Lecture 18)", type:"website", url:"modules/c-ml/pca/index.html" },
+      { title:"★ Interactive Lesson — Autoencoders & VAEs (Lecture 19)", type:"website", url:"modules/c-ml/autoencoders/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
