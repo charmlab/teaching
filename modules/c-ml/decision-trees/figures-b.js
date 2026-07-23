@@ -11,7 +11,7 @@
   const T = LR.dt;
 
   const CLS_COLOR = { A: C.green, B: C.purple };
-  const CLS_SOFT = { A: "rgba(102,102,102,0.18)", B: "rgba(150,150,150,0.15)" };
+  const CLS_SOFT = { A: "rgba(47,158,68,0.18)", B: "rgba(112,72,232,0.15)" };
 
   /* ── the restaurant "will we wait?" dataset ──────────────────
      The slides use the classic 12-example restaurant table and
@@ -43,7 +43,7 @@
   };
   const RNAME = { Patrons: "Patrons", Type: "Type", Hungry: "Hungry", Fri: "Fri/Sat" };
   const YN_COLOR = { Yes: C.green, No: C.red };
-  const YN_SOFT = { Yes: "rgba(102,102,102,0.14)", No: "rgba(61,61,61,0.10)" };
+  const YN_SOFT = { Yes: "rgba(47,158,68,0.14)", No: "rgba(224,49,49,0.10)" };
 
   // expected conditional entropy of a categorical split, on real counts
   function catIG(rows, feat) {
@@ -221,19 +221,19 @@
         let txt, fill, stroke, txtCol, dashed = false;
         if (nd.kids) {
           txt = RNAME[nd.feat] + "?";
-          fill = "#ffffff"; stroke = C.axis; txtCol = C.text;
+          fill = "#fff"; stroke = C.axis; txtCol = C.text;
         } else if (nd.leaf) {
           txt = nd.label + " (" + nd.n + ")";
           fill = YN_SOFT[nd.label]; stroke = YN_COLOR[nd.label]; txtCol = YN_COLOR[nd.label];
         } else {
           txt = (nd.counts.Yes || 0) + " Y / " + (nd.counts.No || 0) + " N";
-          fill = "#ffffff"; stroke = "#aaaaaa"; txtCol = C.muted; dashed = true;
+          fill = "#fff"; stroke = "#aaaaaa"; txtCol = C.muted; dashed = true;
         }
         const tw = ctx.measureText(txt).width;
         const bw = Math.max(40, tw + 16);
         if (dashed) ctx.setLineDash([4, 3]);
         T.rr(ctx, x - bw / 2, y - boxH / 2, bw, boxH, 7);
-        ctx.fillStyle = isCur ? "#f4f4f4" : fill;
+        ctx.fillStyle = isCur ? "#fff2e8" : fill;
         ctx.fill();
         ctx.strokeStyle = isCur ? C.orange : stroke;
         ctx.lineWidth = isCur ? 2.8 : 1.5;
@@ -334,7 +334,7 @@
       ctx.clearRect(0, 0, W, H);
       const SC = LR.plot(ctx, P);
       FRUITS.forEach(function (p) {
-        LR.dot(ctx, SC.sx(p.h), SC.sy(0.5), 7, T.CC[p.cls], "#ffffff");
+        LR.dot(ctx, SC.sx(p.h), SC.sy(0.5), 7, T.CC[p.cls], "#fff");
       });
       ctx.strokeStyle = C.text;
       ctx.lineWidth = 2;
@@ -471,7 +471,7 @@
       ctx.clearRect(0, 0, LC.W, LC.H);
       const SC = LR.plot(ctx, PM);
       drawRegions(ctx, SC, T.regions(trees[depth], BOUNDS), PM);
-      TRAIN.forEach((p) => LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), 3.4, CLS_COLOR[p.cls], "#ffffff"));
+      TRAIN.forEach((p) => LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), 3.4, CLS_COLOR[p.cls], "#fff"));
       ctx.font = "600 11.5px Inter, sans-serif";
       ctx.fillStyle = C.text;
       ctx.textAlign = "left";
@@ -623,7 +623,7 @@
         testText: (nd) => (nd.feat === "w" ? "x₁" : "x₂") + ">" + LR.fmtF(nd.thr, 1),
         leafText: (nd) => (pruned.has(nd.id) ? "✂ " : "") + nd.label + " (" + nd.n + ")",
         leafColor: (nd) => CLS_COLOR[nd.label],
-        leafFill: (nd) => (pruned.has(nd.id) ? "#ffffff" : CLS_SOFT[nd.label]),
+        leafFill: (nd) => (pruned.has(nd.id) ? "#fff" : CLS_SOFT[nd.label]),
         leafMinW: 26,
       });
       ctx.font = "600 12px Inter, sans-serif";
@@ -717,7 +717,7 @@
       const c2 = RC.ctx;
       c2.clearRect(0, 0, RC.W, RC.H);
       const S2 = LR.plot(c2, PR);
-      FRUITS.forEach((p) => LR.dot(c2, S2.sx(p.h), S2.sy(0.5), 7, T.CC[p.cls], "#ffffff"));
+      FRUITS.forEach((p) => LR.dot(c2, S2.sx(p.h), S2.sy(0.5), 7, T.CC[p.cls], "#fff"));
       c2.strokeStyle = C.text;
       c2.lineWidth = 2;
       c2.setLineDash([5, 4]);
@@ -820,7 +820,7 @@
         }
       }
       const SC = LR.plot(ctx, PP);
-      pts.forEach((p) => LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), 3.4, CLS_COLOR[p.cls], "#ffffff"));
+      pts.forEach((p) => LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), 3.4, CLS_COLOR[p.cls], "#fff"));
       diag(ctx, SC);
     }
 
@@ -845,7 +845,7 @@
       const tree = T.build(pts, { maxDepth: depth, minLeaf: 1 });
       const SC = LR.plot(ctx, PP);
       drawRegions(ctx, SC, T.regions(tree, BOUNDS), PP);
-      pts.forEach((p) => LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), 3.4, CLS_COLOR[p.cls], "#ffffff"));
+      pts.forEach((p) => LR.dot(ctx, SC.sx(p.w), SC.sy(p.h), 3.4, CLS_COLOR[p.cls], "#fff"));
       diag(ctx, SC);
       const lv = countLeaves(tree);
       ro.set("lv", lv + " at depth " + depth);

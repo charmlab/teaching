@@ -101,13 +101,13 @@
           const wy = P.ymin + ((P.y0 + P.h - (py + BLK / 2)) / P.h) * (P.ymax - P.ymin);
           const y = BP.mlpForward(net, [(wx - 2.5) / 1.5, (wy - 2.5) / 1.5]).y;
           const a = Math.min(0.30, Math.abs(y - 0.5) * 0.7 + 0.05);
-          ctx.fillStyle = y > 0.5 ? "rgba(102,102,102," + a + ")" : "rgba(150,150,150," + a + ")";
+          ctx.fillStyle = y > 0.5 ? "rgba(47,158,68," + a + ")" : "rgba(112,72,232," + a + ")";
           ctx.fillRect(px, py, BLK, BLK);
         }
       }
       const SC = LR.plot(ctx, P);
       PTS.forEach(function (p) {
-        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 5, CLS_COLOR[p.cls], "#ffffff");
+        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 5, CLS_COLOR[p.cls], "#fff");
       });
 
       // ---- right: loss curve (log10) ----
@@ -285,16 +285,16 @@
         });
         ctx.stroke();
         const last = r.path[r.path.length - 1];
-        LR.dot(ctx, SC.sx(last[0]), SC.sy(last[1]), 5, r.color, "#ffffff");
+        LR.dot(ctx, SC.sx(last[0]), SC.sy(last[1]), 5, r.color, "#fff");
       });
       ctx.restore();
 
       // start + optimum
-      LR.dot(ctx, SC.sx(START[0]), SC.sy(START[1]), 5.5, C.text, "#ffffff");
+      LR.dot(ctx, SC.sx(START[0]), SC.sy(START[1]), 5.5, C.text, "#fff");
       ctx.font = "600 11px Inter, sans-serif";
       ctx.fillStyle = C.text; ctx.textAlign = "left";
       ctx.fillText("start", SC.sx(START[0]) + 9, SC.sy(START[1]) + 4);
-      LR.dot(ctx, SC.sx(opt.w0), SC.sy(opt.w1), 5.5, "#ffffff", C.red);
+      LR.dot(ctx, SC.sx(opt.w0), SC.sy(opt.w1), 5.5, "#fff", C.red);
       ctx.fillStyle = C.red;
       ctx.fillText("minimum", SC.sx(opt.w0) + 9, SC.sy(opt.w1) + 4);
 
@@ -711,7 +711,7 @@
       // reveal the true minimum once locked
       if (locked) {
         const mx2 = SC.sx(Math.log10(mi * LOG));
-        LR.dot(ctx, mx2, SC.sy(vlL[mi]), 6, "#ffffff", C.red);
+        LR.dot(ctx, mx2, SC.sy(vlL[mi]), 6, "#fff", C.red);
         ctx.fillStyle = C.red;
         ctx.fillText("val minimum", mx2, SC.sy(vlL[mi]) - 12);
       }

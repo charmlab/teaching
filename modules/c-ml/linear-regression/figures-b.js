@@ -43,8 +43,8 @@
       const b = LR.button(bar, p.name, function () { flyTo(p.w0, p.w1); }, "small");
       b.style.borderColor = p.color;
       b.style.color = p.color;
-      b.addEventListener("mouseenter", () => (b.style.background = p.color, b.style.color = "#ffffff"));
-      b.addEventListener("mouseleave", () => (b.style.background = "#ffffff", b.style.color = p.color));
+      b.addEventListener("mouseenter", () => (b.style.background = p.color, b.style.color = "#fff"));
+      b.addEventListener("mouseleave", () => (b.style.background = "#fff", b.style.color = p.color));
     });
     LR.button(bar, "Solve  (normal equation)", function () { flyTo(opt.w0, opt.w1); }, "primary");
 
@@ -144,7 +144,7 @@
       // deep purple centre → pale outside
       const t = b / levels.length;
       const light = 32 + t * 64; // 32%..96%
-      return "hsl(0, 0%, " + light + "%)";
+      return "hsl(258, 60%, " + light + "%)";
     };
 
     function drawAll() {
@@ -188,15 +188,15 @@
       SR = LR.plot(rc, PR);
       // presets as dots
       PRESETS.forEach(function (p) {
-        LR.dot(rc, SR.sx(p.w0), SR.sy(p.w1), 6, p.color, "#ffffff");
+        LR.dot(rc, SR.sx(p.w0), SR.sy(p.w1), 6, p.color, "#fff");
       });
       // optimum star
-      drawStar(rc, SR.sx(opt.w0), SR.sy(opt.w1), 8, "#ffffff", C.text);
+      drawStar(rc, SR.sx(opt.w0), SR.sy(opt.w1), 8, "#fff", C.text);
       // current point
-      LR.dot(rc, SR.sx(cur.w0), SR.sy(cur.w1), 8, C.orange, "#ffffff");
+      LR.dot(rc, SR.sx(cur.w0), SR.sy(cur.w1), 8, C.orange, "#fff");
 
       rc.font = "600 11px Inter, sans-serif";
-      rc.fillStyle = "#ffffff";
+      rc.fillStyle = "#fff";
       rc.textAlign = "center";
 
       const J = LR.loss1d(pts, cur.w0, cur.w1);
@@ -286,7 +286,7 @@
       ctx.strokeStyle = C.green; ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.moveTo(sx(1), sy(P.ymin)); ctx.lineTo(sx(1), sy(f(1))); ctx.stroke();
       ctx.setLineDash([]);
-      LR.dot(ctx, sx(1), sy(f(1)), 5, "#ffffff", C.green);
+      LR.dot(ctx, sx(1), sy(f(1)), 5, "#fff", C.green);
       ctx.font = "700 12px Inter, sans-serif";
       ctx.fillStyle = C.green; ctx.textAlign = "left";
       ctx.fillText("x★ = 1, f = −0.75, f′ = 0", sx(1) + 10, sy(f(1)) + 16);
@@ -313,7 +313,7 @@
       ctx.restore();
 
       // the draggable point
-      LR.dot(ctx, sx(px), sy(f(px)), 8, C.orange, "#ffffff");
+      LR.dot(ctx, sx(px), sy(f(px)), 8, C.orange, "#fff");
 
       const flat = Math.abs(slope) < 0.05;
       ro.set("x", LR.fmtF(px, 2));
@@ -371,7 +371,7 @@
       const rPix = Math.abs(sx(1) - sx(0)); // pixels per unit (x)
       const ry = Math.abs(sy(1) - sy(0));
       for (let r = 0.5; r <= 5; r += 0.5) {
-        ctx.strokeStyle = "hsl(0, 0%, " + Math.min(92, 40 + r * 11) + "%)";
+        ctx.strokeStyle = "hsl(258, 55%, " + Math.min(92, 40 + r * 11) + "%)";
         ctx.lineWidth = 1.6;
         ctx.beginPath();
         ctx.ellipse(sx(1), sy(2), r * rPix, r * ry, 0, 0, Math.PI * 2);
@@ -379,7 +379,7 @@
       }
 
       // optimum
-      LR.dot(ctx, sx(1), sy(2), 6, C.purple, "#ffffff");
+      LR.dot(ctx, sx(1), sy(2), 6, C.purple, "#fff");
       ctx.font = "700 12px Inter, sans-serif";
       ctx.fillStyle = C.purple; ctx.textAlign = "left";
       ctx.fillText("w★ = (1, 2)", sx(1) + 11, sy(2) - 9);
@@ -393,7 +393,7 @@
       }
       ctx.restore();
 
-      LR.dot(ctx, sx(w[0]), sy(w[1]), 8, C.orange, "#ffffff");
+      LR.dot(ctx, sx(w[0]), sy(w[1]), 8, C.orange, "#fff");
 
       const flat = mag < 0.12;
       ro.set("w", "(" + LR.fmtF(w[0], 2) + ", " + LR.fmtF(w[1], 2) + ")");
@@ -553,8 +553,8 @@
         const t = Math.min(1, q.h / Jmax);
         // low = warm orange, high = pale grey
         const hgt = Math.round(96 - t * 62);
-        ctx.fillStyle = "hsla(0, 0%, " + hgt + "%, 0.94)";
-        ctx.strokeStyle = "rgba(95,95,95, 0.25)";
+        ctx.fillStyle = "hsla(" + Math.round(24 + t * 20) + ", " + Math.round(85 - t * 55) + "%, " + hgt + "%, 0.94)";
+        ctx.strokeStyle = "rgba(120, 90, 70, 0.25)";
         ctx.lineWidth = 0.7;
         ctx.beginPath();
         ctx.moveTo(q.c[0].x, q.c[0].y);
@@ -565,7 +565,7 @@
 
       // optimum marker
       const po = proj(opt.w0, opt.w1, optJ);
-      LR.dot(ctx, po.x, po.y, 4.5, C.green, "#ffffff");
+      LR.dot(ctx, po.x, po.y, 4.5, C.green, "#fff");
 
       // path
       if (path.length > 1) {
@@ -589,7 +589,7 @@
       const pb = proj(ball[0], ball[1], bJ);
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
-      LR.dot(ctx, pb.x, pb.y, 8, C.red, "#ffffff");
+      LR.dot(ctx, pb.x, pb.y, 8, C.red, "#fff");
       ctx.restore();
 
       // axis labels
@@ -616,7 +616,7 @@
       const IX = 18, IY = H - 130, IW = 190, IH = 112;
       ctx.save();
       ctx.fillStyle = "rgba(255,255,255,0.94)";
-      ctx.strokeStyle = "#dddddd";
+      ctx.strokeStyle = "#ddd";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.roundRect(IX, IY, IW, IH, 8);
@@ -649,7 +649,7 @@
       if (!diverged) {
         const b = Math.max(w1min, Math.min(w1max, ball[1]));
         const v = Jat(ball[0], b);
-        LR.dot(ctx, mx(b), my(Math.min(v, jmax)), 4, C.red, "#ffffff");
+        LR.dot(ctx, mx(b), my(Math.min(v, jmax)), 4, C.red, "#fff");
         const g1 = gradAt(ball[0], b)[1];
         if (Math.abs(g1) > 0.02) {
           const dir = g1 > 0 ? -1 : 1;
@@ -752,7 +752,7 @@
       ctx.restore();
       pts.forEach((p) => LR.dot(ctx, S1.sx(p.x), S1.sy(p.t), 4, C.text));
       for (let i = 0; i < 2; i++) {
-        LR.dot(ctx, S1.sx(HX[i]), S1.sy(hy[i]), 7.5, "#ffffff", C.orange);
+        LR.dot(ctx, S1.sx(HX[i]), S1.sy(hy[i]), 7.5, "#fff", C.orange);
         LR.dot(ctx, S1.sx(HX[i]), S1.sy(hy[i]), 3, C.orange);
       }
     }
@@ -819,7 +819,7 @@
       ctx.beginPath(); ctx.moveTo(S2.sx(w1opt), S2.sy(0)); ctx.lineTo(S2.sx(w1opt), S2.sy(Jhi)); ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
-      LR.dot(ctx, S2.sx(bw), S2.sy(Jw1(bw)), 9, C.red, "#ffffff");
+      LR.dot(ctx, S2.sx(bw), S2.sy(Jw1(bw)), 9, C.red, "#fff");
     }
 
     draw1(); draw2();
@@ -964,7 +964,7 @@
         });
         ctx.stroke();
         arr.forEach(function (v, m) {
-          LR.dot(ctx, sx(m), sy(Math.min(ymax, v)), m === M ? 5.5 : 3.4, color, m === M ? "#ffffff" : null);
+          LR.dot(ctx, sx(m), sy(Math.min(ymax, v)), m === M ? 5.5 : 3.4, color, m === M ? "#fff" : null);
         });
       };
       plotCurve(curves.trn, C.green);
@@ -1095,7 +1095,7 @@
       // gridlines
       for (let e = lo; e <= hi; e++) {
         const y = P.y0 + P.h - ((e - lo) / (hi - lo)) * P.h;
-        ctx.strokeStyle = "#eeeeee";
+        ctx.strokeStyle = "#eee";
         ctx.beginPath(); ctx.moveTo(P.x0, y); ctx.lineTo(P.x0 + P.w, y); ctx.stroke();
         ctx.fillStyle = C.faint; ctx.textAlign = "right";
         ctx.fillText("1e" + e, P.x0 - 5, y + 3);

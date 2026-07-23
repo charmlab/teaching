@@ -139,7 +139,7 @@
     ramp: function (v, vmax) {
       if (!vmax) return "#ffffff";
       const a = Math.min(1, Math.abs(v) / vmax) * 0.85;
-      return v >= 0 ? "rgba(26,26,26," + a.toFixed(3) + ")" : "rgba(150,150,150," + a.toFixed(3) + ")";
+      return v >= 0 ? "rgba(232,89,12," + a.toFixed(3) + ")" : "rgba(112,72,232," + a.toFixed(3) + ")";
     },
 
     fmtV: function (v) {
@@ -248,8 +248,8 @@
 
       // markers at the current image side
       const fcv = fcCount(side, width), cvv = convCount(width);
-      LR.dot(ctx, sx(side), sy(Math.log10(fcv)), 6, C.orange, "#ffffff");
-      LR.dot(ctx, sx(side), sy(cy), 6, C.green, "#ffffff");
+      LR.dot(ctx, sx(side), sy(Math.log10(fcv)), 6, C.orange, "#fff");
+      LR.dot(ctx, sx(side), sy(cy), 6, C.green, "#fff");
       ctx.setLineDash([3, 3]);
       ctx.strokeStyle = "rgba(0,0,0,0.25)"; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(sx(side), sy(3)); ctx.lineTo(sx(side), sy(Math.log10(fcv))); ctx.stroke();
@@ -332,12 +332,12 @@
       xBtns.forEach(function (btn, i) {
         btn.textContent = String(x[i]);
         btn.style.background = CNN.gray(x[i] / 5);
-        btn.style.color = x[i] >= 3 ? "#ffffff" : C.text;
+        btn.style.color = x[i] >= 3 ? "#fff" : C.text;
       });
       wBtns.forEach(function (btn, i) {
         btn.textContent = String(w[i]);
-        btn.style.background = w[i] === 0 ? "#ffffff" : w[i] > 0 ? "rgba(26,26,26,0.75)" : "rgba(150,150,150,0.75)";
-        btn.style.color = w[i] === 0 ? C.text : "#ffffff";
+        btn.style.background = w[i] === 0 ? "#fff" : w[i] > 0 ? "rgba(232,89,12,0.75)" : "rgba(112,72,232,0.75)";
+        btn.style.color = w[i] === 0 ? C.text : "#fff";
       });
 
       // real computation, term by term
@@ -351,11 +351,11 @@
       ctx.clearRect(0, 0, W, H);
       const zmin = -30, zmax = 50;
       const px = (v) => 30 + ((v - zmin) / (zmax - zmin)) * (W - 60);
-      ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(30, 40); ctx.lineTo(W - 30, 40); ctx.stroke();
       ctx.strokeStyle = C.axis; ctx.lineWidth = 1.4;
       ctx.beginPath(); ctx.moveTo(px(0), 26); ctx.lineTo(px(0), 54); ctx.stroke();
-      ctx.fillStyle = z >= 0 ? "rgba(26,26,26,0.8)" : "rgba(150,150,150,0.8)";
+      ctx.fillStyle = z >= 0 ? "rgba(232,89,12,0.8)" : "rgba(112,72,232,0.8)";
       const x0p = px(Math.min(0, z)), x1p = px(Math.max(0, z));
       ctx.fillRect(x0p, 30, Math.max(1.5, x1p - x0p), 20);
       ctx.font = "600 11px Inter, sans-serif";
@@ -465,7 +465,7 @@
         const inside = i >= 0 && i < n;
         const v = inside ? p.x[i] : 0;
         const active = t >= 0 && i <= t && i > t - k;
-        ctx.fillStyle = active ? "rgba(26,26,26,0.14)" : inside ? "#ffffff" : "#fafafa";
+        ctx.fillStyle = active ? "rgba(232,89,12,0.14)" : inside ? "#fff" : "#fafafa";
         ctx.fillRect(colX(i), xRowY, cell - 2, 44);
         ctx.strokeStyle = active ? C.orange : "#d0d0d0";
         ctx.lineWidth = active ? 2 : 1;
@@ -479,13 +479,13 @@
         CNN.label(ctx, x0, wRowY - 12, "kernel w, flipped, at stop t = " + t);
         for (let tau = 0; tau < k; tau++) {
           const i = t - tau;   // x-index this kernel entry multiplies
-          ctx.fillStyle = "rgba(150,150,150,0.12)";
+          ctx.fillStyle = "rgba(112,72,232,0.12)";
           ctx.fillRect(colX(i), wRowY, cell - 2, 44);
           ctx.strokeStyle = C.purple; ctx.lineWidth = 1.6;
           ctx.strokeRect(colX(i), wRowY, cell - 2, 44);
           ctx.fillStyle = C.purple;
           ctx.fillText("w[" + tau + "]=" + p.w[tau], colX(i) + cell / 2 - 1, wRowY + 28);
-          LR.arrow(ctx, colX(i) + cell / 2, wRowY - 2, colX(i) + cell / 2, xRowY + 48, "rgba(150,150,150,0.5)", 1.4);
+          LR.arrow(ctx, colX(i) + cell / 2, wRowY - 2, colX(i) + cell / 2, xRowY + 48, "rgba(112,72,232,0.5)", 1.4);
         }
 
         // the products, written out
@@ -514,7 +514,7 @@
       const ox0 = (W - m * cell) / 2;
       for (let i = 0; i < m; i++) {
         const done = t >= i;
-        ctx.fillStyle = i === t ? "rgba(26,26,26,0.16)" : "#ffffff";
+        ctx.fillStyle = i === t ? "rgba(232,89,12,0.16)" : "#fff";
         ctx.fillRect(ox0 + i * cell, outRowY, cell - 2, 44);
         ctx.strokeStyle = i === t ? C.orange : "#d0d0d0";
         ctx.lineWidth = i === t ? 2 : 1;
@@ -646,7 +646,7 @@
       CNN.label(ctx, IX, IY - 10, "input image, 8 × 8");
       CNN.grid(ctx, IX, IY, CI, IMG, {
         num: (v) => CNN.fmtV(v),
-        numColor: (v) => (v > 0.5 ? "#ffffff" : "#9a9a9a"),
+        numColor: (v) => (v > 0.5 ? "#fff" : "#9a9a9a"),
       });
       // receptive patch highlight
       ctx.strokeStyle = C.orange; ctx.lineWidth = 3;
@@ -689,7 +689,7 @@
       ctx.restore();
 
       // arrow products → output cell
-      LR.arrow(ctx, PX + K * CK + 14, PY + (K * CK) / 2, OX + j * CO - 6, OY + i * CO + CO / 2, "rgba(26,26,26,0.55)", 1.8);
+      LR.arrow(ctx, PX + K * CK + 14, PY + (K * CK) / 2, OX + j * CO - 6, OY + i * CO + CO / 2, "rgba(232,89,12,0.55)", 1.8);
 
       // output feature map
       CNN.label(ctx, OX, OY - 10, "feature map, 6 × 6");

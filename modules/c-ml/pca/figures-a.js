@@ -395,7 +395,7 @@
       // 1σ and 2σ ellipses from the eigendecomposition
       const ang = Math.atan2(e.u1[1], e.u1[0]);
       [1, 2].forEach(function (kk) {
-        ctx.strokeStyle = kk === 1 ? C.orange : "rgba(26,26,26,0.45)";
+        ctx.strokeStyle = kk === 1 ? C.orange : "rgba(232,89,12,0.45)";
         ctx.lineWidth = kk === 1 ? 2.4 : 1.6;
         ctx.beginPath();
         for (let i = 0; i <= 72; i++) {
@@ -568,7 +568,7 @@
 
       // the kept subspace
       if (K === 1) {
-        ctx.strokeStyle = "rgba(102,102,102,0.85)"; ctx.lineWidth = 2.2;
+        ctx.strokeStyle = "rgba(47,158,68,0.85)"; ctx.lineWidth = 2.2;
         ctx.beginPath();
         ctx.moveTo(sx(-6 * e.u1[0]), sy(-6 * e.u1[1]));
         ctx.lineTo(sx(6 * e.u1[0]), sy(6 * e.u1[1]));

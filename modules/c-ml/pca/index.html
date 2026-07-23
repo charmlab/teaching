@@ -239,7 +239,7 @@ stable directions yourself:
 
 <div class="figure" id="fig-eigvec">
   <div class="fig-mount" data-fig="eigvec"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> eigenvectors as the directions a matrix cannot turn. Drag the black vector <span class="m">$v$</span> around the circle and watch its image <span class="m">$Av$</span> (black): for a generic direction the two disagree, but along an eigenvector (dashed lines) they line up and <span class="m">$Av = \lambda v$</span> exactly, with <span class="m">$\lambda$</span> read off live. Switch presets: the shear has one repeated eigen-direction, and the rotation has no real eigenvectors at all, every direction turns. The grid morph slider shows the same matrix acting on all of space.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> eigenvectors as the directions a matrix cannot turn. Drag the black vector <span class="m">$v$</span> around the circle and watch its image <span class="m">$Av$</span> (orange): for a generic direction the two disagree, but along an eigenvector (dashed lines) they line up and <span class="m">$Av = \lambda v$</span> exactly, with <span class="m">$\lambda$</span> read off live. Switch presets: the shear has one repeated eigen-direction, and the rotation has no real eigenvectors at all, every direction turns. The grid morph slider shows the same matrix acting on all of space.</p>
 </div>
 
 <h3>Symmetric matrices are the nice case</h3>
@@ -454,7 +454,7 @@ correlations disappear. Watch the turn:
 
 <div class="figure" id="fig-projrec">
   <div class="fig-mount" data-fig="projrec"></div>
-  <p class="fig-caption"><b>Fig 3.2,</b> project and reconstruct on a live cloud. Slide <span class="m">$K$</span>: at <span class="m">$K = 0$</span> every point collapses to the mean, at <span class="m">$K = 1$</span> points drop onto the first principal axis with their residuals drawn as dark grey segments, at <span class="m">$K = 2$</span> the reconstruction is exact. The two error readouts, mean squared residual computed from the points versus the sum of the discarded eigenvalues, agree to the last digit at every setting, which is the section-4 theorem running live.</p>
+  <p class="fig-caption"><b>Fig 3.2,</b> project and reconstruct on a live cloud. Slide <span class="m">$K$</span>: at <span class="m">$K = 0$</span> every point collapses to the mean, at <span class="m">$K = 1$</span> points drop onto the first principal axis with their residuals drawn as red segments, at <span class="m">$K = 2$</span> the reconstruction is exact. The two error readouts, mean squared residual computed from the points versus the sum of the discarded eigenvalues, agree to the last digit at every setting, which is the section-4 theorem running live.</p>
 </div>
 
 <h3>The code</h3>
@@ -637,7 +637,7 @@ is cheap. Compare both regimes:
 
 <div class="figure" id="fig-scree">
   <div class="fig-mount" data-fig="scree"></div>
-  <p class="fig-caption"><b>Fig 5.1,</b> the scree plot as a decision tool. Bars are the sorted eigenvalues; the curve is cumulative explained variance; drag the black <span class="m">$K$</span> divider (arrow keys work too) and the kept fraction, the reconstruction error, and the 90% recommendation update live. Toggle between a fast-decaying spectrum, where 3 of 10 components clear 90%, and a flat one, where reaching 90% swallows 8 of 10, computed live from the two spectra.</p>
+  <p class="fig-caption"><b>Fig 5.1,</b> the scree plot as a decision tool. Bars are the sorted eigenvalues; the curve is cumulative explained variance; drag the orange <span class="m">$K$</span> divider (arrow keys work too) and the kept fraction, the reconstruction error, and the 90% recommendation update live. Toggle between a fast-decaying spectrum, where 3 of 10 components clear 90%, and a flat one, where reaching 90% swallows 8 of 10, computed live from the two spectra.</p>
 </div>
 
 <div class="quiz" data-correct="b">

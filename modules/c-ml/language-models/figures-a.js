@@ -276,7 +276,7 @@
     inp.type = "text";
     inp.value = "a kind person is smart";
     inp.setAttribute("aria-label", "sentence to score with the bigram model");
-    inp.style.cssText = "font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid #cccccc;border-radius:6px;width:min(280px,60vw)";
+    inp.style.cssText = "font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid #ccc;border-radius:6px;width:min(280px,60vw)";
     lab.appendChild(inp);
     bar.appendChild(lab);
     const vocabSet = new Set(LM.vocab(sents));
@@ -622,7 +622,7 @@
     ctxInp.type = "text";
     ctxInp.value = "i";
     ctxInp.setAttribute("aria-label", "query context, n minus 1 words");
-    ctxInp.style.cssText = "font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid #cccccc;border-radius:6px;width:130px";
+    ctxInp.style.cssText = "font-family:var(--mono);font-size:13px;padding:3px 8px;border:1px solid #ccc;border-radius:6px;width:130px";
     ctxLab.appendChild(ctxInp);
     controls.appendChild(ctxLab);
     LR.button(controls, "Run ▸", run, "primary small");
@@ -705,7 +705,7 @@
     inp.type = "text";
     inp.value = "Unbelievably, the students at the University of Waterloo love tokenization.";
     inp.setAttribute("aria-label", "text to tokenize");
-    inp.style.cssText = "font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid #cccccc;border-radius:6px;width:min(420px,64vw)";
+    inp.style.cssText = "font-family:var(--mono);font-size:13px;padding:4px 8px;border:1px solid #ccc;border-radius:6px;width:min(420px,64vw)";
     lab.appendChild(inp);
     bar.appendChild(lab);
 

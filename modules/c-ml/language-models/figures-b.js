@@ -149,7 +149,7 @@
 
     function cellBg(v, vmax) {
       const a = Math.min(1, Math.abs(v) / (vmax || 1)) * 0.75 + 0.1;
-      return v >= 0 ? "rgba(26,26,26," + a.toFixed(2) + ")" : "rgba(150,150,150," + a.toFixed(2) + ")";
+      return v >= 0 ? "rgba(232,89,12," + a.toFixed(2) + ")" : "rgba(112,72,232," + a.toFixed(2) + ")";
     }
 
     function render() {
@@ -194,7 +194,7 @@
       e.forEach(function (v) {
         const cell = LR.el("span", "vcell", v.toFixed(2));
         cell.style.background = cellBg(v, emax);
-        cell.style.color = Math.abs(v) / emax > 0.55 ? "#ffffff" : "#222222";
+        cell.style.color = Math.abs(v) / emax > 0.55 ? "#fff" : "#222";
         denseRow.appendChild(cell);
       });
 
@@ -263,7 +263,7 @@
         g: "capital",
       };
     });
-    const GCOL = { food: C.orange, instrument: C.purple, country: C.green, capital: "#575757" };
+    const GCOL = { food: C.orange, instrument: C.purple, country: C.green, capital: "#1e7f38" };
     const NAMES = Object.keys(WORDS);
     const PAIRNAMES = Object.keys(COUNTRIES).map(function (c) {
       return COUNTRIES[c].cap + " − " + c;
@@ -379,7 +379,7 @@
         const hot = mode === "sim" && picked.indexOf(w) >= 0;
         LR.dot(ctx, SX(p[0]), SY(p[1]), hot ? 6.5 : 4.5, GCOL[WORDS[w].g], hot ? C.text : null);
         ctx.font = (hot ? "700 " : "600 ") + "11.5px Inter, sans-serif";
-        ctx.fillStyle = hot ? C.text : "#444444";
+        ctx.fillStyle = hot ? C.text : "#444";
         ctx.textAlign = "center";
         ctx.fillText(w, SX(p[0]), SY(p[1]) - 9);
       });
@@ -561,8 +561,8 @@
       vec.forEach(function (v) {
         const cell = LR.el("span", "vcell", v.toFixed(2));
         const a = Math.min(1, Math.abs(v) / (vmax || 1)) * 0.75 + 0.08;
-        cell.style.background = v >= 0 ? "rgba(26,26,26," + a.toFixed(2) + ")" : "rgba(150,150,150," + a.toFixed(2) + ")";
-        cell.style.color = Math.abs(v) / vmax > 0.55 ? "#ffffff" : "#222222";
+        cell.style.background = v >= 0 ? "rgba(232,89,12," + a.toFixed(2) + ")" : "rgba(112,72,232," + a.toFixed(2) + ")";
+        cell.style.color = Math.abs(v) / vmax > 0.55 ? "#fff" : "#222";
         cells.appendChild(cell);
       });
       row.appendChild(cells);
