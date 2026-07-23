@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Principal Component Analysis — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on Principal Component Analysis: dimensionality reduction, eigenvectors of the covariance matrix, the PCA algorithm, the variance/reconstruction duality, scree plots, compression and denoising, random projections, and supervised PCA.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 18 &middot; The ML Bible</div>
+  <h1>Principal Component Analysis</h1>
+  <p class="lede">
+    A digit image from MNIST is 784 numbers, one per pixel. But nobody writes
+    784 independent decisions when they scribble a 3. The pixels move
+    together, and the real variation lives in a handful of directions: slant,
+    thickness, loop size. PCA is the algorithm that finds those directions.
+    It centers the data, reads its covariance matrix, and rotates into the
+    coordinate system where variance sorts itself from largest to smallest.
+    Keep the top few axes and you have compression, denoising, and
+    visualization from one eigendecomposition. This is the course's first
+    unsupervised lesson: no labels, no targets, just the shape of the data
+    itself.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: 784 pixels, a few directions</a></li>
+    <li><a href="#sec-why">Why reduce dimensions</a></li>
+    <li><a href="#sec-eigen">Eigen-review: stable directions</a></li>
+    <li><a href="#sec-algorithm">PCA, step by step</a></li>
+    <li><a href="#sec-twoviews">Two views of PCA</a></li>
+    <li><a href="#sec-choosek">Choosing K: the scree plot</a></li>
+    <li><a href="#sec-applications">Applications: compress, denoise, see</a></li>
+    <li><a href="#sec-random">Random projections and supervised PCA</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: 784 pixels, a few directions</h2>
+
+<p>
+Start with the destination. Below is a small handwritten-style digit, stored
+the honest way: one number per pixel, a vector in a space with hundreds of
+dimensions. Now watch what happens when I throw almost all of those
+dimensions away. Keep 1 direction and the reconstruction is a blur. Keep 5
+and the shape is back. Keep 15 and you would struggle to tell the copy from
+the original. Slide <span class="m">$K$</span> yourself:
+</p>
+
+<div class="figure" id="fig-hook">
+  <div class="fig-mount" data-fig="hook"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the destination, up front. A 196-pixel digit image is projected onto its top <span class="m">$K$</span> principal components and reconstructed; the eigendecomposition behind the slider is computed live in your browser from a dataset of digit variants. The variance-kept readout is real: a few directions carry nearly everything. <!-- flagged addition: the digit images are synthetic (parametric ring shapes generated in JS, varying in size, slant, thickness, and position) rather than actual MNIST samples, so the demo ships no dataset; the source's MNIST claim (43 of 784 components keep about 80% of the variance) is quoted in the text below and in section 6. --></p>
+</div>
+
+<p>
+How is that possible? Because the image dataset only <em>pretends</em> to be
+high-dimensional. The digits in the demo vary in a few ways: how wide, how
+tall, how slanted, how thick, where they sit. Every one of the 196 pixels is
+a function of those few underlying knobs, so the data hugs a low-dimensional
+sheet inside the 196-dimensional pixel space. The real MNIST digits behave
+the same way at 784 dimensions: keep 43 principal components, about 5.5% of
+the dimensions, and you preserve roughly 80% of the total variance.
+</p>
+
+<p>
+That is the whole lesson in one sentence: high-dimensional data usually has
+few real degrees of variation, and PCA finds them by eigendecomposing the
+covariance matrix. The rest of the lesson earns that sentence. We review what
+an eigenvector is, meet the covariance matrix again (you built it in the
+Gaussian Bayes lesson), run the algorithm step by step, prove that its two
+natural interpretations are the same thing, and then spend the payoff on
+compression, denoising, and a data-independent rival called random
+projection.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. WHY REDUCE ═══════════════════ -->
+<section id="sec-why">
+<h2><span class="secnum">1.</span> Why reduce dimensions</h2>
+
+<p>
+Data can fail you in two opposite ways. It can carry too <em>little</em>
+information: a digitized signal is already an approximation of the thing it
+measured. Or it can carry too <em>much</em>: redundant features and redundant
+samples that repeat what you already know. Redundancy is everywhere once you
+look for it:
+</p>
+
+<div class="hook-grid">
+  <div class="hook-card">
+    <div class="hook-emoji">🌡️</div>
+    <div class="hook-q">Temperature, twice</div>
+    <div class="hook-a">A dataset with columns for &deg;C and &deg;F carries one measurement in two features. The second column adds nothing.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🎬</div>
+    <div class="hook-q">The Netflix table</div>
+    <div class="hook-a">A <b>480,189 &times; 17,770</b> user-by-movie ratings matrix. Millions of entries, but taste varies along far fewer axes than 17,770.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🙂</div>
+    <div class="hook-q">Face images</div>
+    <div class="hook-a">Thousands of pixels per face, yet faces vary mostly in <b>orientation and expression</b>. Few knobs, many pixels.</div>
+  </div>
+</div>
+
+<p>
+Why fight the extra dimensions instead of shrugging at them? Four reasons,
+and you have met the first one before. High-dimensional spaces are hostile:
+the curse of dimensionality from the kNN lecture means distances concentrate
+and data gets sparse, so fewer dimensions make neighbourhood-based reasoning
+work again. Smaller inputs also mean faster and smaller models. Removing
+redundancy kills multicollinearity, which you saw destabilize regression
+weights. And humans can only see in 2-D and 3-D, so any honest look at a
+dataset needs a map down to a plottable space.
+</p>
+
+<p>
+Here is the smallest possible case of the disease and the cure. Two features
+that measure the same thing produce a point cloud that is secretly a line:
+</p>
+
+<div class="figure" id="fig-redundant">
+  <div class="fig-mount" data-fig="redundant"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> two features, one measurement. Cities' temperatures recorded in both &deg;C and &deg;F lie exactly on the line <span class="m">$F = 1.8\,C + 32$</span>: a 2-D dataset with 1-D content. Add sensor noise with the slider and the cloud thickens but the verdict barely moves; the share of variance along the principal direction is computed live from the sample covariance. <!-- flagged addition: the specific city temperatures are invented for the demo; the C-and-F redundancy example itself is from the source. --></p>
+</div>
+
+<h3>Selection or extraction</h3>
+
+<p>
+So we want a map from <span class="m">$x \in \mathbb{R}^D$</span> down to
+<span class="m">$z \in \mathbb{R}^K$</span> with
+<span class="m">$K &lt; D$</span>. Formally, dimensionality reduction maps a
+dataset <span class="m">$X \subset \mathbb{R}^d$</span> to an embedding
+<span class="m">$Z \subset \mathbb{R}^k$</span> with
+<span class="m">$k \ll d$</span> while approximately preserving the
+structure you care about. There are exactly two strategies:
+</p>
+
+<ul>
+  <li><strong>Feature selection</strong>: keep a subset of the original features and delete the rest. The survivors keep their meaning: "we kept temperature and dropped humidity".</li>
+  <li><strong>Feature extraction</strong>: build <em>new</em> features as transformations of all the old ones, linear or nonlinear. The new coordinates are combinations, like "0.85 &times; height + 0.53 &times; weight".</li>
+</ul>
+
+<p>
+PCA is feature extraction, and it is the linear workhorse of a whole family.
+Each member of the family answers "what structure should the embedding
+preserve?" differently: PCA preserves maximum variation, MDS preserves
+pairwise <span class="m">$\ell_2$</span> distances, Isomap (Joshua
+Tenenbaum's method) preserves geodesic distances along the data manifold,
+LLE (Sam Roweis's method) preserves each point's local neighbourhood
+relations, random projections preserve pairwise
+<span class="m">$\ell_2$</span> distances with high probability, and
+autoencoders, next lecture, learn a nonlinear compression with a neural
+network. Today is the PCA day, with a random-projection detour at the end.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A hospital model uses 40 lab measurements. Team A drops 30 of the columns and keeps 10. Team B replaces the 40 columns with 10 weighted combinations of all of them. Who did selection and who did extraction?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both did feature selection: each ended with 10 features</button>
+    <button data-k="b">A did selection (a subset of the originals), B did extraction (new features built from all of them)</button>
+    <button data-k="c">Both did extraction: reducing dimensions always builds new features</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The endpoint dimension is the same, but the routes differ in kind. Team B's 10 features are not any of the original 40; they are combinations, which is the defining mark of extraction.</div>
+  <div class="quiz-fb" data-k="b">Right. And notice the trade: A's features stay interpretable ("this column is glucose"), while B's combinations can capture correlated structure that no single kept column holds. PCA is B's strategy with a specific, variance-maximizing choice of combinations.</div>
+  <div class="quiz-fb" data-k="c">Selection is a legitimate reduction that builds nothing new: it keeps a subset. Extraction is the one that transforms. A and B sit on opposite sides of that line.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. EIGEN-REVIEW ═══════════════════ -->
+<section id="sec-eigen">
+<h2><span class="secnum">2.</span> Eigen-review: stable directions</h2>
+
+<h3>Matrices are transformations</h3>
+
+<p>
+Before PCA makes sense, one piece of linear algebra needs to feel physical.
+A matrix is not a spreadsheet of numbers; it is a <em>machine that moves
+space</em>. Multiply every point of the plane by
+<span class="m">$A$</span> and the plane rotates, stretches, or shears.
+Rotation and scaling are the pure linear moves. Translation is affine
+rather than linear, and the standard trick to fold it in is homogeneous
+coordinates: append a 1 to every point and a translation becomes one more
+matrix multiply. What a single matrix can never do is bend space
+nonlinearly; for that you must intersperse nonlinearities between linear
+maps, which is precisely how neural networks are built and why the
+autoencoder lesson follows this one.
+</p>
+
+<p>
+Two more definitions we will need. The <strong>inverse</strong>
+<span class="m">$A^{-1}$</span> is the machine that undoes
+<span class="m">$A$</span>, when such a machine exists:
+<span class="m">$A A^{-1} = A^{-1} A = I$</span>. And the
+<strong>null space</strong> <span class="m">$\{v : Av = 0\}$</span> is the
+set of directions the machine collapses to nothing; a matrix with a
+nontrivial null space destroys information and has no inverse.
+</p>
+
+<h3>Eigenvectors: the directions a matrix cannot turn</h3>
+
+<p>
+Now the star of the show. Feed a generic vector to
+<span class="m">$A$</span> and it comes out pointing somewhere new. But
+almost every matrix has a few special directions it cannot turn, only
+stretch or shrink (or reverse). Those are its <strong>eigenvectors</strong>,
+and the stretch factor is the <strong>eigenvalue</strong>:
+</p>
+
+$$ A v = \lambda v. $$
+
+<p>
+Read it as a sentence: applying the whole machine
+<span class="m">$A$</span> to <span class="m">$v$</span> does nothing but
+multiply it by the number <span class="m">$\lambda$</span>. The direction is
+stable under the transformation. Grab the vector below and feel for the
+stable directions yourself:
+</p>
+
+<div class="figure" id="fig-eigvec">
+  <div class="fig-mount" data-fig="eigvec"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> eigenvectors as the directions a matrix cannot turn. Drag the black vector <span class="m">$v$</span> around the circle and watch its image <span class="m">$Av$</span> (orange): for a generic direction the two disagree, but along an eigenvector (dashed lines) they line up and <span class="m">$Av = \lambda v$</span> exactly, with <span class="m">$\lambda$</span> read off live. Switch presets: the shear has one repeated eigen-direction, and the rotation has no real eigenvectors at all, every direction turns. The grid morph slider shows the same matrix acting on all of space.</p>
+</div>
+
+<h3>Symmetric matrices are the nice case</h3>
+
+<p>
+Eigendecomposition of a general <span class="m">$d \times d$</span> matrix
+costs about <span class="m">$O(d^3)$</span> and can produce complex
+eigenvalues, as the rotation preset just showed. But there is a family of
+matrices where everything is guaranteed to be clean: real
+<strong>symmetric</strong> matrices, <span class="m">$A = A^\top$</span>.
+For them, all eigenvalues are real, and the eigenvectors can be chosen
+mutually orthogonal, perpendicular axes of a rotated coordinate frame.
+Stacking those unit eigenvectors as the columns of
+<span class="m">$Q$</span> gives the eigendecomposition
+</p>
+
+$$ A = Q \Lambda Q^\top, \qquad Q^{-1} = Q^\top, $$
+
+<p>
+with <span class="m">$\Lambda$</span> the diagonal matrix of eigenvalues.
+The <span class="m">$Q^{-1} = Q^\top$</span> is worth savouring: inverting
+an orthogonal matrix is free, just transpose it. Read the decomposition
+right to left as three moves: rotate into the eigenvector frame
+(<span class="m">$Q^\top$</span>), stretch each axis by its eigenvalue
+(<span class="m">$\Lambda$</span>), rotate back
+(<span class="m">$Q$</span>). Every symmetric matrix is a stretch dressed
+up in a rotation.
+</p>
+
+<h3>The covariance matrix is exactly this case</h3>
+
+<p>
+Why do we care? Because the matrix at the heart of this lesson is symmetric.
+Recall from the Gaussian Bayes lesson: the covariance matrix of a dataset
+has entries
+</p>
+
+$$ \Sigma_{ij} = \operatorname{Cov}(X_i, X_j), $$
+
+<p>
+variances on the diagonal, covariances off it. Covariance is symmetric in
+its arguments, so <span class="m">$\Sigma = \Sigma^\top$</span>, and the
+guarantee kicks in:
+</p>
+
+$$ \Sigma = U \Lambda U^\top, $$
+
+<p>
+real eigenvalues, orthonormal eigenvectors. And for this particular matrix
+the eigen-pieces have a meaning you can see. The eigenvectors of
+<span class="m">$\Sigma$</span> are the <em>principal directions</em> of the
+data, the perpendicular axes along which it spreads, and each eigenvalue is
+the amount of variance along its axis. In the Gaussian lesson you drew
+<span class="m">$\Sigma$</span> as an ellipse; the eigenvectors are that
+ellipse's axes and the eigenvalues are its squared radii. Watch the
+principal directions emerge from raw data spread:
+</p>
+
+<div class="figure" id="fig-covellipse">
+  <div class="fig-mount" data-fig="covellipse"></div>
+  <p class="fig-caption"><b>Fig 2.2,</b> the covariance ellipse and its eigenvectors, live. Set the spread of each feature and their correlation; a fresh cloud is sampled, its sample covariance <span class="m">$\Sigma$</span> is computed, and the closed-form <span class="m">$2 \times 2$</span> eigendecomposition draws the eigenvectors scaled by <span class="m">$\sqrt{\lambda_i}$</span> over the 1-and-2 standard-deviation ellipses. Push the correlation toward <span class="m">$\pm 1$</span> and watch one eigenvalue swallow the other: the cloud flattens toward a line and one direction owns the variance.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why are the covariance matrix's eigenvectors guaranteed to be orthogonal, and what does each eigenvalue tell you?</p>
+  <div class="quiz-opts">
+    <button data-k="a">They are orthogonal because covariance matrices are invertible; the eigenvalue is the feature's mean</button>
+    <button data-k="b">They are orthogonal only when the features are uncorrelated; the eigenvalue counts the number of points along that direction</button>
+    <button data-k="c">Because <span class="m">$\Sigma$</span> is symmetric, and real symmetric matrices always admit an orthogonal set of eigenvectors; each eigenvalue is the variance of the data along its eigenvector's direction</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Invertibility is a separate property (it fails exactly when some eigenvalue is 0), and means never enter the covariance matrix: it is built from centered data. The orthogonality comes from symmetry.</div>
+  <div class="quiz-fb" data-k="b">Correlation changes where the eigenvectors point, not whether they are orthogonal. Even a heavily correlated cloud, like Fig 2.2 at <span class="m">$\rho = 0.9$</span>, has perpendicular principal axes; they are just rotated.</div>
+  <div class="quiz-fb" data-k="c">Right. Symmetry buys the orthogonal frame, and the eigenvalue prices each axis in units of variance. That pairing, orthogonal directions each labelled with a variance, is the entire raw material of PCA.</div>
+</div>
+
+<details class="check">
+  <summary>Check: what does a zero eigenvalue of &Sigma; mean?</summary>
+  <div>
+    <p>Suppose the covariance matrix of your dataset has <span class="m">$\lambda_3 = 0$</span>. What is the data doing?</p>
+    <p><b>Answer.</b> Zero variance along the third principal direction: every data point has exactly the same coordinate along <span class="m">$u_3$</span>. The cloud is perfectly flat in that direction, so the dataset actually lives in a lower-dimensional subspace, and <span class="m">$u_3$</span> is in the null space of <span class="m">$\Sigma$</span> (indeed <span class="m">$\Sigma u_3 = 0 \cdot u_3 = 0$</span>). The &deg;C-and-&deg;F cloud of Fig 1.1 at zero noise is precisely this: its <span class="m">$\lambda_2$</span> is 0 because the second direction holds no information. This is the degenerate limit of the story PCA exploits; PCA just extends the same logic to directions whose variance is small rather than exactly zero.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. THE ALGORITHM ═══════════════════ -->
+<section id="sec-algorithm">
+<h2><span class="secnum">3.</span> PCA, step by step</h2>
+
+<p>
+Everything is now on the table: data spreads, the covariance matrix measures
+the spread, and its eigendecomposition hands us orthogonal directions
+priced by variance. PCA is the five-step recipe that turns those pieces
+into a dimensionality reducer. Fix the notation first: the data matrix is
+<span class="m">$X \in \mathbb{R}^{D \times N}$</span>, one <em>column</em>
+per data point, <span class="m">$D$</span> features,
+<span class="m">$N$</span> points.
+</p>
+
+<p>
+<strong>Step 1, center.</strong> Compute the mean point and subtract it from
+every column:
+</p>
+
+$$ \bar{x} = \frac{1}{N}\sum_{n=1}^{N} x^{(n)}, \qquad X_c = X - M, $$
+
+<p>
+where <span class="m">$M$</span> stacks <span class="m">$\bar{x}$</span> in
+every column. Why bother? Because variance is spread <em>around the
+mean</em>. Without centering, the first principal direction would chase the
+mean's offset from the origin instead of the data's true spread; centering
+removes that bias so the eigenvectors describe shape, not location.
+</p>
+
+<p>
+<strong>Step 2, covariance.</strong> Build the
+<span class="m">$D \times D$</span> covariance matrix of the centered data:
+</p>
+
+$$ \Sigma = \frac{1}{N-1}\sum_{n=1}^{N} (x^{(n)} - \bar{x})(x^{(n)} - \bar{x})^\top
+   = \frac{1}{N-1} X_c X_c^\top \;\in\; \mathbb{R}^{D \times D}. $$
+
+<p>
+The <span class="m">$\frac{1}{N-1}$</span> rather than
+<span class="m">$\frac{1}{N}$</span> gives the unbiased estimate, the same
+convention as the Gaussian lesson.
+</p>
+
+<p>
+<strong>Step 3, eigendecompose.</strong> Since
+<span class="m">$\Sigma$</span> is symmetric,
+</p>
+
+$$ \Sigma = U \Lambda U^\top, \qquad \lVert u_i \rVert = 1, \qquad
+   \lambda_1 \ge \lambda_2 \ge \cdots \ge \lambda_D \ge 0. $$
+
+<p>
+Sort the eigenpairs by eigenvalue, largest first.
+<span class="m">$u_1$</span> is the direction of greatest variance, each
+later <span class="m">$u_i$</span> is the direction of greatest remaining
+variance perpendicular to all the earlier ones, and because the eigenvectors
+are mutually orthogonal, each principal component is an uncorrelated source
+of variation. The eigenvectors of the covariance matrix have earned their
+own name: <strong>principal components</strong>.
+</p>
+
+<p>
+<strong>Step 4, choose <span class="m">$K$</span> and project.</strong>
+Assemble the top <span class="m">$K$</span> eigenvectors as the columns of
+<span class="m">$U_K \in \mathbb{R}^{D \times K}$</span>, so
+<span class="m">$U_K^\top U_K = I_K$</span>, and encode every point by its
+coordinates along those directions:
+</p>
+
+$$ z = U_K^\top x_c \in \mathbb{R}^K, \qquad Z = U_K^\top X_c \in \mathbb{R}^{K \times N}. $$
+
+<p>
+<strong>Step 5, reconstruct.</strong> To go back to the original space,
+rebuild from the kept coordinates and restore the mean:
+</p>
+
+$$ \tilde{X}_c = U_K Z, \qquad \tilde{X} = U_K Z + M. $$
+
+<p>
+The reconstruction lands on the <span class="m">$K$</span>-dimensional
+subspace spanned by the kept components: it is the shadow of the data on
+that subspace, plus the mean put back.
+</p>
+
+<h3>What the algorithm feels like: a rotation</h3>
+
+<p>
+Steps 1 to 3 have a clean geometric reading. Centering moves the cloud to
+the origin. The eigenvectors define a rotated set of axes. Expressing every
+point in eigenvector coordinates, <span class="m">$U^\top x_c$</span>, is a
+pure rotation of the cloud, no information lost, and in the new frame the
+covariance matrix is diagonal: the coordinates are decorrelated, and the
+variances on the diagonal are exactly the eigenvalues, sorted. PCA does not
+squash anything until step 4; first it just turns the data until the
+correlations disappear. Watch the turn:
+</p>
+
+<div class="figure" id="fig-rotate">
+  <div class="fig-mount" data-fig="rotate"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the PCA rotation. The centered cloud turns until its principal components become the coordinate axes; the sample covariance of the rotated points is recomputed live at every frame, and its off-diagonal entry melts to zero as the frame aligns, leaving the eigenvalues on the diagonal. Animate it or step through in quarters; with reduced motion enabled the step buttons are the intended controls.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: PCA on five points</div>
+  <p>Five data points with two features, columns of <span class="m">$X$</span> (this mirrors the assignment's PCA question with different numbers):</p>
+  $$ X = \begin{bmatrix} 2 & 3 & 4 & 5 & 6 \\ 2 & 2 & 3 & 4 & 4 \end{bmatrix} $$
+  <p><b>Center.</b> The mean is <span class="m">$\bar{x} = (4, 3)$</span>, so the centered columns are</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    (-2,-1)&nbsp;&nbsp;(-1,-1)&nbsp;&nbsp;(0,0)&nbsp;&nbsp;(1,1)&nbsp;&nbsp;(2,1)
+  </p>
+  <p><b>Covariance.</b> With <span class="m">$N - 1 = 4$</span>: sum of <span class="m">$x_1^2$</span> is 10, sum of <span class="m">$x_2^2$</span> is 4, sum of <span class="m">$x_1 x_2$</span> is 6, so</p>
+  $$ \Sigma = \frac{1}{4}\begin{bmatrix} 10 & 6 \\ 6 & 4 \end{bmatrix}
+            = \begin{bmatrix} 2.5 & 1.5 \\ 1.5 & 1.0 \end{bmatrix} $$
+  <p><b>Eigendecompose.</b> The characteristic equation <span class="m">$\lambda^2 - 3.5\lambda + 0.25 = 0$</span> (trace 3.5, determinant 0.25) gives</p>
+  $$ \lambda_{1,2} = \frac{3.5 \pm \sqrt{3.5^2 - 4(0.25)}}{2} = \frac{3.5 \pm \sqrt{11.25}}{2}
+     \;\Rightarrow\; \lambda_1 \approx 3.427, \quad \lambda_2 \approx 0.073. $$
+  <p>Solving <span class="m">$(\Sigma - \lambda_1 I)u = 0$</span> and normalizing to unit length:</p>
+  $$ u_1 \approx \begin{bmatrix} 0.851 \\ 0.526 \end{bmatrix}, \qquad
+     u_2 \approx \begin{bmatrix} -0.526 \\ 0.851 \end{bmatrix}, $$
+  <p>orthogonal, as symmetry promised. <span class="m">$u_1$</span> points along the cloud at about <span class="m">$31.7^\circ$</span>.</p>
+  <p><b>Project to 1-D.</b> With <span class="m">$K = 1$</span>, each <span class="m">$z^{(n)} = u_1^\top x_c^{(n)}$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    Z = [-2.227, -1.376, 0, 1.376, 2.227]
+  </p>
+  <p><b>Scorecard.</b> Total variance is <span class="m">$\lambda_1 + \lambda_2 = 3.5$</span> (the trace of <span class="m">$\Sigma$</span>, as it must be). The kept share is <span class="m">$\lambda_1 / 3.5 \approx 97.9\%$</span>, and the reconstruction error will turn out to be exactly the discarded <span class="m">$\lambda_2 \approx 0.073$</span>. Section 4 proves that last claim; Fig 3.2 lets you check it numerically first.</p>
+</div>
+
+<div class="figure" id="fig-projrec">
+  <div class="fig-mount" data-fig="projrec"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> project and reconstruct on a live cloud. Slide <span class="m">$K$</span>: at <span class="m">$K = 0$</span> every point collapses to the mean, at <span class="m">$K = 1$</span> points drop onto the first principal axis with their residuals drawn as red segments, at <span class="m">$K = 2$</span> the reconstruction is exact. The two error readouts, mean squared residual computed from the points versus the sum of the discarded eigenvalues, agree to the last digit at every setting, which is the section-4 theorem running live.</p>
+</div>
+
+<h3>The code</h3>
+
+<p>
+The whole algorithm is a dozen lines of NumPy. Note the row-versus-column
+convention: like most Python code, this stores data points as <em>rows</em>
+of <code>X</code>, so the formulas transpose relative to the math above.
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def pca_fit(X, K):
+    # X: N x D, one data point per row
+    mean = X.mean(axis=0)
+    Xc = X - mean                          # step 1: center
+    Sigma = Xc.T @ Xc / (len(X) - 1)       # step 2: covariance, D x D
+    lam, U = np.linalg.eigh(Sigma)         # step 3: eigendecompose (symmetric)
+    order = np.argsort(lam)[::-1]          # sort eigenvalues, largest first
+    lam, U = lam[order], U[:, order]
+    return mean, U[:, :K], lam             # mean, top-K components, spectrum
+
+def project(X, mean, UK):
+    return (X - mean) @ UK                 # step 4: Z = N x K
+
+def reconstruct(Z, mean, UK):
+    return Z @ UK.T + mean                 # step 5: back to D dims, mean restored
+
+def explained_variance_ratio(lam, K):
+    return lam[:K].sum() / lam.sum()       # share of variance the top K keep</code></pre>
+
+<p>
+Do not just read it, run it. The version below executes the same
+computation on the worked dataset, and you can rerun it with either
+<span class="m">$K$</span>:
+</p>
+
+<div class="figure" id="fig-pcacode">
+  <div class="fig-mount" data-fig="pcacode"></div>
+  <p class="fig-caption"><b>Fig 3.3,</b> a live <code>pca_fit</code>. Press Run and the pipeline above executes for real on the five worked points: the printed mean, covariance, eigenvalues, components, projections, and reconstruction error match the worked example digit for digit at <span class="m">$K = 1$</span>. Switch to <span class="m">$K = 2$</span> and the error drops to zero while the explained-variance ratio hits 1.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Three data points: <span class="m">$(1, 2)$</span>, <span class="m">$(2, 3)$</span>, <span class="m">$(3, 4)$</span>. Center them, form <span class="m">$\Sigma$</span> with the <span class="m">$\frac{1}{N-1}$</span> convention, and reduce to 1-D. What do you get?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$\Sigma = \begin{bmatrix}1 & 1\\ 1 & 1\end{bmatrix}$</span>, eigenvalues <span class="m">$2$</span> and <span class="m">$0$</span>, <span class="m">$u_1 = \frac{1}{\sqrt{2}}(1,1)$</span>, projections <span class="m">$Z \approx [-1.414,\ 0,\ 1.414]$</span></button>
+    <button data-k="b"><span class="m">$\Sigma = \begin{bmatrix}2 & 2\\ 2 & 2\end{bmatrix}$</span>, eigenvalues <span class="m">$4$</span> and <span class="m">$0$</span>, <span class="m">$u_1 = (1, 1)$</span>, projections <span class="m">$Z = [-2, 0, 2]$</span></button>
+    <button data-k="c"><span class="m">$\Sigma = \begin{bmatrix}1 & 0\\ 0 & 1\end{bmatrix}$</span>, eigenvalues <span class="m">$1$</span> and <span class="m">$1$</span>, so no direction is preferred</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. The mean is <span class="m">$(2,3)$</span>, centered points <span class="m">$(-1,-1), (0,0), (1,1)$</span>, sums of squares and cross-products all equal 2, and dividing by <span class="m">$N-1 = 2$</span> gives the all-ones matrix. The data is perfectly correlated, so <span class="m">$\lambda_2 = 0$</span>: a genuinely 1-D dataset, and the 1-D projection <span class="m">$z^{(n)} = u_1^\top x_c^{(n)}$</span> loses nothing.</div>
+  <div class="quiz-fb" data-k="b">Two slips: the sums of squares (each equals 2) must be divided by <span class="m">$N - 1 = 2$</span>, and the eigenvector must be normalized to unit length before projecting, <span class="m">$\lVert u_1 \rVert = 1$</span>. Redo both and you land on option (a).</div>
+  <div class="quiz-fb" data-k="c">That would describe uncorrelated features with equal spread, a round cloud. These three points sit exactly on a line of slope 1, the most correlated a dataset can be. The off-diagonal of <span class="m">$\Sigma$</span> cannot be zero.</div>
+</div>
+
+<details class="check">
+  <summary>Check: why must the data be centered before the covariance step?</summary>
+  <div>
+    <p>Suppose you skip step 1 and compute <span class="m">$\frac{1}{N-1} X X^\top$</span> on raw data whose mean sits far from the origin. What goes wrong?</p>
+    <p><b>Answer.</b> The matrix you build is no longer the covariance; it is the matrix of second moments about the <em>origin</em>, which mixes the data's spread with its location. Its top eigenvector gets pulled toward the mean's direction: for a cloud centered at <span class="m">$(100, 100)$</span> with almost all its variance vertical, the uncentered "first component" points roughly along <span class="m">$(1,1)$</span> toward the cloud, not vertically along the spread. Centering subtracts the location so the eigenvectors answer the question we actually asked: along which directions does the data <em>vary</em>? That is what the source means by centering removing mean bias so PCA captures true spread.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 4. TWO VIEWS ═══════════════════ -->
+<section id="sec-twoviews">
+<h2><span class="secnum">4.</span> Two views of PCA</h2>
+
+<p>
+So far PCA is "keep the directions with the most variance", and you might
+reasonably ask why variance deserves the crown. Here is the principled
+justification, and it is the deepest fact in this lesson. Consider every
+possible <span class="m">$K$</span>-dimensional linear subspace you could
+project the centered data onto, and score each one by how much projecting
+and reconstructing damages the data, measured in squared
+<span class="m">$\ell_2$</span> distance. The best subspace, the one
+minimizing reconstruction error,
+</p>
+
+$$ U_K^\star = \arg\min_{U_K^\top U_K = I_K} \frac{1}{N-1}\sum_{n=1}^{N}
+   \big\lVert x_c^{(n)} - U_K U_K^\top x_c^{(n)} \big\rVert_2^2, $$
+
+<p>
+is spanned by the top <span class="m">$K$</span> eigenvectors of
+<span class="m">$\Sigma$</span>. The variance-maximizing subspace and the
+error-minimizing subspace are the same subspace. Maximizing projected
+variance and minimizing reconstruction error are the same problem.
+</p>
+
+<p>
+Why must they coincide? Pythagoras. Each centered point splits into a part
+that lies on the subspace (the reconstruction) and a part perpendicular to
+it (the residual), and the two parts are orthogonal, so
+</p>
+
+$$ \underbrace{\text{total variance}}_{\text{fixed by the data}}
+   \;=\; \underbrace{\text{variance kept on the subspace}}_{\text{maximize this}}
+   \;+\; \underbrace{\text{reconstruction error}}_{\text{or minimize this}}. $$
+
+<p>
+The total is a property of the data alone; the subspace only chooses how
+the total splits. Pushing one term up pulls the other down by exactly the
+same amount. They are one dial with two labels. Grab the dial:
+</p>
+
+<div class="figure" id="fig-duality">
+  <div class="fig-mount" data-fig="duality"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the duality, in your hand. Drag the candidate direction (or use the angle slider) and watch the two bars: variance captured along the line rises exactly as the mean squared residual falls, their sum pinned to the total variance at every angle. The maximum of one bar and the minimum of the other land at the same place, <span class="m">$u_1$</span>, and the leftover error there is <span class="m">$\lambda_2$</span>. Snap buttons take you to <span class="m">$u_1$</span> (the best direction), to <span class="m">$u_2$</span> (the worst), or to a random one.</p>
+</div>
+
+<p>
+The conservation law also hands us the exact price of truncation. Rotate
+into the eigenvector frame, where the variances along the axes are
+<span class="m">$\lambda_1, \dots, \lambda_D$</span>. Keeping the top
+<span class="m">$K$</span> axes keeps
+<span class="m">$\sum_{i \le K} \lambda_i$</span> of the variance, so what
+you lose is everything else:
+</p>
+
+$$ \operatorname{err}_K = \frac{1}{N-1}\big\lVert X_c - U_K U_K^\top X_c \big\rVert_F^2
+   = \sum_{i=K+1}^{D} \lambda_i, $$
+
+<p>
+where the Frobenius norm is just the entrywise Euclidean norm of a matrix,
+</p>
+
+$$ \lVert A \rVert_F = \sqrt{\sum_{i,j} a_{ij}^2} = \sqrt{\operatorname{tr}(A A^\top)}. $$
+
+<p>
+Read the boxed result again, because it is the workhorse of the next
+section: <strong>the reconstruction error of PCA is the sum of the
+discarded eigenvalues.</strong> No simulation needed, no test set: the
+spectrum of <span class="m">$\Sigma$</span> tells you in advance exactly
+what keeping <span class="m">$K$</span> components will cost. That is what
+Fig 3.2's two agreeing readouts were demonstrating, and it is why the worked
+example could promise an error of <span class="m">$\lambda_2 \approx 0.073$</span>
+before reconstructing anything.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why does keeping the maximum-variance directions automatically minimize reconstruction error?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Because high-variance directions are less noisy, so reconstructions from them are more accurate</button>
+    <button data-k="b">Because each point splits orthogonally into an on-subspace part and a residual, so kept variance and reconstruction error sum to the fixed total variance: maximizing one term is literally minimizing the other</button>
+    <button data-k="c">It does not in general; the two objectives only coincide for Gaussian data</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Tempting, but this smuggles in a noise model the theorem does not need. The equivalence is pure geometry: it holds for any dataset, noisy or not, Gaussian or not.</div>
+  <div class="quiz-fb" data-k="b">Right. Pythagoras plus a fixed total. The subspace cannot change how much variance exists, only how much of it lands on the subspace versus in the residuals, so the two objectives are one objective with opposite signs.</div>
+  <div class="quiz-fb" data-k="c">No distributional assumption enters anywhere: the orthogonal split of each point holds for arbitrary data. Fig 4.1's cloud is just a cloud, and the bars mirror each other at every angle regardless.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. CHOOSING K ═══════════════════ -->
+<section id="sec-choosek">
+<h2><span class="secnum">5.</span> Choosing K: the scree plot</h2>
+
+<p>
+One decision remains: how many components? The spectrum already contains
+the answer, because section 4 priced every choice: keeping
+<span class="m">$K$</span> components costs exactly
+<span class="m">$\sum_{i &gt; K} \lambda_i$</span>. So plot the sorted
+eigenvalues and look at them. That bar chart has a name, the
+<strong>scree plot</strong>, after the rubble that piles up at the foot of
+a cliff: a steep drop of big eigenvalues, then a long flat tail of small
+ones. The companion curve is <strong>cumulative explained variance</strong>,
+the running fraction <span class="m">$\sum_{i \le K} \lambda_i / \sum_i \lambda_i$</span>,
+and the standard recipe is to pick the smallest <span class="m">$K$</span>
+whose cumulative share clears a target like 90%.
+</p>
+
+<p>
+The shape of the spectrum decides how well PCA can possibly do. A spectrum
+that drops off fast is the friendly case: a few components hoard the
+variance and you keep almost everything for almost nothing. A flat spectrum
+is the hostile case: variance is spread evenly, every discarded component
+costs as much as the ones you kept, and no small <span class="m">$K$</span>
+is cheap. Compare both regimes:
+</p>
+
+<div class="figure" id="fig-scree">
+  <div class="fig-mount" data-fig="scree"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the scree plot as a decision tool. Bars are the sorted eigenvalues; the curve is cumulative explained variance; drag the orange <span class="m">$K$</span> divider (arrow keys work too) and the kept fraction, the reconstruction error, and the 90% recommendation update live. Toggle between a fast-decaying spectrum, where 3 of 10 components clear 90%, and a flat one, where reaching 90% swallows 8 of 10, computed live from the two spectra.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">After standardizing a 6-feature dataset you run PCA and get the spectrum <span class="m">$\lambda = (4.0,\ 2.0,\ 1.2,\ 0.5,\ 0.2,\ 0.1)$</span>. How many components do you need to reach 90% explained variance?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$K = 2$</span>: the first two eigenvalues are much bigger than the rest</button>
+    <button data-k="b"><span class="m">$K = 3$</span>: the total is 8.0 and <span class="m">$4.0 + 2.0 + 1.2 = 7.2$</span>, which is exactly 90%</button>
+    <button data-k="c"><span class="m">$K = 5$</span>: you must keep going until the leftover eigenvalues are individually tiny</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Check the arithmetic against the target: <span class="m">$(4.0 + 2.0)/8.0 = 75\%$</span>. "Much bigger than the rest" is the eyeball version; the cumulative ratio is the accountable version, and it says 75% is short of 90%.</div>
+  <div class="quiz-fb" data-k="b">Right. Total variance <span class="m">$= 8.0$</span>, cumulative shares are 50%, 75%, then <span class="m">$7.2/8.0 = 90\%$</span> at <span class="m">$K = 3$</span>. Equivalently, the discarded tail <span class="m">$0.5 + 0.2 + 0.1 = 0.8$</span> is 10% of the total: the same decision read from the reconstruction-error side.</div>
+    <div class="quiz-fb" data-k="c">Individually tiny is not the criterion; the cumulative share is. By <span class="m">$K = 3$</span> the kept fraction already hits the 90% target, and the remaining three components together hold only 10% of the variance.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. APPLICATIONS ═══════════════════ -->
+<section id="sec-applications">
+<h2><span class="secnum">6.</span> Applications: compress, denoise, see</h2>
+
+<p>
+Time to spend what we built. Three applications, all the same
+eigendecomposition wearing different hats.
+</p>
+
+<p>
+<strong>Visualization.</strong> The most common PCA call in practice is the
+humblest: <span class="m">$K = 2$</span>. Project any dataset onto its top
+two components and you get the best possible 2-D shadow, in the
+variance-preserving sense, of something you could not otherwise look at.
+MNIST is the standard demo: each <span class="m">$28 \times 28$</span>
+digit is a 784-dimensional point, and the 2-D PCA projection already
+scatters the ten digit classes into visible clumps. The deeper fact is the
+one from the hook: MNIST's real variation is small, and retaining 43
+components, about 5.5% of the 784 dimensions, preserves roughly 80% of the
+total variance.
+</p>
+
+<p>
+<strong>Compression.</strong> Storing <span class="m">$z$</span> instead of
+<span class="m">$x$</span> costs <span class="m">$K$</span> numbers instead
+of <span class="m">$D$</span>, plus the shared dictionary
+(<span class="m">$U_K$</span> and the mean) paid once for the whole
+dataset. The classic image recipe: split the image into
+<span class="m">$12 \times 12$</span> patches, treat each patch as a 144-D
+vector, run PCA over the patch collection, and keep the top
+<span class="m">$k$</span> coefficients per patch. Patches of natural
+images are massively redundant, so their spectrum decays fast, which
+section 5 just taught you is exactly when PCA compression is cheap.
+</p>
+
+<p>
+<strong>Denoising.</strong> This one sounds like magic until the spectrum
+explains it. Add pixel noise to an image and the noise spreads its variance
+almost evenly across <em>all</em> directions, while the signal
+concentrates its variance in the top few. Project onto the high-variance
+components, say 15 of them, and reconstruct: you keep nearly all the
+signal but only the small slice of noise that happened to land in the kept
+directions. The low-eigenvalue directions, where noise dominates signal,
+are deleted wholesale. Try both hats on the digit:
+</p>
+
+<div class="figure" id="fig-digits">
+  <div class="fig-mount" data-fig="digits"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> compression and denoising with one eigendecomposition, on the synthetic digit set from Fig 0.1. Slide <span class="m">$K$</span> to trade fidelity for size and watch detail return as components are added; the readouts price the trade in real numbers (dimensions kept, variance kept). Then switch on noise: the corrupted image goes through the same project-and-reconstruct pipeline, and at moderate <span class="m">$K$</span> the reconstruction sits visibly closer to the clean original than the noisy input does, because the discarded low-eigenvalue directions carried mostly noise. The per-pixel errors are computed live.</p>
+</div>
+
+<details class="check">
+  <summary>Check: why does the denoised image beat the noisy input it was built from?</summary>
+  <div>
+    <p>The reconstruction only ever sees the noisy image. How can its output be <em>closer</em> to the clean original than its own input?</p>
+    <p><b>Answer.</b> Because the projection throws information away, and the trick is that it throws away unequally. Write the noisy point as signal plus noise. The signal lives almost entirely in the span of the top components, learned from the dataset's structure, so <span class="m">$U_K U_K^\top$</span> passes it nearly untouched. The noise is direction-agnostic: it spreads its energy roughly evenly over all <span class="m">$D$</span> directions, so the projection keeps only about <span class="m">$K/D$</span> of it. Deleting <span class="m">$D - K$</span> directions therefore deletes almost no signal and most of the noise. The reconstruction is worse than the clean original but better than the noisy input, which is the useful inequality. The same logic said "compression": there the discarded tail was fine detail; here it is noise. What PCA cannot do is separate noise that lands <em>inside</em> the top components, which is why denoising improves the image rather than perfecting it.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. RANDOM PROJECTIONS ═══════════════════ -->
+<section id="sec-random">
+<h2><span class="secnum">7.</span> Random projections and supervised PCA</h2>
+
+<h3>The data-independent alternative</h3>
+
+<p>
+Everything so far fits the projection to the data: compute
+<span class="m">$\Sigma$</span>, eigendecompose, keep the top directions.
+Here is a provocation: what if you skipped all of that and projected onto
+<em>random</em> directions? Draw a random matrix
+<span class="m">$R \in \mathbb{R}^{d \times k}$</span> with entries
+</p>
+
+$$ r_{ij} \sim \tfrac{1}{\sqrt{k}} \, \mathcal{N}(0, 1), $$
+
+<p>
+and map <span class="m">$y = R^\top x$</span>. No covariance, no
+eigendecomposition, no pass over the data at all: simple and efficient.
+It sounds like it should be terrible, and the astonishing thing is that it
+provably is not. The <strong>Johnson-Lindenstrauss theorem</strong>: for
+<span class="m">$n$</span> points and any tolerance
+<span class="m">$0 &lt; \epsilon &lt; 1$</span>, if
+</p>
+
+$$ k \;\ge\; k_0 \;=\; 4\left(\frac{\epsilon^2}{2} - \frac{\epsilon^3}{3}\right)^{-1} \log n, $$
+
+<p>
+then a linear map such as <span class="m">$y^{(i)} = R^\top x^{(i)}$</span>
+preserves all pairwise distances to within a factor of
+<span class="m">$1 \pm \epsilon$</span>, with high probability. Sit with
+the strangeness of that bound for a second: the required
+<span class="m">$k$</span> depends on the <em>number of points</em>, only
+logarithmically, and not at all on the original dimension
+<span class="m">$d$</span>. A thousand points in a million dimensions can
+be squeezed to <span class="m">$k_0 \approx 332$</span> dimensions at
+<span class="m">$\epsilon = 0.5$</span>, and every pairwise distance
+survives to within 50%, no matter what the data looks like.
+</p>
+
+<p>
+So when does PCA still earn its keep? When the promise you need is not
+"distances roughly survive" but "the most structure survives in very few
+dimensions". The contrast is data-dependence: random projection uses
+<span class="m">$y = R^\top x$</span>, one matrix for any dataset, while
+PCA uses <span class="m">$y = U_{1:k}^\top x$</span>, a matrix fitted to
+<em>this</em> dataset's variance. At the same small
+<span class="m">$k$</span>, the fitted projection keeps more of what this
+particular dataset is doing. Feel the gap:
+</p>
+
+<div class="figure" id="fig-randproj">
+  <div class="fig-mount" data-fig="randproj"></div>
+  <p class="fig-caption"><b>Fig 7.1,</b> principal versus random, same cloud, same budget of one dimension. The top strip is the data projected onto <span class="m">$u_1$</span>; the bottom strip is a projection onto a random unit direction, redrawn on demand. The variance-kept readouts are computed live: the principal projection always captures <span class="m">$\lambda_1$</span>, the best possible, while the random one lands anywhere between <span class="m">$\lambda_2$</span> and <span class="m">$\lambda_1$</span> depending on the draw. Random projection's real defence is the Johnson-Lindenstrauss regime: many points, moderate <span class="m">$k$</span>, and no time or memory to fit anything.</p>
+</div>
+
+<h3>Supervised PCA</h3>
+
+<p>
+One more variant closes the survey. Standard PCA is
+<strong>unsupervised</strong>: it looks only at <span class="m">$X$</span>
+and preserves its variance, labels never consulted. That can backfire when
+the direction that varies most is not the direction that <em>matters</em>:
+imagine classifying tumours where the dominant variance in the features is
+patient age, while the diagnostic signal hides in a lower-variance
+direction. PCA would happily rank the age direction first, because variance
+is its only value system. <strong>Supervised PCA</strong> fixes the value
+system: it folds the target <span class="m">$Y$</span> into the reduction
+and seeks components that both explain variance in the predictors
+<span class="m">$X$</span> and help predict <span class="m">$Y$</span>.
+Same spirit, label-aware criterion.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">What is the essential difference between PCA and random projection as dimensionality reducers?</p>
+  <div class="quiz-opts">
+    <button data-k="a">PCA is linear while random projection is nonlinear</button>
+    <button data-k="b">Random projection preserves variance better, but PCA is faster to compute</button>
+    <button data-k="c">PCA is data-dependent (<span class="m">$y = U_{1:k}^\top x$</span>, fitted to this dataset's covariance), while random projection is data-independent (<span class="m">$y = R^\top x$</span>, drawn without looking at the data) and backs its distance preservation with the Johnson-Lindenstrauss guarantee</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Both are linear maps, a matrix multiply each. The difference is where the matrix comes from: an eigendecomposition of this data, or a random draw that never sees it.</div>
+  <div class="quiz-fb" data-k="b">Both halves are backwards. PCA is the variance-optimal linear projection by the section-4 theorem, and random projection is the cheap one: no covariance, no eigendecomposition, just sampling.</div>
+  <div class="quiz-fb" data-k="c">Right. Fitted versus drawn. You pay for PCA's optimality with a pass over the data and an <span class="m">$O(d^3)$</span> eigendecomposition; you pay for random projection's speed with a <span class="m">$k$</span> that must grow like <span class="m">$\log n / \epsilon^2$</span> to make the JL guarantee hold.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 8. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">8.</span> Summary and method card</h2>
+
+<p>
+One idea carried the lesson: high-dimensional data usually has few real
+degrees of variation, and the covariance matrix knows where they are. Its
+eigenvectors are the principal directions, its eigenvalues price each
+direction in variance, and PCA is just the disciplined use of that fact:
+center, form <span class="m">$\Sigma$</span>, eigendecompose, keep the top
+<span class="m">$K$</span>, project, reconstruct. The two ways of wanting
+this, keep the most variance or lose the least reconstruction accuracy,
+turned out to be one objective, and the leftover error is exactly the sum
+of the discarded eigenvalues, so the scree plot lets you buy
+<span class="m">$K$</span> with your eyes open. The same decomposition
+compresses, denoises, and draws 2-D maps; random projection undercuts it
+on cost when Johnson-Lindenstrauss distance preservation is all you need;
+supervised PCA patches its label-blindness.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Principal Component Analysis</div>
+  <table>
+    <tr><th>Assumption</th><td>The interesting structure lives in a few high-variance linear directions, and variation carries relevant information.</td></tr>
+    <tr><th>Model class</th><td>An orthonormal linear projection onto the top eigenvectors of the data covariance matrix.</td></tr>
+    <tr><th>Learning / selection</th><td>Center the data, eigendecompose the covariance, keep the top <span class="m">$K$</span> components, with <span class="m">$K$</span> chosen via the scree plot / explained variance.</td></tr>
+    <tr><th>Prediction</th><td>Encode <span class="m">$z = U_K^\top (x - \bar{x})$</span>; reconstruct <span class="m">$\tilde{x} = U_K z + \bar{x}$</span>; error is the sum of discarded eigenvalues.</td></tr>
+    <tr><th>Strengths</th><td>Simple, closed-form, decorrelating, and optimal (minimum reconstruction error) among linear subspaces; enables compression, denoising, and visualization.</td></tr>
+    <tr><th>Limitations</th><td>Only linear structure; sensitive to feature scaling (standardize first); variance is not always the same as usefulness for a downstream label.</td></tr>
+    <tr><th>Next step</th><td>Nonlinear dimensionality reduction with autoencoders.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: the Gaussian Bayes lesson taught you
+to read a covariance matrix; this lesson taught you to <em>spend</em> one.
+And the limitation line above is a loaded gun. PCA can only flatten data
+onto a linear subspace, but plenty of real data lies on curved sheets, a
+spiral, a swiss roll, the manifold of face images. Rotating axes cannot
+unroll a curve. The fix is to let the encoder and decoder be neural
+networks instead of matrices, learn the compression with gradient descent,
+and that is the next lesson: autoencoders, PCA's nonlinear successor.
+</p>
+</section>
+
+<!-- ═══════════════════ 9. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">9.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then four transfer questions that ask you to reason with
+the machinery, not recall it. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">In one pass: what are the five steps of PCA, in order?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Normalize, correlate, invert the covariance, project, classify</button>
+    <button data-k="b">Center the data, form the covariance matrix, eigendecompose it, project onto the top <span class="m">$K$</span> eigenvectors, reconstruct by mapping back and restoring the mean</button>
+    <button data-k="c">Eigendecompose the raw data matrix, sort the rows, keep the top <span class="m">$K$</span> rows, transpose, add noise</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Inverting the covariance is the Gaussian-classifier move (it appears inside the likelihood), not the PCA move. PCA eigendecomposes <span class="m">$\Sigma$</span>, and nothing here classifies.</div>
+  <div class="quiz-fb" data-k="b">Right. Center, covariance, eigendecompose, project, reconstruct: <span class="m">$z = U_K^\top x_c$</span> forward, <span class="m">$\tilde{x} = U_K z + \bar{x}$</span> back.</div>
+  <div class="quiz-fb" data-k="c">Eigendecomposition applies to the square, symmetric covariance matrix, not to the <span class="m">$D \times N$</span> data matrix itself, and no step of PCA adds noise.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2 &middot; coding</div>
+  <p class="quiz-q">A teammate's <code>explained_variance_ratio(lam, K)</code> must return the fraction of total variance kept by the top <span class="m">$K$</span> components, given the sorted eigenvalue array <code>lam</code>. Which body is correct?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><code>return lam[:K].sum() / lam.sum()</code></button>
+    <button data-k="b"><code>return lam[:K].sum() / len(lam)</code></button>
+    <button data-k="c"><code>return lam[K] / lam[0]</code></button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. Kept variance over total variance, <span class="m">$\sum_{i \le K} \lambda_i / \sum_i \lambda_i$</span>. On the worked example with <span class="m">$K = 1$</span>: <span class="m">$3.427 / 3.5 \approx 0.979$</span>.</div>
+  <div class="quiz-fb" data-k="b">Dividing by the number of eigenvalues gives the average kept eigenvalue, not a fraction of variance; it is not even guaranteed to be at most 1. The denominator must be the total variance <code>lam.sum()</code>.</div>
+  <div class="quiz-fb" data-k="c">That compares one eigenvalue to the largest one, a decay ratio, useful for eyeballing the spectrum's slope but not the cumulative share the function promises.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): why standardize features before PCA?</summary>
+  <div>
+    <p>You run PCA on medical records with height in metres (variance about 0.01) and annual income in dollars (variance about <span class="m">$10^8$</span>). What goes wrong, and what is the fix?</p>
+    <p><b>Answer.</b> PCA's only value system is variance, and variance carries units. Income's variance is ten billion times height's purely because dollars are small units and metres are large ones, so <span class="m">$u_1$</span> will point almost exactly along income and the explained-variance ratio will announce that one component captures nearly everything. True, and useless: the ranking reflects the choice of units, not the structure of the data. Rescale height to centimetres and the "important direction" changes, which no honest analysis should allow. The fix is to standardize first, divide each centered feature by its standard deviation, so every feature enters with variance 1 and components are ranked by shared structure (correlation) rather than by unit size. This is exactly why the method card lists scale sensitivity as a limitation, and why the assignment-style workflow in section 5's quiz standardizes before computing the spectrum. The exception that proves the rule: if the features share meaningful units, like the pixel intensities of Fig 6.1, raw covariance is fine, because there the variance differences are real signal, not unit artifacts.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): why does PCA denoise?</summary>
+  <div>
+    <p>Explain, using the eigenvalue spectrum, why projecting a noisy image onto its top principal components and reconstructing removes much of the noise. What kind of noise defeats this?</p>
+    <p><b>Answer.</b> Decompose the noisy data as signal plus noise and ask where each puts its variance. The signal is structured: its variance concentrates in a few directions, the top of the spectrum. Isotropic pixel noise is unstructured: it spreads variance evenly across all <span class="m">$D$</span> directions, adding a thin layer to every eigenvalue. So in the top-<span class="m">$K$</span> subspace the ratio of signal to noise is high, and in the discarded <span class="m">$D - K$</span> directions it is dreadful, mostly noise with a whisper of signal. Projecting keeps the good subspace wholesale and deletes the bad one wholesale: nearly all signal survives, only about <span class="m">$K/D$</span> of the noise does. That is the Fig 6.1 effect, and the source's recipe of keeping around 15 high-variance components is this argument with a number attached. What defeats it: noise that is itself structured along the top components (then deleting directions cannot separate the two), or signal whose fine detail genuinely lives in the low-variance tail, which gets deleted along with the noise, the smoothing you see at very small <span class="m">$K$</span>.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): when is a random projection the better tool?</summary>
+  <div>
+    <p>You must reduce 10-million-point, 100,000-dimensional web-scale feature vectors before a nearest-neighbour search, on a deadline, on one machine. Argue for random projection over PCA here, and name what you give up.</p>
+    <p><b>Answer.</b> Count PCA's costs at this scale: forming <span class="m">$\Sigma$</span> is a <span class="m">$100{,}000 \times 100{,}000$</span> matrix built from a full pass over ten million points, and eigendecomposition costs on the order of <span class="m">$d^3 = 10^{15}$</span> operations, neither of which fits the deadline or the machine. Random projection needs no pass over the data at all: draw <span class="m">$R$</span> with entries <span class="m">$\frac{1}{\sqrt{k}}\mathcal{N}(0,1)$</span> and multiply. And the task is nearest-neighbour search, whose currency is pairwise distances, which is precisely what Johnson-Lindenstrauss guarantees: with <span class="m">$k \ge 4(\epsilon^2/2 - \epsilon^3/3)^{-1} \log n$</span>, distances survive to <span class="m">$1 \pm \epsilon$</span> with high probability, and the bound grows only with <span class="m">$\log n$</span>, independent of the 100,000 input dimensions. What you give up: optimality and interpretability. At equal <span class="m">$k$</span> a fitted PCA basis would keep more variance (Fig 7.1's gap), the random axes mean nothing individually, and <span class="m">$k_0$</span> can be large when <span class="m">$\epsilon$</span> is small. Here the trade is obviously right: the guarantee you need is the one random projection sells, at a price you can actually pay.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 6 (transfer): where PCA hits its ceiling, and what comes next</summary>
+  <div>
+    <p>A dataset of 2-D points lies on a tight spiral winding three times around the origin: essentially 1-D data, a single coordinate (arc length along the spiral) describes every point. What does PCA do with it, and how could a nonlinear method beat PCA here?</p>
+    <p><b>Answer.</b> PCA fails honourably. The spiral winds symmetrically around the origin, so the cloud's covariance is nearly round: <span class="m">$\lambda_1 \approx \lambda_2$</span>, the scree plot is flat, and section 5's own diagnostic announces that no 1-D <em>linear</em> projection is cheap. Any single direction PCA picks collapses different arms of the spiral onto the same coordinates, and the 1-D reconstruction error is huge. The failure is baked into the model class: PCA can only rotate axes and flatten onto a linear subspace, and no rotation unrolls a curve. But the data <em>is</em> 1-D, just 1-D along a curved coordinate. A nonlinear method can learn that coordinate: an autoencoder replaces the encode matrix <span class="m">$U_K^\top$</span> and decode matrix <span class="m">$U_K$</span> with neural networks, whose interleaved nonlinearities (section 2's point about what single matrices cannot do) let the decoder bend its 1-D latent line back into a spiral. Same encode-compress-decode-reconstruct template, same reconstruction-error objective, curved subspaces now reachable. That is the next lesson, and this spiral is the picture to carry into it.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is PCA. The covariance matrix you learned to read in the Gaussian lesson turned out to contain a complete instruction manual for compressing its own dataset: eigenvectors say which directions matter, eigenvalues say by how much, and the discarded tail prices the loss before you pay it. One rotation buys decorrelation, compression, denoising, and a way to see high-dimensional data at all. What it cannot buy is a curve, so next lesson the matrices become networks, and the subspace learns to bend.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../gaussian-bayes/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 17: Gaussian Bayes Models</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../autoencoders/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 19: Autoencoders &amp; VAEs</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; Lecture 18 &middot; Principal Component Analysis</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>
