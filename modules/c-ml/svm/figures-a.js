@@ -321,14 +321,14 @@
 
       // points
       pts.forEach(function (p) {
-        LR.dot(ctx, sx(p.x), sy(p.y), 5.5, T_COLOR[p.t], "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), 5.5, T_COLOR[p.t], "#ffffff");
       });
 
       // endpoint handles + labels
       infos.forEach(function (o) {
         const L = o.L;
         [L.p1, L.p2].forEach(function (e) {
-          LR.dot(ctx, sx(e.x), sy(e.y), 6, "#fff", L.color);
+          LR.dot(ctx, sx(e.x), sy(e.y), 6, "#ffffff", L.color);
         });
         ctx.font = "800 13px Inter, sans-serif";
         ctx.fillStyle = L.color;
@@ -397,7 +397,7 @@
 
       ctx.save();
       ctx.beginPath(); ctx.rect(P.x0, P.y0, P.w, P.h); ctx.clip();
-      shadeBand(ctx, SC, w, b, -1, 1, P, "rgba(232,89,12,0.08)");
+      shadeBand(ctx, SC, w, b, -1, 1, P, "rgba(26,26,26,0.08)");
       strokeLevel(ctx, SC, w, b, 0, P, C.orange, 2.8);
       strokeLevel(ctx, SC, w, b, 1, P, C.green, 2, [7, 5]);
       strokeLevel(ctx, SC, w, b, -1, P, C.purple, 2, [7, 5]);
@@ -577,7 +577,7 @@
       if (mode === "manual") {
         const L = manualLine();
         if (L.m > 0) {
-          shadeBand(ctx, SC, L.n, L.b, -L.m, L.m, P, "rgba(232,89,12,0.07)");
+          shadeBand(ctx, SC, L.n, L.b, -L.m, L.m, P, "rgba(26,26,26,0.07)");
           strokeLevel(ctx, SC, L.n, L.b, L.m, P, C.faint, 1.6, [6, 5]);
           strokeLevel(ctx, SC, L.n, L.b, -L.m, P, C.faint, 1.6, [6, 5]);
           pts.forEach(function (p, i) {
@@ -589,7 +589,7 @@
         ro.set("norm", "drag, or press Solve");
         ro.set("sv", L.m > 0 ? "ringed: the point(s) limiting you" : "–");
       } else if (fit) {
-        shadeBand(ctx, SC, fit.w, fit.b, -1, 1, P, "rgba(232,89,12,0.08)");
+        shadeBand(ctx, SC, fit.w, fit.b, -1, 1, P, "rgba(26,26,26,0.08)");
         strokeLevel(ctx, SC, fit.w, fit.b, 1, P, C.green, 1.8, [7, 5]);
         strokeLevel(ctx, SC, fit.w, fit.b, -1, P, C.purple, 1.8, [7, 5]);
         strokeLevel(ctx, SC, fit.w, fit.b, 0, P, C.orange, 2.8);
@@ -598,7 +598,7 @@
         ro.set("norm", LR.fmtF(S.norm(fit.w), 3));
         ro.set("sv", fit.sv.length + " of " + pts.length + " points", C.green);
       } else if (lastFit) {
-        strokeLevel(ctx, SC, lastFit.w, lastFit.b, 0, P, "#bbb", 2, [4, 4]);
+        strokeLevel(ctx, SC, lastFit.w, lastFit.b, 0, P, "#bbbbbb", 2, [4, 4]);
         ro.set("margin", "not separable", C.red);
         ro.set("norm", "–");
         ro.set("sv", "–");
@@ -608,7 +608,7 @@
       // data points (rings mark support vectors / limiting points)
       pts.forEach(function (p, i) {
         const ringed = svSet.has(i);
-        LR.dot(ctx, sx(p.x), sy(p.y), ringed ? 7.5 : 5.5, T_COLOR[p.t], ringed ? C.orange : "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), ringed ? 7.5 : 5.5, T_COLOR[p.t], ringed ? C.orange : "#ffffff");
         if (ringed) {
           ctx.beginPath();
           ctx.arc(sx(p.x), sy(p.y), 11, 0, Math.PI * 2);
@@ -623,9 +623,9 @@
         const rh = rotHandle();
         ctx.fillStyle = C.orange;
         ctx.fillRect(sx(cp.x) - 6, sy(cp.y) - 6, 12, 12);
-        ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5;
         ctx.strokeRect(sx(cp.x) - 6, sy(cp.y) - 6, 12, 12);
-        LR.dot(ctx, sx(rh.x), sy(rh.y), 7, "#fff", C.orange);
+        LR.dot(ctx, sx(rh.x), sy(rh.y), 7, "#ffffff", C.orange);
         ctx.font = "600 11.5px Inter, sans-serif";
         ctx.fillStyle = C.muted; ctx.textAlign = "left";
         ctx.fillText("slide", sx(cp.x) + 10, sy(cp.y) + 4);
@@ -682,10 +682,10 @@
 
     const legend = LR.el("div", "legend-row");
     legend.innerHTML =
-      "<span class='legend-chip'><span class='swatch' style='background:#fff;border-color:#999'></span>ξ = 0 (outside, correct)</span>" +
-      "<span class='legend-chip'><span class='swatch' style='background:#fff;border-color:" + C.orange + "'></span>on the margin</span>" +
-      "<span class='legend-chip'><span class='swatch' style='background:#fff;border-color:" + C.amber + "'></span>0 &lt; ξ &lt; 1 (inside, correct)</span>" +
-      "<span class='legend-chip'><span class='swatch' style='background:#fff;border-color:" + C.red + "'></span>ξ &gt; 1 (misclassified)</span>";
+      "<span class='legend-chip'><span class='swatch' style='background:#ffffff;border-color:#999999'></span>ξ = 0 (outside, correct)</span>" +
+      "<span class='legend-chip'><span class='swatch' style='background:#ffffff;border-color:" + C.orange + "'></span>on the margin</span>" +
+      "<span class='legend-chip'><span class='swatch' style='background:#ffffff;border-color:" + C.amber + "'></span>0 &lt; ξ &lt; 1 (inside, correct)</span>" +
+      "<span class='legend-chip'><span class='swatch' style='background:#ffffff;border-color:" + C.red + "'></span>ξ &gt; 1 (misclassified)</span>";
     mount.appendChild(legend);
 
     const ro = LR.readout(mount, [
@@ -700,7 +700,7 @@
 
     function regimeRing(tz, xi) {
       if (Math.abs(tz - 1) <= 0.05) return C.orange;   // on the margin
-      if (xi <= 0.02) return "#fff";                    // comfortably outside
+      if (xi <= 0.02) return "#ffffff";                    // comfortably outside
       if (xi > 1.02) return C.red;                      // misclassified
       if (Math.abs(xi - 1) <= 0.02) return C.text;      // on the boundary itself
       return C.amber;                                   // inside the margin, correct
@@ -714,7 +714,7 @@
 
       ctx.save();
       ctx.beginPath(); ctx.rect(P.x0, P.y0, P.w, P.h); ctx.clip();
-      shadeBand(ctx, SC, w, b, -1, 1, P, "rgba(232,89,12,0.07)");
+      shadeBand(ctx, SC, w, b, -1, 1, P, "rgba(26,26,26,0.07)");
       strokeLevel(ctx, SC, w, b, 1, P, C.faint, 1.6, [7, 5]);
       strokeLevel(ctx, SC, w, b, -1, P, C.faint, 1.6, [7, 5]);
       strokeLevel(ctx, SC, w, b, 0, P, C.orange, 2.7);
@@ -727,8 +727,8 @@
         sumXi += xi;
         if (tz < 0) errors++;
         const ring = regimeRing(tz, xi);
-        LR.dot(ctx, sx(p.x), sy(p.y), ring === "#fff" ? 5.5 : 6.5, T_COLOR[p.t], ring);
-        if (ring !== "#fff") {
+        LR.dot(ctx, sx(p.x), sy(p.y), ring === "#ffffff" ? 5.5 : 6.5, T_COLOR[p.t], ring);
+        if (ring !== "#ffffff") {
           ctx.beginPath();
           ctx.arc(sx(p.x), sy(p.y), 10, 0, Math.PI * 2);
           ctx.strokeStyle = ring;

@@ -76,7 +76,7 @@ numbers, which are computed from the actual darts:
 
 <div class="figure" id="fig-dartboard">
   <div class="fig-mount" data-fig="dartboard"></div>
-  <p class="fig-caption"><b>Fig 0.1,</b> the two axes of error. Each throw scatters twelve darts per board from that board's aim and shake settings. The purple dot is the dart centroid, the average prediction: its distance from the bullseye is the bias, and the spread around it is the variance. Note that you cannot tell the two apart from a single dart.</p>
+  <p class="fig-caption"><b>Fig 0.1,</b> the two axes of error. Each throw scatters twelve darts per board from that board's aim and shake settings. The pale grey dot is the dart centroid, the average prediction: its distance from the bullseye is the bias, and the spread around it is the variance. Note that you cannot tell the two apart from a single dart.</p>
 </div>
 
 <p>
@@ -211,7 +211,7 @@ decomposition for real. Before it shows you the total, commit to a guess:
 
 <div class="figure" id="fig-decomp">
   <div class="fig-mount" data-fig="decomp"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the decomposition, measured. Bias² (green) falls as the model gains capacity; variance (purple) rises as it gains sensitivity; the Bayes floor <span class="m">$\sigma^2 = 0.0625$</span> never moves. Click the degree you would ship. Only then does the orange total appear, with the computed sweet spot where the falling and rising curves trade places.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the decomposition, measured. Bias² (darker grey) falls as the model gains capacity; variance (paler grey) rises as it gains sensitivity; the Bayes floor <span class="m">$\sigma^2 = 0.0625$</span> never moves. Click the degree you would ship. Only then does the black total-error curve appear, with the computed sweet spot where the falling and rising curves trade places.</p>
 </div>
 
 <div class="quiz" data-correct="b">
@@ -224,7 +224,7 @@ decomposition for real. Before it shows you the total, commit to a guess:
   </div>
   <div class="quiz-fb" data-k="a">Backwards on the first two. A constant cannot bend toward the truth no matter the sample, so its error is systematic (bias); a degree-9 fit bends to every accident of the sample, so its error is instability (variance).</div>
   <div class="quiz-fb" data-k="b">Right. Too-simple means restrictive, which is bias² and underfitting; too-flexible means sample-sensitive, which is variance and overfitting; and <span class="m">$\operatorname{Var}(t\mid x)$</span> comes from the target itself, so no model, and no amount of data, removes it.</div>
-  <div class="quiz-fb" data-k="c">Check Fig 2.1: the green and purple curves are dramatically different at the two ends. Bayes error is the one term that is identical for every model, not the one that differs.</div>
+  <div class="quiz-fb" data-k="c">Check Fig 2.1: the bias and variance curves are dramatically different at the two ends. Bayes error is the one term that is identical for every model, not the one that differs.</div>
 </div>
 
 <details class="check">
@@ -373,7 +373,7 @@ building many independent bags and watching their answers disagree:
 
 <div class="figure" id="fig-bagging">
   <div class="fig-mount" data-fig="bagging"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> bagging, live. At <span class="m">$m = 1$</span> the boundary is one tree's jagged guess, and the variance at the &times; probe is large. Slide <span class="m">$m$</span> up: the faint single-tree boundaries keep wobbling, the orange averaged boundary settles, and the measured variance falls, tracking (but not quite reaching) the <span class="m">$\operatorname{Var}/m$</span> benchmark because bootstrap trees are correlated. The mean prediction readout barely moves: bias stays put.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> bagging, live. At <span class="m">$m = 1$</span> the boundary is one tree's jagged guess, and the variance at the &times; probe is large. Slide <span class="m">$m$</span> up: the faint single-tree boundaries keep wobbling, the black averaged boundary settles, and the measured variance falls, tracking (but not quite reaching) the <span class="m">$\operatorname{Var}/m$</span> benchmark because bootstrap trees are correlated. The mean prediction readout barely moves: bias stays put.</p>
 </div>
 
 <p>
@@ -553,7 +553,7 @@ best available stump on the current weights:
 
 <div class="figure" id="fig-adaboost">
   <div class="fig-mount" data-fig="adaboost"></div>
-  <p class="fig-caption"><b>Fig 5.1,</b> AdaBoost round by round. Dot area is the current weight. Step: the round's best stump appears dashed, its <span class="m">$\epsilon_m$</span> and <span class="m">$\alpha_m$</span> are computed in the log, its mistakes get red rings and swell by <span class="m">$e^{\alpha_m}$</span>, and the shaded weighted-vote boundary bends. Single stumps can only draw one straight line each, yet the ensemble carves a staircase around a diagonal problem.</p>
+  <p class="fig-caption"><b>Fig 5.1,</b> AdaBoost round by round. Dot area is the current weight. Step: the round's best stump appears dashed, its <span class="m">$\epsilon_m$</span> and <span class="m">$\alpha_m$</span> are computed in the log, its mistakes get dark rings and swell by <span class="m">$e^{\alpha_m}$</span>, and the shaded weighted-vote boundary bends. Single stumps can only draw one straight line each, yet the ensemble carves a staircase around a diagonal problem.</p>
 </div>
 
 <p>
@@ -643,7 +643,7 @@ sum of all the small corrections becomes an accurate model:
 
 <div class="figure" id="fig-gradboost">
   <div class="fig-mount" data-fig="gradboost"></div>
-  <p class="fig-caption"><b>Fig 5.3,</b> gradient boosting on 1-D regression. Top: the running model <span class="m">$F_m$</span>, which begins as the flat mean of the targets. Bottom: the current residuals <span class="m">$t - F_{m-1}$</span> in red and the real stump fitted to them in purple, added at strength <span class="m">$\eta$</span> on each Step. Lower <span class="m">$\eta$</span> takes smaller, safer steps and needs more rounds.</p>
+  <p class="fig-caption"><b>Fig 5.3,</b> gradient boosting on 1-D regression. Top: the running model <span class="m">$F_m$</span>, which begins as the flat mean of the targets. Bottom: the current residuals <span class="m">$t - F_{m-1}$</span> in dark grey and the real stump fitted to them in light grey, added at strength <span class="m">$\eta$</span> on each Step. Lower <span class="m">$\eta$</span> takes smaller, safer steps and needs more rounds.</p>
 </div>
 
 <pre class="code" data-lang="python"><code>def gradient_boost(X, t, M, eta):

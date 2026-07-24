@@ -39,9 +39,9 @@
     ramp: function (v) {
       // v in [0,1] → white → orange
       const t = Math.max(0, Math.min(1, v));
-      const r = Math.round(255 + (232 - 255) * t);
-      const g = Math.round(255 + (89 - 255) * t);
-      const b = Math.round(255 + (12 - 255) * t);
+      const r = Math.round(255 + (26 - 255) * t);
+      const g = Math.round(255 + (26 - 255) * t);
+      const b = Math.round(255 + (26 - 255) * t);
       return "rgb(" + r + "," + g + "," + b + ")";
     },
     rampSigned: function (v, vmax) {
@@ -49,16 +49,16 @@
       const t = Math.max(-1, Math.min(1, v / (vmax || 1)));
       if (t >= 0) return AE.ramp(t);
       const u = -t;
-      const r = Math.round(255 + (112 - 255) * u);
-      const g = Math.round(255 + (72 - 255) * u);
-      const b = Math.round(255 + (232 - 255) * u);
+      const r = Math.round(255 + (150 - 255) * u);
+      const g = Math.round(255 + (150 - 255) * u);
+      const b = Math.round(255 + (150 - 255) * u);
       return "rgb(" + r + "," + g + "," + b + ")";
     },
     txtOn: function (bg) {
       const m = bg.match(/(\d+),(\d+),(\d+)/);
-      if (!m) return "#111";
+      if (!m) return "#111111";
       const lum = 0.299 * +m[1] + 0.587 * +m[2] + 0.114 * +m[3];
-      return lum > 150 ? "#111" : "#fff";
+      return lum > 150 ? "#111111" : "#ffffff";
     },
 
     /* ── matrix table renderer (same conventions as the series) ── */
@@ -265,7 +265,7 @@
     drawGlyph: function (ctx, img, x0, y0, size, opts) {
       opts = opts || {};
       const G = AE.G, cell = size / G;
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(x0, y0, size, size);
       for (let i = 0; i < G; i++)
         for (let j = 0; j < G; j++) {
@@ -397,7 +397,7 @@
         ys[l].forEach(function (y1) {
           ys[l + 1].forEach(function (y2) {
             const mid = (layers[l].x + layers[l + 1].x) / 2;
-            ctx.strokeStyle = l < 2 ? "rgba(232,89,12,0.15)" : "rgba(47,158,68,0.15)";
+            ctx.strokeStyle = l < 2 ? "rgba(26,26,26,0.15)" : "rgba(102,102,102,0.15)";
             ctx.beginPath();
             ctx.moveTo(layers[l].x, y1);
             ctx.bezierCurveTo(mid, y1, mid, y2, layers[l + 1].x, y2);
@@ -424,7 +424,7 @@
       layers.forEach(function (L, l) {
         ys[l].forEach(function (y) {
           const isLatent = l === 2;
-          LR.dot(ctx, L.x, y, isLatent ? 9 : 6.5, isLatent ? C.purple : "#fff", isLatent ? C.purple : "#444");
+          LR.dot(ctx, L.x, y, isLatent ? 9 : 6.5, isLatent ? C.purple : "#ffffff", isLatent ? C.purple : "#444444");
         });
         ctx.fillStyle = l === 2 ? C.purple : C.text;
         ctx.font = "700 12.5px Inter, sans-serif";
@@ -450,7 +450,7 @@
     }
 
     function miniSignal(x0, y0, w, h, series, label) {
-      ctx.strokeStyle = "#ddd";
+      ctx.strokeStyle = "#dddddd";
       ctx.lineWidth = 1;
       ctx.strokeRect(x0, y0, w, h);
       ctx.fillStyle = LR.C.muted;
@@ -637,7 +637,7 @@
       pts.forEach(function (p) {
         const z = wd[0] * p[0] + wd[1] * p[1];
         const rx = vd[0] * z, ry = vd[1] * z;
-        ctx.strokeStyle = "rgba(224,49,49,0.35)";
+        ctx.strokeStyle = "rgba(61,61,61,0.35)";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(sx(p[0]), sy(p[1]));
@@ -647,7 +647,7 @@
       pts.forEach((p) => LR.dot(ctx, sx(p[0]), sy(p[1]), 3.4, C.text));
       pts.forEach(function (p) {
         const z = wd[0] * p[0] + wd[1] * p[1];
-        LR.dot(ctx, sx(vd[0] * z), sy(vd[1] * z), 2.8, "#fff", C.orange);
+        LR.dot(ctx, sx(vd[0] * z), sy(vd[1] * z), 2.8, "#ffffff", C.orange);
       });
 
       ctx.font = "700 11.5px Inter, sans-serif";
@@ -796,7 +796,7 @@
       // residuals for the flat model
       ctx.lineWidth = 1;
       if (view === 0 || view === 2) {
-        ctx.strokeStyle = "rgba(224,49,49,0.4)";
+        ctx.strokeStyle = "rgba(61,61,61,0.4)";
         pts.forEach(function (p, i) {
           ctx.beginPath();
           ctx.moveTo(sx(p[0]), sy(p[1]));
@@ -835,7 +835,7 @@
       pts.forEach((p) => LR.dot(ctx, sx(p[0]), sy(p[1]), 3.6, C.text));
       if (view === 1 || view === 2) {
         pts.forEach(function (p, i) {
-          LR.dot(ctx, sx(curvRec[i][0]), sy(curvRec[i][1]), 2.6, "#fff", C.orange);
+          LR.dot(ctx, sx(curvRec[i][0]), sy(curvRec[i][1]), 2.6, "#ffffff", C.orange);
         });
       }
 
@@ -941,7 +941,7 @@
         ctx.setLineDash([]);
       }
       // noisy as dots + faint line
-      ctx.strokeStyle = "rgba(224,49,49,0.35)";
+      ctx.strokeStyle = "rgba(61,61,61,0.35)";
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       noisy.forEach(function (val, j) {
@@ -950,13 +950,13 @@
       });
       ctx.stroke();
       noisy.forEach((val, j) => LR.dot(ctx, sx(ts[j]), sy(val), 2.4, C.red));
-      curve(clean.v, "#bbb", 2, [6, 5]);
+      curve(clean.v, "#bbbbbb", 2, [6, 5]);
       curve(den, C.orange, 2.6);
 
       ctx.font = "700 11.5px Inter, sans-serif";
       ctx.textAlign = "left";
       ctx.fillStyle = C.red; ctx.fillText("x̃ (corrupted input)", Pl.x0 + 10, Pl.y0 + 16);
-      ctx.fillStyle = "#999"; ctx.fillText("x (clean, hidden from the model)", Pl.x0 + 10, Pl.y0 + 32);
+      ctx.fillStyle = "#999999"; ctx.fillText("x (clean, hidden from the model)", Pl.x0 + 10, Pl.y0 + 32);
       ctx.fillStyle = C.orange; ctx.fillText("denoiser output", Pl.x0 + 10, Pl.y0 + 48);
 
       const eN = mse(noisy, clean.v), eD = mse(den, clean.v);
@@ -1071,7 +1071,7 @@
       // right: reconstruction
       const Rp = { x0: 420, y0: 16, w: W - 450, h: H - 70, xmin: 0, xmax: 1, ymin: -0.2, ymax: 1.1, xlabel: "t", ylabel: "signal" };
       const pr = LR.plot(ctx, Rp);
-      ctx.strokeStyle = "#bbb";
+      ctx.strokeStyle = "#bbbbbb";
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 5]);
       ctx.beginPath();
@@ -1091,7 +1091,7 @@
       ctx.stroke();
       ctx.font = "700 11.5px Inter, sans-serif";
       ctx.textAlign = "left";
-      ctx.fillStyle = "#999"; ctx.fillText("target x", Rp.x0 + 8, Rp.y0 + 16);
+      ctx.fillStyle = "#999999"; ctx.fillText("target x", Rp.x0 + 8, Rp.y0 + 16);
       ctx.fillStyle = C.orange; ctx.fillText("reconstruction W_g z", Rp.x0 + 8, Rp.y0 + 32);
 
       ro.set("nz", nz + " of " + K, nz <= 3 ? C.green : C.amber);

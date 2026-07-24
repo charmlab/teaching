@@ -33,7 +33,7 @@
   });
 
   const CLS_COLOR = { A: C.green, B: C.purple, C: C.amber };
-  const CLS_SOFT = { A: "rgba(47,158,68,0.16)", B: "rgba(112,72,232,0.14)", C: "rgba(240,162,2,0.16)" };
+  const CLS_SOFT = { A: "rgba(102,102,102,0.16)", B: "rgba(150,150,150,0.14)", C: "rgba(173,173,173,0.16)" };
 
   /* ════════════════════════════════════════════════════════════
      Fig 0.1 — the hook: similar things, similar labels
@@ -96,13 +96,13 @@
       // training fruits
       pts.forEach(function (p) {
         const r = p === nn.p ? 9 : 6;
-        LR.dot(ctx, sx(p.x), sy(p.y), r, CLS_COLOR[p.cls], p === nn.p ? C.orange : "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), r, CLS_COLOR[p.cls], p === nn.p ? C.orange : "#ffffff");
       });
 
       // mystery fruit: takes on the copied colour, keeps a "?"
       LR.dot(ctx, sx(q.x), sy(q.y), 11, CLS_COLOR[nn.p.cls], C.orange);
       ctx.font = "800 13px Inter, sans-serif";
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.fillText("?", sx(q.x), sy(q.y) + 4.5);
 
@@ -384,7 +384,7 @@
 
       // the "ball" of the selected metric, centred at A, through B
       ctx.strokeStyle = C.orange;
-      ctx.fillStyle = "rgba(232,89,12,0.07)";
+      ctx.fillStyle = "rgba(26,26,26,0.07)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       if (metric === "L2") {
@@ -421,8 +421,8 @@
       ctx.restore();
 
       // points
-      LR.dot(ctx, sx(A.x), sy(A.y), 8, C.orange, "#fff");
-      LR.dot(ctx, sx(B.x), sy(B.y), 8, C.text, "#fff");
+      LR.dot(ctx, sx(A.x), sy(A.y), 8, C.orange, "#ffffff");
+      LR.dot(ctx, sx(B.x), sy(B.y), 8, C.text, "#ffffff");
       ctx.font = "700 12px Inter, sans-serif";
       ctx.fillStyle = C.orange; ctx.textAlign = "left";
       ctx.fillText("A", sx(A.x) + 11, sy(A.y) - 8);
@@ -613,7 +613,7 @@
 
       // training points
       pts.forEach(function (p, i) {
-        LR.dot(ctx, sx(p.x), sy(p.y), i === corruptIdx && corrupted ? 8 : 6, CLS_COLOR[p.cls], i === corruptIdx && corrupted ? C.red : "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), i === corruptIdx && corrupted ? 8 : 6, CLS_COLOR[p.cls], i === corruptIdx && corrupted ? C.red : "#ffffff");
       });
 
       // query
@@ -622,7 +622,7 @@
       ctx.strokeStyle = C.orange; ctx.lineWidth = 1.8;
       ctx.beginPath(); ctx.moveTo(sx(q.x), sy(q.y)); ctx.lineTo(sx(nn.p.x), sy(nn.p.y)); ctx.stroke();
       ctx.setLineDash([]);
-      LR.dot(ctx, sx(q.x), sy(q.y), 9, "#fff", C.orange);
+      LR.dot(ctx, sx(q.x), sy(q.y), 9, "#ffffff", C.orange);
       ctx.font = "800 12px Inter, sans-serif";
       ctx.fillStyle = C.orange; ctx.textAlign = "center";
       ctx.fillText("?", sx(q.x), sy(q.y) + 4);

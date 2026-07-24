@@ -63,7 +63,7 @@
       const { sx, sy } = LR.plot(ctx, P);
 
       // the stable line a^t = 1
-      ctx.strokeStyle = "#bbb";
+      ctx.strokeStyle = "#bbbbbb";
       ctx.setLineDash([5, 5]);
       ctx.beginPath(); ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(P.xmax), sy(0)); ctx.stroke();
       ctx.setLineDash([]);
@@ -85,7 +85,7 @@
         ctx.stroke();
         if (P.xmax >= 50) {
           const y50 = Math.max(YMIN, Math.min(YMAX, 50 * Math.log10(ra)));
-          LR.dot(ctx, sx(50), sy(y50), 4, "#fff", C.purple);
+          LR.dot(ctx, sx(50), sy(y50), 4, "#ffffff", C.purple);
           ctx.fillStyle = C.purple;
           ctx.font = "700 11px Inter, sans-serif";
           ctx.textAlign = ra < 1 ? "left" : "left";
@@ -195,7 +195,7 @@
       for (let t = 1; t <= T; t++) {
         const x = cx(t);
         // cell
-        ctx.fillStyle = t >= ptr ? "#fff5ec" : "#fff";
+        ctx.fillStyle = t >= ptr ? "#f5f5f5" : "#ffffff";
         ctx.strokeStyle = t >= ptr ? C.orange : C.axis;
         ctx.lineWidth = t === ptr ? 2.4 : 1.4;
         ctx.fillRect(x, y - ch / 2, cw, ch);
@@ -238,7 +238,7 @@
         const mag = Math.abs(g[t]);
         const lv = Math.max(LMIN, Math.min(LMAX, Math.log10(Math.max(mag, 1e-12))));
         const hpx = bh * ((lv - LMIN) / (LMAX - LMIN));
-        ctx.fillStyle = known ? (mag < 0.01 ? "rgba(224,49,49,0.75)" : C.orange) : "#e6e6e6";
+        ctx.fillStyle = known ? (mag < 0.01 ? "rgba(61,61,61,0.75)" : C.orange) : "#e6e6e6";
         ctx.fillRect(x + 8, by0 - hpx, cw - 16, hpx);
         if (known) {
           ctx.fillStyle = C.text;
@@ -350,7 +350,7 @@
       if (over) LR.arrow(ctx, sx(0), sy(0), sx(cg.x), sy(cg.y), C.orange, 3);
 
       // drag handle
-      LR.dot(ctx, sx(g.x), sy(g.y), 7, "#fff", over ? "#9a9a9a" : C.orange);
+      LR.dot(ctx, sx(g.x), sy(g.y), 7, "#ffffff", over ? "#9a9a9a" : C.orange);
       ctx.fillStyle = C.text;
       ctx.font = "700 11.5px JetBrains Mono, Menlo, monospace";
       ctx.textAlign = "left";
@@ -555,7 +555,7 @@
     function gateNode(ctx, x, y, sym, color) {
       ctx.beginPath();
       ctx.arc(x, y, 12, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#ffffff";
       ctx.fill();
       ctx.strokeStyle = color;
       ctx.lineWidth = 2.2;
@@ -638,8 +638,8 @@
         ctx.fillText(label, 30, y - ch / 2 - 6);
         for (let i2 = 0; i2 < N; i2++) {
           const x = cx(i2);
-          ctx.fillStyle = i2 === sel ? "#fff5ec" : "#fff";
-          ctx.strokeStyle = i2 === sel ? C.orange : "#bbb";
+          ctx.fillStyle = i2 === sel ? "#f5f5f5" : "#ffffff";
+          ctx.strokeStyle = i2 === sel ? C.orange : "#bbbbbb";
           ctx.lineWidth = i2 === sel ? 2.2 : 1.2;
           ctx.fillRect(x, y - ch / 2, cw, ch);
           ctx.strokeRect(x, y - ch / 2, cw, ch);
@@ -795,7 +795,7 @@
       // the funnel to h_T
       const hx = W * 0.66, hy = 92;
       const last = encPos[T - 1];
-      ctx.fillStyle = "rgba(232, 89, 12, 0.12)";
+      ctx.fillStyle = "rgba(26,26,26, 0.12)";
       ctx.beginPath();
       ctx.moveTo(bx, encY - 4);
       ctx.lineTo(bx + encSpan - step + 14, encY - 4);
@@ -825,7 +825,7 @@
       ctx.fillText("decoder (generates the output one token at a time)", dx0 - 8, decY - 32);
       for (let t = 0; t < decN; t++) {
         const x = dx0 + t * dstep;
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = "#ffffff";
         ctx.strokeStyle = C.axis;
         ctx.lineWidth = 1.4;
         ctx.fillRect(x, decY - 17, 56, 34);

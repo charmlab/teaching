@@ -17,16 +17,16 @@
   LR.C = {
     text: "#111111",
     muted: "#555555",
-    faint: "#868e96",
+    faint: "#8d8d8d",
     grid: "#ececec",
     axis: "#333333",
-    orange: "#e8590c",
-    orangeSoft: "#ffd8bd",
-    green: "#2f9e44",
-    purple: "#7048e8",
-    red: "#e03131",
-    amber: "#f0a202",
-    yellow: "#e6b800",
+    orange: "#1a1a1a",
+    orangeSoft: "#dedede",
+    green: "#666666",
+    purple: "#969696",
+    red: "#3d3d3d",
+    amber: "#adadad",
+    yellow: "#bdbdbd",
   };
 
   /* ── deterministic RNG ──────────────────────────────────── */

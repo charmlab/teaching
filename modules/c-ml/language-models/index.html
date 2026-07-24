@@ -245,7 +245,7 @@ phrases from the corpus:
 
 <div class="figure" id="fig-ngramgen">
   <div class="fig-mount" data-fig="ngramgen"></div>
-  <p class="fig-caption"><b>Fig 2.2,</b> the n-gram text generator. Each step shows the current context (purple), the live next-word distribution sampled from the counting table, and the sampled word (orange) getting appended. At <span class="m">$n=1$</span> the output is word salad, at <span class="m">$n=2$</span> word pairs make local sense, and at <span class="m">$n=3$</span> whole phrases from the corpus reappear because most trigram rows contain a single continuation.</p>
+  <p class="fig-caption"><b>Fig 2.2,</b> the n-gram text generator. Each step shows the current context (highlighted), the live next-word distribution sampled from the counting table, and the sampled word (black) getting appended. At <span class="m">$n=1$</span> the output is word salad, at <span class="m">$n=2$</span> word pairs make local sense, and at <span class="m">$n=3$</span> whole phrases from the corpus reappear because most trigram rows contain a single continuation.</p>
 </div>
 
 <h3>The wall: data sparsity</h3>
@@ -563,7 +563,7 @@ every number in it is live:
 
 <div class="figure" id="fig-neurallm">
   <div class="fig-mount" data-fig="neurallm"></div>
-  <p class="fig-caption"><b>Fig 5.1,</b> the neural trigram next-word predictor, the signature figure of this section. Pick the two context words: their embedding rows (trained live on the pet corpus at page load) are looked up, concatenated, pushed through <span class="m">$z = Wc + b$</span>, and softmaxed into the orange distribution. Change the context and watch the whole distribution shift. The readout counts this model's actual parameters, <span class="m">$3d|\mathcal{V}|$</span>, against the <span class="m">$|\mathcal{V}|^3$</span> cells a count trigram would need for the same vocabulary.</p>
+  <p class="fig-caption"><b>Fig 5.1,</b> the neural trigram next-word predictor, the signature figure of this section. Pick the two context words: their embedding rows (trained live on the pet corpus at page load) are looked up, concatenated, pushed through <span class="m">$z = Wc + b$</span>, and softmaxed into the black distribution. Change the context and watch the whole distribution shift. The readout counts this model's actual parameters, <span class="m">$3d|\mathcal{V}|$</span>, against the <span class="m">$|\mathcal{V}|^3$</span> cells a count trigram would need for the same vocabulary.</p>
 </div>
 
 <h3>The parameter count, and why it matters</h3>

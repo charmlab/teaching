@@ -13,7 +13,7 @@
   const C = LR.C;
   const E = LR.ens;
 
-  const SOFT = { pos: "rgba(47,158,68,0.20)", neg: "rgba(112,72,232,0.17)" };
+  const SOFT = { pos: "rgba(102,102,102,0.20)", neg: "rgba(150,150,150,0.17)" };
   const HARD = { pos: C.green, neg: C.purple };
 
   /* ── shared tree / stump core ───────────────────────────── */
@@ -335,7 +335,7 @@
 
       // data
       data.forEach(function (p) {
-        LR.dot(ctx, sx(p.x), sy(p.y), 4.4, p.c === 1 ? HARD.pos : HARD.neg, "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), 4.4, p.c === 1 ? HARD.pos : HARD.neg, "#ffffff");
       });
 
       // probe point
@@ -468,13 +468,13 @@
           const c = cellCentre(P, G, ix, iy);
           const v = predictSoft(c.x, c.y); // in [−1, 1]
           const a = 0.06 + 0.16 * Math.min(1, Math.abs(v));
-          ctx.fillStyle = v >= 0 ? "rgba(47,158,68," + a + ")" : "rgba(112,72,232," + a + ")";
+          ctx.fillStyle = v >= 0 ? "rgba(102,102,102," + a + ")" : "rgba(150,150,150," + a + ")";
           ctx.fillRect(c.px, c.py, G.blk, G.blk);
         }
       }
       const SC = LR.plot(ctx, P);
       data.forEach(function (p) {
-        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 3.6, p.c === 1 ? HARD.pos : HARD.neg, "#fff");
+        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 3.6, p.c === 1 ? HARD.pos : HARD.neg, "#ffffff");
       });
     }
 
@@ -625,7 +625,7 @@
       data.forEach(function (p, i) {
         const r = Math.max(3, Math.min(15, 4 + Math.sqrt(w[i] * N) * 3.2));
         const wrongNow = last && last.wrong[i];
-        LR.dot(ctx, sx(p.x), sy(p.y), r, p.c === 1 ? HARD.pos : HARD.neg, wrongNow ? C.red : "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), r, p.c === 1 ? HARD.pos : HARD.neg, wrongNow ? C.red : "#ffffff");
       });
 
       // legend
@@ -769,7 +769,7 @@
       ctx.fillText(pol === 1 ? "+1 side ←" : "→ +1 side", SC.sx(thr) + (pol === 1 ? -42 : 42), P.y0 + 14);
       X.forEach(function (x, i) {
         const r = Math.max(4, Math.min(18, Math.sqrt(w[i]) * 26));
-        LR.dot(ctx, SC.sx(x), SC.sy(0), r, TL[i] === 1 ? HARD.pos : HARD.neg, stumpPred(x) !== TL[i] ? C.red : "#fff");
+        LR.dot(ctx, SC.sx(x), SC.sy(0), r, TL[i] === 1 ? HARD.pos : HARD.neg, stumpPred(x) !== TL[i] ? C.red : "#ffffff");
         ctx.font = "600 11px 'JetBrains Mono', Menlo, monospace";
         ctx.fillStyle = C.muted;
         ctx.textAlign = "center";
@@ -1024,9 +1024,9 @@
       for (let i = 0; i < 5; i++) {
         const cx = mid / 2 + (i - 2) * gap;
         const done = prog >= 1 || prog > 0.25; // all together
-        const fill = prog === 0 ? "#fff" : done ? "rgba(47,158,68,0.15)" : "#fff";
+        const fill = prog === 0 ? "#ffffff" : done ? "rgba(102,102,102,0.15)" : "#ffffff";
         // sample arrow
-        ctx.strokeStyle = "#bbb";
+        ctx.strokeStyle = "#bbbbbb";
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(mid / 2, 78);
@@ -1052,7 +1052,7 @@
       for (let i = 0; i < 5; i++) {
         const cx = mid + mid / 2 + (i - 2) * gap;
         const t = Math.max(0, Math.min(1, (prog - i * 0.18) / 0.18)); // sequential fill
-        const fill = t >= 1 ? "rgba(232,89,12,0.14)" : "#fff";
+        const fill = t >= 1 ? "rgba(26,26,26,0.14)" : "#ffffff";
         box(cx - bw / 2, 116, bw, bh, fill, "model " + (i + 1), "ε" + (i + 1) + " → α" + (i + 1));
         if (i < 4) {
           const t2 = Math.max(0, Math.min(1, (prog - (i + 1) * 0.18) / 0.1));

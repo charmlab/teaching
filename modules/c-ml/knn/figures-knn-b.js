@@ -12,7 +12,7 @@
   const K = LR.knn;
 
   const CLS_COLOR = { A: C.green, B: C.purple, C: C.amber };
-  const CLS_SOFT = { A: "rgba(47,158,68,0.20)", B: "rgba(112,72,232,0.17)", C: "rgba(240,162,2,0.22)" };
+  const CLS_SOFT = { A: "rgba(102,102,102,0.20)", B: "rgba(150,150,150,0.17)", C: "rgba(173,173,173,0.22)" };
 
   /* ════════════════════════════════════════════════════════════
      Fig 3.1 — the k-NN classifier playground (signature figure)
@@ -97,7 +97,7 @@
       const nbrSet = new Set(nbrs.map((n) => n.p));
 
       // neighbour links
-      ctx.strokeStyle = "rgba(232,89,12,0.45)";
+      ctx.strokeStyle = "rgba(26,26,26,0.45)";
       ctx.lineWidth = 1.4;
       nbrs.forEach(function (n) {
         ctx.beginPath();
@@ -109,13 +109,13 @@
       // training points
       pts.forEach(function (p) {
         const isNbr = nbrSet.has(p);
-        LR.dot(ctx, sx(p.x), sy(p.y), isNbr ? 7 : 5, CLS_COLOR[p.cls], isNbr ? C.orange : "#fff");
+        LR.dot(ctx, sx(p.x), sy(p.y), isNbr ? 7 : 5, CLS_COLOR[p.cls], isNbr ? C.orange : "#ffffff");
       });
 
       // query
       LR.dot(ctx, sx(q.x), sy(q.y), 10, CLS_COLOR[v.label], C.orange);
       ctx.font = "800 12px Inter, sans-serif";
-      ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+      ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
       ctx.fillText("?", sx(q.x), sy(q.y) + 4);
 
       // tally pills
@@ -258,7 +258,7 @@
       if (v === 3) o.selected = true;
       sel.appendChild(o);
     });
-    sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
+    sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
     sel.addEventListener("change", () => { k = parseInt(sel.value, 10); });
     kSel.appendChild(sel);
     controls.appendChild(kSel);
@@ -303,9 +303,9 @@
       const nbrSet = nbrs ? new Set(nbrs.map((n) => n.p)) : new Set();
       X.forEach(function (p) {
         const isN = nbrSet.has(p);
-        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), isN ? 7 : 5, CLS_COLOR[p.cls], isN ? C.orange : "#fff");
+        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), isN ? 7 : 5, CLS_COLOR[p.cls], isN ? C.orange : "#ffffff");
       });
-      LR.dot(ctx, SC.sx(qx), SC.sy(qy), 8, v ? CLS_COLOR[v.label] : "#fff", C.orange);
+      LR.dot(ctx, SC.sx(qx), SC.sy(qy), 8, v ? CLS_COLOR[v.label] : "#ffffff", C.orange);
       ctx.font = "600 11px Inter, sans-serif";
       ctx.fillStyle = C.muted; ctx.textAlign = "left";
       ctx.fillText("green = A, purple = B, orange ring = query", P.x0 + 8, P.y0 + 14);
@@ -410,7 +410,7 @@
 
       // custom x tick labels (actual k values)
       ctx.font = "10.5px Inter, sans-serif";
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(P.x0 - 10, P.y0 + P.h + 6, P.w + 20, 14);
       ctx.fillStyle = C.faint; ctx.textAlign = "center";
       KS.forEach(function (k, i) {
@@ -429,12 +429,12 @@
       // legend
       ctx.fillStyle = C.green; ctx.fillText("— train", P.x0 + P.w - 130, P.y0 + 16);
       ctx.fillStyle = C.orange; ctx.fillText("— validation", P.x0 + P.w - 130, P.y0 + 32);
-      ctx.fillStyle = revealed ? C.red : "#bbb";
+      ctx.fillStyle = revealed ? C.red : "#bbbbbb";
       ctx.fillText(revealed ? "- - test (revealed)" : "- - test (hidden)", P.x0 + P.w - 130, P.y0 + 48);
 
       // best-k marker and the user's pick
       if (revealed) {
-        LR.dot(ctx, sx(bestIdx), sy(curves.vl[bestIdx]), 7, "#fff", C.orange);
+        LR.dot(ctx, sx(bestIdx), sy(curves.vl[bestIdx]), 7, "#ffffff", C.orange);
         ctx.fillStyle = C.orange;
         ctx.fillText("best on validation: k=" + KS[bestIdx], sx(bestIdx) + 10, sy(curves.vl[bestIdx]) + 4);
       }
@@ -540,7 +540,7 @@
       const bw = P.w / BINS;
       for (let b = 0; b < BINS; b++) {
         const h = hist[b] * (P.h - 20);
-        ctx.fillStyle = "rgba(112,72,232,0.55)";
+        ctx.fillStyle = "rgba(150,150,150,0.55)";
         ctx.fillRect(P.x0 + b * bw + 1, P.y0 + P.h - h, bw - 2, h);
       }
 
@@ -626,16 +626,16 @@
       const qxy = std ? { x: (q.sal - musd.ms) / musd.ss, y: (q.age - musd.ma) / musd.sa } : { x: q.sal, y: q.age };
 
       // links
-      ctx.strokeStyle = "rgba(232,89,12,0.5)"; ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "rgba(26,26,26,0.5)"; ctx.lineWidth = 1.4;
       nbrs.forEach(function (n) {
         const c = toXY(n.p);
         ctx.beginPath(); ctx.moveTo(SC.sx(qxy.x), SC.sy(qxy.y)); ctx.lineTo(SC.sx(c.x), SC.sy(c.y)); ctx.stroke();
       });
       ppl.forEach(function (p) {
         const c = toXY(p);
-        LR.dot(ctx, SC.sx(c.x), SC.sy(c.y), nset.has(p) ? 6.5 : 4.5, nset.has(p) ? C.green : C.text, nset.has(p) ? C.orange : "#fff");
+        LR.dot(ctx, SC.sx(c.x), SC.sy(c.y), nset.has(p) ? 6.5 : 4.5, nset.has(p) ? C.green : C.text, nset.has(p) ? C.orange : "#ffffff");
       });
-      LR.dot(ctx, SC.sx(qxy.x), SC.sy(qxy.y), 8, "#fff", C.orange);
+      LR.dot(ctx, SC.sx(qxy.x), SC.sy(qxy.y), 8, "#ffffff", C.orange);
       return nbrs;
     }
 

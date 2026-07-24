@@ -264,7 +264,7 @@ scrambled basis. Learned codes are useful, not canonical.
 
 <div class="figure" id="fig-linearpca">
   <div class="fig-mount" data-fig="linearpca"></div>
-  <p class="fig-caption"><b>Fig 1.1,</b> gradient descent on a real linear autoencoder, running in your browser. The orange subspace starts at a random init and rotates onto the dashed green PCA direction as you train; the matrix panel shows <span class="m">$W_g W_f$</span> converging entry by entry to <span class="m">$U_1 U_1^\top$</span>, and the loss converging to <span class="m">$\lambda_2$</span>. Then slide the refactor <span class="m">$A$</span>: both factors change, the product does not move. Non-uniqueness, live.</p>
+  <p class="fig-caption"><b>Fig 1.1,</b> gradient descent on a real linear autoencoder, running in your browser. The solid black subspace line starts at a random init and rotates onto the dashed PCA direction as you train; the matrix panel shows <span class="m">$W_g W_f$</span> converging entry by entry to <span class="m">$U_1 U_1^\top$</span>, and the loss converging to <span class="m">$\lambda_2$</span>. Then slide the refactor <span class="m">$A$</span>: both factors change, the product does not move. Non-uniqueness, live.</p>
 </div>
 
 <div class="quiz" data-correct="b">
@@ -410,7 +410,7 @@ clean signals that could have produced this corruption.
 
 <div class="figure" id="fig-denoise">
   <div class="fig-mount" data-fig="denoise"></div>
-  <p class="fig-caption"><b>Fig 3.2,</b> denoising as projection back onto the clean family. The clean signal (dashed grey) lives in a 2-parameter family; you corrupt it with the noise slider (red), and the denoiser maps the corruption back to the nearest family member (orange), computed live by least squares. The readouts compare the corruption's error against the denoised output's error: most of the noise is simply gone, because noise has no room to survive in a 2-parameter code. <!-- flagged addition: the sinusoid family is a synthetic stand-in dataset; the denoising setup, the simulate-the-corruption training recipe, and the E[x | x-tilde] statement are per the source. --></p>
+  <p class="fig-caption"><b>Fig 3.2,</b> denoising as projection back onto the clean family. The clean signal (dashed grey) lives in a 2-parameter family; you corrupt it with the noise slider (dark grey), and the denoiser maps the corruption back to the nearest family member (solid black), computed live by least squares. The readouts compare the corruption's error against the denoised output's error: most of the noise is simply gone, because noise has no room to survive in a 2-parameter code. <!-- flagged addition: the sinusoid family is a synthetic stand-in dataset; the denoising setup, the simulate-the-corruption training recipe, and the E[x | x-tilde] statement are per the source. --></p>
 </div>
 
 <details class="check">
@@ -677,7 +677,7 @@ through the noise. At test time, generation reuses the same pipe: sample
 
 <div class="figure" id="fig-reparam">
   <div class="fig-mount" data-fig="reparam"></div>
-  <p class="fig-caption"><b>Fig 6.2,</b> the reparameterization trick as geometry. The purple point is <span class="m">$\mu$</span>, the orange ellipses are the 1&sigma; and 2&sigma; contours of <span class="m">$q$</span>, the ghost cloud is 260 real reparameterized draws, and the green arrow is <span class="m">$\sigma \odot \epsilon$</span> carrying you to the red sample <span class="m">$z$</span>. Slide &epsilon; with fixed <span class="m">$\mu, \sigma$</span>: the sample orbits the blob. Slide <span class="m">$\mu$</span> or <span class="m">$\sigma$</span> with fixed &epsilon;: the same noise lands somewhere new, which is exactly the dependence the gradient differentiates. The KL readout updates from the closed form.</p>
+  <p class="fig-caption"><b>Fig 6.2,</b> the reparameterization trick as geometry. The pale grey point is <span class="m">$\mu$</span>, the black ellipses are the 1&sigma; and 2&sigma; contours of <span class="m">$q$</span>, the ghost cloud is 260 real reparameterized draws, and the mid-grey arrow is <span class="m">$\sigma \odot \epsilon$</span> carrying you to the sampled <span class="m">$z$</span>. Slide &epsilon; with fixed <span class="m">$\mu, \sigma$</span>: the sample orbits the blob. Slide <span class="m">$\mu$</span> or <span class="m">$\sigma$</span> with fixed &epsilon;: the same noise lands somewhere new, which is exactly the dependence the gradient differentiates. The KL readout updates from the closed form.</p>
 </div>
 
 <div class="quiz" data-correct="c">
@@ -754,7 +754,7 @@ morph rather than the spliced garbage of Fig 4.1.
 
 <div class="figure" id="fig-generate">
   <div class="fig-mount" data-fig="generate"></div>
-  <p class="fig-caption"><b>Fig 6.4,</b> the generative finale on the smoothed (high-&beta;) latent. Left: slide along the straight latent line between a disc code and a cross code; every intermediate decode is computed live and the morph is gradual. Right: each press of Generate draws nine fresh <span class="m">$z \sim \mathcal{N}(0, I)$</span> by Box-Muller and decodes them; green borders mark samples that landed on the data manifold. The encoder is nowhere in this figure. That is the point.</p>
+  <p class="fig-caption"><b>Fig 6.4,</b> the generative finale on the smoothed (high-&beta;) latent. Left: slide along the straight latent line between a disc code and a cross code; every intermediate decode is computed live and the morph is gradual. Right: each press of Generate draws nine fresh <span class="m">$z \sim \mathcal{N}(0, I)$</span> by Box-Muller and decodes them; darker borders mark samples that landed on the data manifold. The encoder is nowhere in this figure. That is the point.</p>
 </div>
 
 <details class="check">

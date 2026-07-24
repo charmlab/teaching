@@ -81,7 +81,7 @@ Slide the window and watch the subject fall off the edge:
 
 <div class="figure" id="fig-window">
   <div class="fig-mount" data-fig="window"></div>
-  <p class="fig-caption"><b>Fig 0.1,</b> the fixed-window failure. The model predicts the word after "he" while seeing only the last <span class="m">$k$</span> words (orange). At the trigram setting, <span class="m">$k = 2$</span>, the subject "Amir" (purple) is invisible, and no amount of training fixes what the model literally cannot see. Only at <span class="m">$k \ge 7$</span> does the subject come back into view.</p>
+  <p class="fig-caption"><b>Fig 0.1,</b> the fixed-window failure. The model predicts the word after "he" while seeing only the last <span class="m">$k$</span> words (black). At the trigram setting, <span class="m">$k = 2$</span>, the subject "Amir" (pale grey) is invisible, and no amount of training fixes what the model literally cannot see. Only at <span class="m">$k \ge 7$</span> does the subject come back into view.</p>
 </div>
 
 <p>
@@ -277,7 +277,7 @@ become its future context. Watch both modes on a genuinely trained network:
 
 <div class="figure" id="fig-lmstep">
   <div class="fig-mount" data-fig="lmstep"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the RNN language-model stepper. A small RNN is actually trained in your browser on a toy corpus when this figure loads, so every probability is real. Step through a sentence: the hidden state (heat strip) carries forward, and the bars show the softmax over the vocabulary at each step. In teacher forcing the true token (green) is fed next regardless of the model's favourite; in free generation the model's own pick (orange) is fed back, and the sentence becomes whatever it becomes.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the RNN language-model stepper. A small RNN is actually trained in your browser on a toy corpus when this figure loads, so every probability is real. Step through a sentence: the hidden state (heat strip) carries forward, and the bars show the softmax over the vocabulary at each step. In teacher forcing the true token (grey) is fed next regardless of the model's favourite; in free generation the model's own pick (black) is fed back, and the sentence becomes whatever it becomes.</p>
 </div>
 
 <p>
@@ -432,7 +432,7 @@ norm is exactly 2 and whose direction is unchanged. In code:
 
 <div class="figure" id="fig-clip">
   <div class="fig-mount" data-fig="clip"></div>
-  <p class="fig-caption"><b>Fig 3.3,</b> the clipping demo. Drag the gradient vector; whenever it leaves the threshold circle, the clipped version (orange) is computed by the rescale above: identical direction, norm pinned to <span class="m">$\eta$</span>. Drag it back inside the circle and clipping does nothing at all. The readout confirms the angle never changes.</p>
+  <p class="fig-caption"><b>Fig 3.3,</b> the clipping demo. Drag the gradient vector; whenever it leaves the threshold circle, the clipped version (black) is computed by the rescale above: identical direction, norm pinned to <span class="m">$\eta$</span>. Drag it back inside the circle and clipping does nothing at all. The readout confirms the angle never changes.</p>
 </div>
 
 <p>

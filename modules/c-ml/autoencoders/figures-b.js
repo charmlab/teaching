@@ -110,7 +110,7 @@
       });
 
       // probe
-      LR.dot(ctx, sx(probe[0]), sy(probe[1]), 7, "#fff", C.red);
+      LR.dot(ctx, sx(probe[0]), sy(probe[1]), 7, "#ffffff", C.red);
       LR.dot(ctx, sx(probe[0]), sy(probe[1]), 3, C.red);
 
       // decode
@@ -120,15 +120,15 @@
       ctx.font = "700 12.5px Inter, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("decoder output gθ(z)", gx + gsz / 2, gy - 10);
-      AE.drawGlyph(ctx, dec.img, gx, gy, gsz, { border: "#999", borderW: 1.4 });
+      AE.drawGlyph(ctx, dec.img, gx, gy, gsz, { border: "#999999", borderW: 1.4 });
 
       // blend-weight bars (three families plus the off-manifold component)
       const bx = 490, by = 268, bw = 210, bh = 15;
       const names = layout.clusters.map((c) => c.name).concat(["off-manifold"]);
-      const cols = [0, 1, 2].map(AE.clusterColor).concat(["#adb5bd"]);
+      const cols = [0, 1, 2].map(AE.clusterColor).concat(["#b4b4b4"]);
       names.forEach(function (nm, ci) {
         const y = by + ci * 28;
-        ctx.fillStyle = "#f1f3f5";
+        ctx.fillStyle = "#f3f3f3";
         ctx.fillRect(bx + 74, y, bw - 74, bh);
         ctx.fillStyle = cols[ci];
         ctx.fillRect(bx + 74, y, (bw - 74) * dec.wn[ci], bh);
@@ -217,11 +217,11 @@
 
       if (mode === 1) {
         items.forEach(function (it) {
-          ctx.fillStyle = "rgba(232,89,12,0.10)";
+          ctx.fillStyle = "rgba(26,26,26,0.10)";
           ctx.beginPath();
           ctx.arc(sx(it.z[0]), sy(it.z[1]), 2 * sigma * pxPerUnit, 0, Math.PI * 2);
           ctx.fill();
-          ctx.strokeStyle = "rgba(232,89,12,0.35)";
+          ctx.strokeStyle = "rgba(26,26,26,0.35)";
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.arc(sx(it.z[0]), sy(it.z[1]), sigma * pxPerUnit, 0, Math.PI * 2);
@@ -306,7 +306,7 @@
 
       // the target prior N(0, I): dashed rings at 1σ and 2σ
       [1, 2].forEach(function (r) {
-        ctx.strokeStyle = "#adb5bd";
+        ctx.strokeStyle = "#b4b4b4";
         ctx.setLineDash([5, 4]);
         ctx.lineWidth = 1.4;
         ctx.beginPath();
@@ -321,7 +321,7 @@
 
       // encoder blobs
       items.forEach(function (it) {
-        ctx.fillStyle = "rgba(232,89,12,0.09)";
+        ctx.fillStyle = "rgba(26,26,26,0.09)";
         ctx.beginPath();
         ctx.arc(sx(it.z[0]), sy(it.z[1]), layout.sigmaEnc * pxPerUnit, 0, Math.PI * 2);
         ctx.fill();
@@ -373,8 +373,8 @@
         const dec = AE.decode(it.z, layout);
         const y = 42 + i * 78;
         AE.drawGlyph(ctx, truth, rx, y, 64);
-        LR.arrow(ctx, rx + 74, y + 32, rx + 100, y + 32, "#999", 1.6);
-        AE.drawGlyph(ctx, dec.img, rx + 110, y, 64, { border: "#999" });
+        LR.arrow(ctx, rx + 74, y + 32, rx + 100, y + 32, "#999999", 1.6);
+        AE.drawGlyph(ctx, dec.img, rx + 110, y, 64, { border: "#999999" });
       });
 
       ctx.fillStyle = C.text;
@@ -457,13 +457,13 @@
       const rand = LR.rng(300);
       for (let i = 0; i < 260; i++) {
         const gz = [mu[0] + sg[0] * LR.gauss(rand), mu[1] + sg[1] * LR.gauss(rand)];
-        ctx.fillStyle = "rgba(232,89,12,0.16)";
+        ctx.fillStyle = "rgba(26,26,26,0.16)";
         ctx.fillRect(sx(gz[0]) - 1.4, sy(gz[1]) - 1.4, 2.8, 2.8);
       }
 
       // 1σ and 2σ ellipses of q
       [1, 2].forEach(function (k) {
-        ctx.strokeStyle = k === 1 ? C.orange : "rgba(232,89,12,0.45)";
+        ctx.strokeStyle = k === 1 ? C.orange : "rgba(26,26,26,0.45)";
         ctx.lineWidth = k === 1 ? 2 : 1.2;
         ctx.beginPath();
         ctx.ellipse(sx(mu[0]), sy(mu[1]), k * sg[0] * pxPerUnit, k * sg[1] * pxPerUnit, 0, 0, Math.PI * 2);
@@ -484,13 +484,13 @@
 
       // mu marker and the arrow sigma*eps
       const z = [mu[0] + sg[0] * eps[0], mu[1] + sg[1] * eps[1]];
-      LR.dot(ctx, sx(mu[0]), sy(mu[1]), 5, C.purple, "#fff");
+      LR.dot(ctx, sx(mu[0]), sy(mu[1]), 5, C.purple, "#ffffff");
       ctx.fillStyle = C.purple;
       ctx.font = "700 12px Inter, sans-serif";
       ctx.textAlign = "right";
       ctx.fillText("μ", sx(mu[0]) - 9, sy(mu[1]) - 8);
       LR.arrow(ctx, sx(mu[0]), sy(mu[1]), sx(z[0]), sy(z[1]), C.green, 2);
-      LR.dot(ctx, sx(z[0]), sy(z[1]), 6.5, "#fff", C.red);
+      LR.dot(ctx, sx(z[0]), sy(z[1]), 6.5, "#ffffff", C.red);
       LR.dot(ctx, sx(z[0]), sy(z[1]), 2.8, C.red);
       ctx.fillStyle = C.red;
       ctx.textAlign = "left";
