@@ -200,13 +200,13 @@
         const active = (step === 0 && i === 0) || (step > 0 && i === step) || (step === STEPS.length - 1 && i === boxes.length - 1);
         const isOut = i === boxes.length - 1;
         const hot = i === (step === 0 ? 0 : step) || (step === 5 && isOut);
-        ctx.fillStyle = hot ? C.orange : "#ffffff";
-        ctx.strokeStyle = hot ? C.orange : "#bbbbbb";
+        ctx.fillStyle = hot ? C.orange : "#fff";
+        ctx.strokeStyle = hot ? C.orange : "#bbb";
         ctx.lineWidth = 1.6;
         roundRect(ctx, x, 26, bw, 44, 9);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = hot ? "#ffffff" : C.text;
+        ctx.fillStyle = hot ? "#fff" : C.text;
         ctx.font = "700 12px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText(t, x + bw / 2, 52);
@@ -214,7 +214,7 @@
         ctx.font = "10px Inter, sans-serif";
         ctx.fillText("4×5", x + bw / 2, 84);
         if (i < boxes.length - 1) {
-          LR.arrow(ctx, x + bw + 3, 48, x + bw + gap - 3, 48, "#999999", 1.6);
+          LR.arrow(ctx, x + bw + 3, 48, x + bw + gap - 3, 48, "#999", 1.6);
         }
       });
       // residual arcs
@@ -471,7 +471,7 @@
           ctx.fillRect(x0 + j * cell, y0 + i * cell, cell + 0.5, cell + 0.5);
         }
       // patch grid
-      ctx.strokeStyle = "#111111";
+      ctx.strokeStyle = "#111";
       ctx.lineWidth = 1.4;
       const np = N / p;
       for (let g = 0; g <= np; g++) {
@@ -509,7 +509,7 @@
             ctx.fillStyle = AT.ramp(pix(pi * p + a, pj * p + b));
             ctx.fillRect(gx + b * sub, gy + a * sub, sub + 0.4, sub + 0.4);
           }
-        ctx.strokeStyle = "#999999";
+        ctx.strokeStyle = "#999";
         ctx.lineWidth = 1;
         ctx.strokeRect(gx, gy, ts, ts);
         ctx.fillStyle = LR.C.faint;
@@ -677,8 +677,8 @@
 
       // marker at current n
       const q = Math.pow(n / BASE, 2), l = n / BASE;
-      LR.dot(ctx, sx(n / 1024), sy(Math.min(q, 16.4)), 6, C.orange, "#ffffff");
-      LR.dot(ctx, sx(n / 1024), sy(l), 5, "#ffffff", C.green);
+      LR.dot(ctx, sx(n / 1024), sy(Math.min(q, 16.4)), 6, C.orange, "#fff");
+      LR.dot(ctx, sx(n / 1024), sy(l), 5, "#fff", C.green);
       // gap line
       ctx.strokeStyle = C.red;
       ctx.lineWidth = 1.4;
@@ -754,15 +754,15 @@
       ctx.font = "600 11px Inter, sans-serif";
       ctx.textAlign = "left";
       ctx.fillText("retrieval strength across the window (stylized “lost in the middle”)", bx, 40);
-      ctx.strokeStyle = "#dddddd";
+      ctx.strokeStyle = "#ddd";
       ctx.beginPath(); ctx.moveTo(bx, 118); ctx.lineTo(bx + bw, 118); ctx.stroke();
 
       // overflow, spilling off the left edge
       if (overflow > 0) {
         const ow = Math.min(overflow * scale, bx - 6);
-        ctx.fillStyle = "#ececec";
+        ctx.fillStyle = "#e9ecef";
         ctx.fillRect(bx - ow, by + 8, ow, bh - 16);
-        ctx.strokeStyle = "#b4b4b4";
+        ctx.strokeStyle = "#adb5bd";
         ctx.setLineDash([4, 3]);
         ctx.strokeRect(bx - ow, by + 8, ow, bh - 16);
         ctx.setLineDash([]);
@@ -773,7 +773,7 @@
       }
 
       // window frame
-      ctx.strokeStyle = "#111111";
+      ctx.strokeStyle = "#111";
       ctx.lineWidth = 2;
       ctx.strokeRect(bx, by, bw, bh);
 
@@ -783,7 +783,7 @@
         { n: "system", v: SYS, c: C.purple },
         { n: "retrieved docs", v: docs, c: C.green },
         { n: "conversation (kept)", v: keptConv, c: C.orange },
-        { n: "answer", v: ANS, c: "#b4b4b4" },
+        { n: "answer", v: ANS, c: "#adb5bd" },
       ];
       ctx.font = "600 10.5px Inter, sans-serif";
       segs.forEach(function (s) {
@@ -794,7 +794,7 @@
         ctx.fillRect(x, by, w, bh);
         ctx.globalAlpha = 1;
         if (w > 56) {
-          ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = "#fff";
           ctx.textAlign = "center";
           ctx.fillText(s.n, x + w / 2, by + bh / 2 + 4);
         }
@@ -831,7 +831,7 @@
       ctx.font = "700 10.5px Inter, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("key fact", fx, by - 26);
-      LR.dot(ctx, fx, 118 - st * 62, 5, C.red, "#ffffff");
+      LR.dot(ctx, fx, 118 - st * 62, 5, C.red, "#fff");
 
       ro.set("used", Math.min(total, CAP).toLocaleString("en-CA") + " / " + CAP.toLocaleString("en-CA") + " tokens");
       ro.set("lost", overflow > 0 ? overflow.toLocaleString("en-CA") + " tokens of oldest conversation" : "nothing (yet)", overflow > 0 ? C.red : C.green);
@@ -969,12 +969,12 @@
       ctx.stroke();
 
       // optimum + current markers
-      LR.dot(ctx, sx(bestLogN), sy(bestL), 5.5, C.green, "#ffffff");
+      LR.dot(ctx, sx(bestLogN), sy(bestL), 5.5, C.green, "#fff");
       ctx.fillStyle = C.green;
       ctx.font = "700 11px Inter, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("compute-optimal", sx(bestLogN), sy(bestL) + 22);
-      LR.dot(ctx, sx(logN), sy(Math.min(L, ymax)), 6.5, C.orange, "#ffffff");
+      LR.dot(ctx, sx(logN), sy(Math.min(L, ymax)), 6.5, C.orange, "#fff");
 
       const Dopt = Cb / (6 * Math.pow(10, bestLogN));
       ro.set("N", fmtBig(N) + " params");

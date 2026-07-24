@@ -143,7 +143,7 @@
 
     /* class colours + faint region tints */
     COLS: [C.green, C.orange, C.purple],
-    TINTS: ["rgba(102,102,102,0.10)", "rgba(26,26,26,0.10)", "rgba(150,150,150,0.12)"],
+    TINTS: ["rgba(47,158,68,0.10)", "rgba(232,89,12,0.10)", "rgba(112,72,232,0.12)"],
 
     /* decision regions + boundary, computed on a grid over the plot area */
     regions: function (ctx, P, map, classes, opts) {
@@ -179,7 +179,7 @@
         }
       }
       // boundary: mark grid edges where the winning class changes
-      ctx.fillStyle = opts.boundary || "#333333";
+      ctx.fillStyle = opts.boundary || "#333";
       for (let r = 0; r < rows; r++) {
         for (let cc = 0; cc < cols; cc++) {
           const me = lab[r * cols + cc];
@@ -317,7 +317,7 @@
       // query marker (envelope)
       const px = map.sx(q.x), py = map.sy(q.y);
       ctx.fillStyle = C.purple;
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.rect(px - 11, py - 8, 22, 16);
@@ -444,7 +444,7 @@
           GB.meanCross(ctx, map, cc.mu, GB.COLS[k]);
         });
         if (ends.length === 2) {
-          ctx.strokeStyle = "#333333";
+          ctx.strokeStyle = "#333";
           ctx.lineWidth = 1.8;
           ctx.setLineDash([6, 5]);
           ctx.beginPath();
@@ -454,7 +454,7 @@
           ctx.setLineDash([]);
         }
       } else if (ends.length === 2) {
-        ctx.strokeStyle = "#333333";
+        ctx.strokeStyle = "#333";
         ctx.lineWidth = 2.4;
         ctx.beginPath();
         ctx.moveTo(map.sx(ends[0][0]), map.sy(ends[0][1]));
@@ -591,7 +591,7 @@
       for (let px = P.x0; px < P.x0 + P.w; px += 2) {
         const x = map.inv(px, 0).x;
         const win = score(1, x) > score(0, x) ? 1 : 0;
-        ctx.fillStyle = win === 1 ? "rgba(26,26,26,0.14)" : "rgba(102,102,102,0.12)";
+        ctx.fillStyle = win === 1 ? "rgba(232,89,12,0.14)" : "rgba(47,158,68,0.12)";
         ctx.fillRect(px, P.y0, 2, 8);
       }
 
@@ -610,7 +610,7 @@
 
       // boundary lines
       roots.forEach(function (r) {
-        ctx.strokeStyle = "#333333";
+        ctx.strokeStyle = "#333";
         ctx.lineWidth = 1.6;
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
@@ -631,8 +631,8 @@
       ctx.beginPath();
       ctx.moveTo(qpx, P.y0); ctx.lineTo(qpx, P.y0 + P.h);
       ctx.stroke();
-      LR.dot(ctx, qpx, map.sy(w0), 4.5, "#ffffff", C.green);
-      LR.dot(ctx, qpx, map.sy(w1), 4.5, "#ffffff", C.orange);
+      LR.dot(ctx, qpx, map.sy(w0), 4.5, "#fff", C.green);
+      LR.dot(ctx, qpx, map.sy(w1), 4.5, "#fff", C.orange);
       ctx.fillStyle = C.purple;
       ctx.font = "700 12px Inter, sans-serif";
       ctx.textAlign = "center";

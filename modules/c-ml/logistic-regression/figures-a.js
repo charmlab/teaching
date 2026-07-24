@@ -167,7 +167,7 @@
       ctx.restore();
 
       // data
-      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.t), 5.5, CLS_COLOR[p.t], "#ffffff"));
+      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.t), 5.5, CLS_COLOR[p.t], "#fff"));
 
       // query
       const z = wFit[0] + wFit[1] * qx;
@@ -175,7 +175,7 @@
       ctx.setLineDash([3, 3]); ctx.strokeStyle = C.orange; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(sx(qx), sy(P.ymin)); ctx.lineTo(sx(qx), sy(yq)); ctx.stroke();
       ctx.setLineDash([]);
-      LR.dot(ctx, sx(qx), sy(yq), 9, "#ffffff", C.orange);
+      LR.dot(ctx, sx(qx), sy(yq), 9, "#fff", C.orange);
       ctx.font = "800 12px Inter, sans-serif";
       ctx.fillStyle = C.orange; ctx.textAlign = "center";
       ctx.fillText("?", sx(qx), sy(yq) + 4);
@@ -363,7 +363,7 @@
       pts.forEach(function (p) {
         const pred = tri === 1 ? (p.x >= boundary ? 1 : 0) : (model(p.x) >= 0.5 ? 1 : 0);
         const wrong = pred !== p.t;
-        LR.dot(ctx, sx(p.x), sy(p.t), p.isOutlier ? 8 : 5.5, CLS_COLOR[p.t], wrong ? C.red : p.isOutlier ? C.orange : "#ffffff");
+        LR.dot(ctx, sx(p.x), sy(p.t), p.isOutlier ? 8 : 5.5, CLS_COLOR[p.t], wrong ? C.red : p.isOutlier ? C.orange : "#fff");
       });
       ctx.font = "600 11px Inter, sans-serif";
       ctx.fillStyle = C.orange; ctx.textAlign = "center";
@@ -387,7 +387,7 @@
       bs.forEach((b, i) => (i === 0 ? ctx.moveTo(SCR.sx(b), SCR.sy(ls[i])) : ctx.lineTo(SCR.sx(b), SCR.sy(ls[i]))));
       ctx.stroke();
       // current boundary marker
-      LR.dot(ctx, SCR.sx(boundary), SCR.sy(lossOfB(boundary)), 5.5, C.orange, "#ffffff");
+      LR.dot(ctx, SCR.sx(boundary), SCR.sy(lossOfB(boundary)), 5.5, C.orange, "#fff");
       ctx.restore();
 
       // ---- readouts + narration ----
@@ -490,7 +490,7 @@
       CURVES.forEach(function (c) {
         if (!c.on) return;
         const v = c.f(zq);
-        if (v <= P.ymax) LR.dot(ctx, sx(zq), sy(v), 5, c.color, "#ffffff");
+        if (v <= P.ymax) LR.dot(ctx, sx(zq), sy(v), 5, c.color, "#fff");
       });
       ctx.restore();
 
@@ -498,7 +498,7 @@
       ctx.font = "600 12px Inter, sans-serif"; ctx.textAlign = "left";
       let ly = P.y0 + 16;
       CURVES.forEach(function (c) {
-        ctx.fillStyle = c.on ? c.color : "#cccccc";
+        ctx.fillStyle = c.on ? c.color : "#ccc";
         ctx.fillText("— " + c.name, P.x0 + P.w - 165, ly);
         ly += 17;
       });
@@ -579,7 +579,7 @@
           ctx.setLineDash([3, 3]); ctx.strokeStyle = C.green; ctx.lineWidth = 1.4;
           ctx.beginPath(); ctx.moveTo(sx(xc), sy(P.ymin)); ctx.lineTo(sx(xc), sy(0.5)); ctx.stroke();
           ctx.setLineDash([]);
-          LR.dot(ctx, sx(xc), sy(0.5), 6, C.green, "#ffffff");
+          LR.dot(ctx, sx(xc), sy(0.5), 6, C.green, "#fff");
         }
       }
       ctx.restore();
@@ -672,7 +672,7 @@
           const wy = P.ymin + ((P.y0 + P.h - (py + BLK / 2)) / P.h) * (P.ymax - P.ymin);
           const p = LG.sig(w[0] + w[1] * wx + w[2] * wy);
           // single-hue ramp: white → purple with p
-          offCtx.fillStyle = "rgba(150,150,150," + (p * 0.42).toFixed(3) + ")";
+          offCtx.fillStyle = "rgba(112,72,232," + (p * 0.42).toFixed(3) + ")";
           offCtx.fillRect(px, py, BLK, BLK);
         }
       }
@@ -726,20 +726,20 @@
       ctx.restore();
 
       // data
-      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.y), 5.5, CLS_COLOR[p.t], "#ffffff"));
+      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.y), 5.5, CLS_COLOR[p.t], "#fff"));
 
       // handles
       const h = handles();
       ctx.fillStyle = C.orange;
       ctx.fillRect(sx(h.sq.x) - 7, sy(h.sq.y) - 7, 14, 14);
-      ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 2;
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
       ctx.strokeRect(sx(h.sq.x) - 7, sy(h.sq.y) - 7, 14, 14);
-      LR.dot(ctx, sx(h.rot.x), sy(h.rot.y), 8, "#ffffff", C.orange);
+      LR.dot(ctx, sx(h.rot.x), sy(h.rot.y), 8, "#fff", C.orange);
 
       // query
       const zq = w[0] + w[1] * q.x + w[2] * q.y;
       const pq = LG.sig(zq);
-      LR.dot(ctx, sx(q.x), sy(q.y), 9, "#ffffff", C.text);
+      LR.dot(ctx, sx(q.x), sy(q.y), 9, "#fff", C.text);
       ctx.font = "800 11px Inter, sans-serif";
       ctx.fillStyle = C.text; ctx.textAlign = "center";
       ctx.fillText("?", sx(q.x), sy(q.y) + 4);
@@ -833,10 +833,10 @@
       ctx.restore();
 
       // data
-      hours.forEach((h, i) => LR.dot(ctx, sx(h), sy(pass[i]), 5, CLS_COLOR[pass[i]], "#ffffff"));
+      hours.forEach((h, i) => LR.dot(ctx, sx(h), sy(pass[i]), 5, CLS_COLOR[pass[i]], "#fff"));
 
       // query marker
-      LR.dot(ctx, sx(hq), sy(pq), 8, "#ffffff", C.orange);
+      LR.dot(ctx, sx(hq), sy(pq), 8, "#fff", C.orange);
 
       // labels
       ctx.font = "600 12px Inter, sans-serif"; ctx.textAlign = "left";

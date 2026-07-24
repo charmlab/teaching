@@ -223,7 +223,7 @@
       // ghosts of previous boundaries
       st.ghosts.forEach(function (g, i) {
         const alpha = 0.10 + (0.22 * (i + 1)) / st.ghosts.length;
-        LC.drawBoundary(ctx, P, sx, sy, g, "rgba(26,26,26," + alpha.toFixed(2) + ")", 1.6, [5, 5]);
+        LC.drawBoundary(ctx, P, sx, sy, g, "rgba(232,89,12," + alpha.toFixed(2) + ")", 1.6, [5, 5]);
       });
       if (hasLine) LC.drawBoundary(ctx, P, sx, sy, st.w, C.orange, 2.6);
 
@@ -239,7 +239,7 @@
       pts.forEach(function (p, idx) {
         const isCur = !st.converged && idx === st.i;
         const wrong = pMistake(st.w, p);
-        LR.dot(ctx, sx(p.x), sy(p.y), isCur ? 9 : 5.5, p.t === 1 ? POS : NEG, isCur ? C.orange : wrong ? C.red : "#ffffff");
+        LR.dot(ctx, sx(p.x), sy(p.y), isCur ? 9 : 5.5, p.t === 1 ? POS : NEG, isCur ? C.orange : wrong ? C.red : "#fff");
       });
 
       // weight-space inset showing the last update: w_old + t·x̃ = w_new
@@ -247,7 +247,7 @@
         const IN = { x: P.x0 + P.w - 152, y: P.y0 + 10, w: 142, h: 132 };
         ctx.fillStyle = "rgba(255,255,255,0.93)";
         ctx.fillRect(IN.x, IN.y, IN.w, IN.h);
-        ctx.strokeStyle = "#cccccc"; ctx.lineWidth = 1;
+        ctx.strokeStyle = "#ccc"; ctx.lineWidth = 1;
         ctx.strokeRect(IN.x, IN.y, IN.w, IN.h);
         const cxI = IN.x + IN.w / 2, cyI = IN.y + IN.h / 2 + 8;
         const all = [st.lastUp.wOld, st.w];
@@ -258,7 +258,7 @@
         ctx.fillStyle = C.muted; ctx.textAlign = "left";
         ctx.fillText("weight space (w₁, w₂)", IN.x + 8, IN.y + 14);
         if (Math.abs(wo[1]) + Math.abs(wo[2]) > 1e-9) {
-          LR.arrow(ctx, cxI, cyI, cxI + wo[1] * sc, cyI - wo[2] * sc, "#999999", 1.8);
+          LR.arrow(ctx, cxI, cyI, cxI + wo[1] * sc, cyI - wo[2] * sc, "#999", 1.8);
         }
         LR.arrow(ctx, cxI + wo[1] * sc, cyI - wo[2] * sc, cxI + (wo[1] + p.t * p.x) * sc, cyI - (wo[2] + p.t * p.y) * sc, p.t === 1 ? POS : NEG, 1.8);
         LR.arrow(ctx, cxI, cyI, cxI + st.w[1] * sc, cyI - st.w[2] * sc, C.orange, 2.2);
@@ -410,7 +410,7 @@
       // handles (only meaningful in manual mode)
       if (!usingAuto) {
         [h1, h2].forEach(function (h) {
-          ctx.fillStyle = "#ffffff"; ctx.strokeStyle = C.orange; ctx.lineWidth = 2;
+          ctx.fillStyle = "#fff"; ctx.strokeStyle = C.orange; ctx.lineWidth = 2;
           ctx.fillRect(sx(h.x) - 6, sy(h.y) - 6, 12, 12);
           ctx.strokeRect(sx(h.x) - 6, sy(h.y) - 6, 12, 12);
         });
@@ -421,9 +421,9 @@
       pts.forEach(function (p) {
         const right = classify(w, p) === p.t;
         if (right) ok++;
-        LR.dot(ctx, sx(p.x), sy(p.y), 11, p.t === 1 ? POS : NEG, right ? "#ffffff" : C.red);
+        LR.dot(ctx, sx(p.x), sy(p.y), 11, p.t === 1 ? POS : NEG, right ? "#fff" : C.red);
         ctx.font = "700 11px Inter, sans-serif";
-        ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
+        ctx.fillStyle = "#fff"; ctx.textAlign = "center";
         ctx.fillText("(" + p.x + "," + p.y + ")", sx(p.x), sy(p.y) + 3.5);
       });
 
@@ -494,7 +494,7 @@
       if (v === 10) o.selected = true;
       epSel.appendChild(o);
     });
-    epSel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
+    epSel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
     epSel.addEventListener("change", () => { epochs = parseInt(epSel.value, 10); });
     epLab.appendChild(epSel);
     controls.appendChild(epLab);
@@ -575,7 +575,7 @@
       if (w) LC.drawBoundary(ctx, P, SC.sx, SC.sy, w, C.orange, 2.4);
       (pts || TINY).forEach(function (p) {
         const wrong = w ? p.t * (w[0] + w[1] * p.x + w[2] * p.y) <= 0 : false;
-        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 6, p.t === 1 ? POS : NEG, wrong ? C.red : "#ffffff");
+        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 6, p.t === 1 ? POS : NEG, wrong ? C.red : "#fff");
       });
       ctx.font = "600 11px Inter, sans-serif";
       ctx.fillStyle = C.muted; ctx.textAlign = "left";
@@ -596,8 +596,8 @@
 
     const NAMES = ["A", "B", "C"];
     const COLS = { A: C.green, B: C.purple, C: C.amber };
-    const SOFT = { A: "rgba(102,102,102,0.20)", B: "rgba(150,150,150,0.17)", C: "rgba(173,173,173,0.22)" };
-    const CONFLICT = "rgba(141,141,141,0.16)";
+    const SOFT = { A: "rgba(47,158,68,0.20)", B: "rgba(112,72,232,0.17)", C: "rgba(240,162,2,0.22)" };
+    const CONFLICT = "rgba(134,142,150,0.16)";
 
     // three blobs (deterministic)
     const rand = LR.rng(71);
@@ -739,12 +739,12 @@
       const ws = method === "onehot" ? null : method === "ovr" ? wOvr : wOvo;
       if (ws) ws.forEach((w, i) => LC.drawBoundary(ctx, P, sx, sy, w, "rgba(17,17,17,0.35)", 1.3, [5, 4]));
 
-      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.y), 5.5, COLS[p.cls], "#ffffff"));
+      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.y), 5.5, COLS[p.cls], "#fff"));
 
       const d = decide(method, q.x, q.y);
-      LR.dot(ctx, sx(q.x), sy(q.y), 10, d.conflict ? "#b4b4b4" : COLS[d.win], C.orange);
+      LR.dot(ctx, sx(q.x), sy(q.y), 10, d.conflict ? "#adb5bd" : COLS[d.win], C.orange);
       ctx.font = "800 12px Inter, sans-serif";
-      ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
+      ctx.fillStyle = "#fff"; ctx.textAlign = "center";
       ctx.fillText("?", sx(q.x), sy(q.y) + 4);
 
       // legend
@@ -753,7 +753,7 @@
         ctx.fillStyle = COLS[c];
         ctx.fillText("● class " + c, P.x0 + 8, P.y0 + 16 + i * 17);
       });
-      ctx.fillStyle = "#8d8d8d";
+      ctx.fillStyle = "#868e96";
       ctx.fillText("▨ conflict zone", P.x0 + 8, P.y0 + 16 + 3 * 17);
 
       // verdict text

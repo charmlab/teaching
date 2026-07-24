@@ -64,7 +64,7 @@
     XOR: (p) => (p.x !== p.y ? 1 : 0),
   };
   const POS = C.green, NEG = C.purple;
-  const POS_SOFT = "rgba(102,102,102,0.14)", NEG_SOFT = "rgba(150,150,150,0.12)";
+  const POS_SOFT = "rgba(47,158,68,0.14)", NEG_SOFT = "rgba(112,72,232,0.12)";
 
   /* ════════════════════════════════════════════════════════════
      Fig 1.1 — AND vs XOR line-drawing (signature)
@@ -192,13 +192,13 @@
           ctx.beginPath(); ctx.moveTo(sx(pos[0].x), sy(pos[0].y)); ctx.lineTo(sx(pos[1].x), sy(pos[1].y)); ctx.stroke();
           ctx.strokeStyle = NEG;
           ctx.beginPath(); ctx.moveTo(sx(neg[0].x), sy(neg[0].y)); ctx.lineTo(sx(neg[1].x), sy(neg[1].y)); ctx.stroke();
-          LR.dot(ctx, sx(0.5), sy(0.5), 8, "#ffffff", C.red);
+          LR.dot(ctx, sx(0.5), sy(0.5), 8, "#fff", C.red);
           ctx.font = "700 12.5px Inter, sans-serif";
           ctx.fillStyle = C.red; ctx.textAlign = "left";
           ctx.fillText("(0.5, 0.5): both segments claim it", sx(0.5) + 14, sy(0.5) - 8);
         } else {
           // AND: negative hull is a triangle, positive hull a single point; disjoint
-          ctx.fillStyle = "rgba(150,150,150,0.16)";
+          ctx.fillStyle = "rgba(112,72,232,0.16)";
           ctx.strokeStyle = NEG;
           ctx.beginPath();
           ctx.moveTo(sx(0), sy(0)); ctx.lineTo(sx(0), sy(1)); ctx.lineTo(sx(1), sy(0));
@@ -214,13 +214,13 @@
 
       // handles
       [A, B].forEach(function (h) {
-        LR.dot(ctx, sx(h.x), sy(h.y), 8, "#ffffff", C.orange);
+        LR.dot(ctx, sx(h.x), sy(h.y), 8, "#fff", C.orange);
         LR.dot(ctx, sx(h.x), sy(h.y), 3, C.orange);
       });
 
       // the four points
       GATE_PTS.forEach(function (p, i) {
-        LR.dot(ctx, sx(p.x), sy(p.y), 9, t[i] ? POS : NEG, "#ffffff");
+        LR.dot(ctx, sx(p.x), sy(p.y), 9, t[i] ? POS : NEG, "#fff");
         ctx.font = "600 11.5px Inter, sans-serif";
         ctx.fillStyle = C.muted; ctx.textAlign = "center";
         ctx.fillText("(" + p.x + "," + p.y + ")", sx(p.x), sy(p.y) + 24);
@@ -321,7 +321,7 @@
         ctx.beginPath();
         corners.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
         ctx.closePath();
-        ctx.fillStyle = "rgba(26,26,26,0.13)";
+        ctx.fillStyle = "rgba(232,89,12,0.13)";
         ctx.strokeStyle = C.orange; ctx.lineWidth = 1.6;
         ctx.fill(); ctx.stroke();
         ctx.font = "600 11px Inter, sans-serif";
@@ -335,13 +335,13 @@
         const z = t * p.x * p.y;
         const base = proj(p.x, p.y, 0), top = proj(p.x, p.y, z);
         if (z > 1e-3) {
-          ctx.strokeStyle = "#bbbbbb"; ctx.lineWidth = 1.4;
+          ctx.strokeStyle = "#bbb"; ctx.lineWidth = 1.4;
           ctx.setLineDash([3, 3]);
           ctx.beginPath(); ctx.moveTo(base.x, base.y); ctx.lineTo(top.x, top.y); ctx.stroke();
           ctx.setLineDash([]);
         }
         const ok = (score(p) > 0 ? 1 : 0) === t01[i];
-        LR.dot(ctx, top.x, top.y, 8, t01[i] ? POS : NEG, showPlane ? (ok ? "#ffffff" : C.red) : "#ffffff");
+        LR.dot(ctx, top.x, top.y, 8, t01[i] ? POS : NEG, showPlane ? (ok ? "#fff" : C.red) : "#fff");
         ctx.font = "600 10.5px Inter, sans-serif";
         ctx.fillStyle = C.muted; ctx.textAlign = "center";
         ctx.fillText("(" + p.x + "," + p.y + ")", top.x, top.y - 13);
@@ -366,7 +366,7 @@
       }
       const SC = LR.plot(ctx, P);
       GATE_PTS.forEach(function (p, i) {
-        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 7, t01[i] ? POS : NEG, "#ffffff");
+        LR.dot(ctx, SC.sx(p.x), SC.sy(p.y), 7, t01[i] ? POS : NEG, "#fff");
       });
       ctx.font = "600 11px Inter, sans-serif";
       ctx.fillStyle = C.text; ctx.textAlign = "left";
@@ -444,10 +444,10 @@
     function heat(v01) {
       if (v01 >= 0.5) {
         const a = (v01 - 0.5) * 2;
-        return "rgba(26,26,26," + (0.04 + 0.42 * a).toFixed(3) + ")";
+        return "rgba(232,89,12," + (0.04 + 0.42 * a).toFixed(3) + ")";
       }
       const a = (0.5 - v01) * 2;
-      return "rgba(150,150,150," + (0.04 + 0.34 * a).toFixed(3) + ")";
+      return "rgba(112,72,232," + (0.04 + 0.34 * a).toFixed(3) + ")";
     }
     function normalize(a) {
       if (actName === "sigmoid") return a;
@@ -505,7 +505,7 @@
       ctx.restore();
 
       // probe
-      LR.dot(ctx, sx(probe.x), sy(probe.y), 8, "#ffffff", C.orange);
+      LR.dot(ctx, sx(probe.x), sy(probe.y), 8, "#fff", C.orange);
       LR.dot(ctx, sx(probe.x), sy(probe.y), 3, C.orange);
 
       const z = w1 * probe.x + w2 * probe.y + b;
@@ -580,7 +580,7 @@
           const bits = z.map((v) => (v > 0 ? 1 : 0));
           seen.add(bits.join(""));
           const on = bits[0] + bits[1] + bits[2];
-          ctx.fillStyle = "rgba(26,26,26," + (0.03 + 0.13 * on).toFixed(3) + ")";
+          ctx.fillStyle = "rgba(232,89,12," + (0.03 + 0.13 * on).toFixed(3) + ")";
           ctx.fillRect(px, py, BLK, BLK);
         }
       }
@@ -613,7 +613,7 @@
       });
 
       // probe
-      LR.dot(ctx, sx(probe.x), sy(probe.y), 8, "#ffffff", C.orange);
+      LR.dot(ctx, sx(probe.x), sy(probe.y), 8, "#fff", C.orange);
       LR.dot(ctx, sx(probe.x), sy(probe.y), 3, C.orange);
 
       const z = zs(probe.x, probe.y);

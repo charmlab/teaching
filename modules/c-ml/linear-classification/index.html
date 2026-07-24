@@ -11,7 +11,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1a1a'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="lesson.css">
 </head>
 <body>
@@ -155,7 +155,7 @@ perfectly valid positive examples far to the right:
      motivate the move past squared loss, foreshadowing logistic regression. -->
 <div class="figure" id="fig-regthresh">
   <div class="fig-mount" data-fig="regthresh"></div>
-  <p class="fig-caption"><b>Fig 1.1,</b> regression as a classifier. The black line is the genuine least-squares fit to targets <span class="m">$t = \pm 1$</span>; where it crosses zero becomes the decision boundary, and the shaded regions are the two predicted classes. Add the distant positive points: the squared loss drags the line toward them, the crossing slides right, and previously correct points get misclassified. Squared loss punishes the model for being <em>too confidently right</em>, which is the first hint that classification wants its own loss.</p>
+  <p class="fig-caption"><b>Fig 1.1,</b> regression as a classifier. The orange line is the genuine least-squares fit to targets <span class="m">$t = \pm 1$</span>; where it crosses zero becomes the decision boundary, and the shaded regions are the two predicted classes. Add the distant positive points: the squared loss drags the line toward them, the crossing slides right, and previously correct points get misclassified. Squared loss punishes the model for being <em>too confidently right</em>, which is the first hint that classification wants its own loss.</p>
 </div>
 
 <p>
@@ -393,7 +393,7 @@ threshold:
 
 <div class="figure" id="fig-prcurve">
   <div class="fig-mount" data-fig="prcurve"></div>
-  <p class="fig-caption"><b>Fig 4.2,</b> the precision-recall curve, traced from real threshold sweeps over the Fig 4.1 data. The black marker is the threshold you set in Fig 4.1, drag in either figure and the other follows. Toggle the weaker model, a noisier score on the same patients, and its whole curve sits lower: at any recall you want, it offers less precision.</p>
+  <p class="fig-caption"><b>Fig 4.2,</b> the precision-recall curve, traced from real threshold sweeps over the Fig 4.1 data. The orange marker is the threshold you set in Fig 4.1, drag in either figure and the other follows. Toggle the weaker model, a noisier score on the same patients, and its whole curve sits lower: at any recall you want, it offers less precision.</p>
 </div>
 
 <p>

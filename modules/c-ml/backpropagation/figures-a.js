@@ -185,7 +185,7 @@
     o = o || {};
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-    ctx.fillStyle = o.lit ? "#f5f5f5" : "#ffffff";
+    ctx.fillStyle = o.lit ? "#fff5ec" : "#fff";
     ctx.fill();
     ctx.lineWidth = o.lit ? 2.6 : 1.6;
     ctx.strokeStyle = o.lit ? C.orange : o.dim ? "#c8c8c8" : C.axis;
@@ -773,7 +773,7 @@
       if (v === 1) o.selected = true;
       sel.appendChild(o);
     });
-    sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
+    sel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
     sel.addEventListener("change", () => { tv = parseInt(sel.value, 10); });
     lab.appendChild(sel);
     controls.appendChild(lab);

@@ -167,7 +167,7 @@
           const wx = P.xmin + ((px + BLK / 2 - P.x0) / P.w) * (P.xmax - P.xmin);
           const wy = P.ymin + ((P.y0 + P.h - (py + BLK / 2)) / P.h) * (P.ymax - P.ymin);
           const p = LG.sig(w[0] + w[1] * wx + w[2] * wy);
-          offCtx.fillStyle = "rgba(150,150,150," + (p * 0.4).toFixed(3) + ")";
+          offCtx.fillStyle = "rgba(112,72,232," + (p * 0.4).toFixed(3) + ")";
           offCtx.fillRect(px, py, BLK, BLK);
         }
       }
@@ -198,7 +198,7 @@
       ctx.restore();
 
       pts.forEach(function (p) {
-        LR.dot(ctx, sx(p.x), sy(p.y), p.flag ? 7 : 5, CLS_COLOR[p.t], p.flag ? C.red : "#ffffff");
+        LR.dot(ctx, sx(p.x), sy(p.y), p.flag ? 7 : 5, CLS_COLOR[p.t], p.flag ? C.red : "#fff");
       });
       if (beatState) {
         const p = beatState.p.src;
@@ -299,7 +299,7 @@
       if (v === 0.3) o.selected = true;
       aSel.appendChild(o);
     });
-    aSel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #cccccc";
+    aSel.style.cssText = "font-family:var(--mono);font-size:13px;padding:2px 6px;border-radius:6px;border:1px solid #ccc";
     aSel.setAttribute("aria-label", "learning rate alpha");
     aSel.addEventListener("change", () => { alpha = parseFloat(aSel.value); });
     aLab.appendChild(aSel);
@@ -429,7 +429,7 @@
       const { sx, sy } = SC;
 
       // predicted-positive shading
-      ctx.fillStyle = "rgba(26,26,26,0.07)";
+      ctx.fillStyle = "rgba(232,89,12,0.07)";
       ctx.fillRect(sx(tau), P.y0, P.x0 + P.w - sx(tau), P.h);
 
       // τ line
@@ -456,7 +456,7 @@
         else if (s.t === 1 && !pos) FN++;
         else TN++;
         const wrong = (s.t === 1) !== pos;
-        LR.dot(ctx, sx(s.p), sy(yy), 5, CLS_COLOR[s.t], wrong ? C.red : "#ffffff");
+        LR.dot(ctx, sx(s.p), sy(yy), 5, CLS_COLOR[s.t], wrong ? C.red : "#fff");
       });
 
       // confusion matrix + metrics (HTML for accessibility)
@@ -553,7 +553,7 @@
           const wx = P.xmin + ((px + BLK / 2 - P.x0) / P.w) * (P.xmax - P.xmin);
           const wy = P.ymin + ((P.y0 + P.h - (py + BLK / 2)) / P.h) * (P.ymax - P.ymin);
           const p = LG.sig(LG.dot(w, phi(wx, wy)));
-          ctx.fillStyle = "rgba(150,150,150," + (p * 0.42).toFixed(3) + ")";
+          ctx.fillStyle = "rgba(112,72,232," + (p * 0.42).toFixed(3) + ")";
           ctx.fillRect(px, py, BLK, BLK);
           if (Math.abs(p - 0.5) < 0.045) {
             ctx.fillStyle = C.orange;
@@ -563,7 +563,7 @@
       }
       const { sx, sy } = LR.plot(ctx, P);
       train.forEach(function (p) {
-        LR.dot(ctx, sx(p.x), sy(p.y), p.flipped ? 6.5 : 5, CLS_COLOR[p.t], p.flipped ? C.red : "#ffffff");
+        LR.dot(ctx, sx(p.x), sy(p.y), p.flipped ? 6.5 : 5, CLS_COLOR[p.t], p.flipped ? C.red : "#fff");
       });
       ctx.font = "600 11px Inter, sans-serif"; ctx.textAlign = "left";
       ctx.fillStyle = C.red;
@@ -578,7 +578,7 @@
       const PT = { x0: 50, y0: 14, w: R.W - 66, h: 150, xmin: 0, xmax: LAMS.length - 1, ymin: 0, ymax: ymax, xlabel: "", ylabel: "cross-entropy", xticks: LAMS.map((_, i) => i) };
       const SC = LR.plot(ctx, PT);
       // custom tick labels: the λ values
-      ctx.font = "9.5px Inter, sans-serif"; ctx.fillStyle = "#ffffff";
+      ctx.font = "9.5px Inter, sans-serif"; ctx.fillStyle = "#fff";
       ctx.fillRect(PT.x0 - 8, PT.y0 + PT.h + 5, PT.w + 16, 12);
       ctx.fillStyle = C.faint; ctx.textAlign = "center";
       LAMS.forEach((l, i) => ctx.fillText(String(l), SC.sx(i), PT.y0 + PT.h + 14));
@@ -608,7 +608,7 @@
       FEATS.forEach(function (name, j) {
         const v = Math.abs(w[j]);
         const h = Math.max(1.5, (v / maxW) * bh);
-        ctx.fillStyle = j === 0 ? "#c6c6c6" : C.purple;
+        ctx.fillStyle = j === 0 ? "#c9c2e8" : C.purple;
         ctx.fillRect(50 + j * bw + 6, by0 + bh - h, bw - 12, h);
         ctx.fillStyle = C.muted; ctx.textAlign = "center";
         ctx.fillText(name, 50 + j * bw + bw / 2, by0 + bh + 14);
@@ -652,7 +652,7 @@
     const K = 3;
     const NAMES = ["A", "B", "C"];
     const KCOL = [C.green, C.purple, C.amber];
-    const KSOFT = ["rgba(102,102,102,0.16)", "rgba(150,150,150,0.14)", "rgba(173,173,173,0.18)"];
+    const KSOFT = ["rgba(47,158,68,0.16)", "rgba(112,72,232,0.14)", "rgba(240,162,2,0.18)"];
 
     const rand = LR.rng(67);
     const pts = [];
@@ -744,7 +744,7 @@
       SC = LR.plot(ctx, P);
       const { sx, sy } = SC;
 
-      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.y), 5, KCOL[p.t], "#ffffff"));
+      pts.forEach((p) => LR.dot(ctx, sx(p.x), sy(p.y), 5, KCOL[p.t], "#fff"));
 
       const zs = scoresAt(q.x, q.y);
       const pr = LG.softmax(zs);
@@ -753,7 +753,7 @@
 
       // query
       LR.dot(ctx, sx(q.x), sy(q.y), 9.5, KCOL[pred], C.orange);
-      ctx.font = "800 12px Inter, sans-serif"; ctx.fillStyle = "#ffffff"; ctx.textAlign = "center";
+      ctx.font = "800 12px Inter, sans-serif"; ctx.fillStyle = "#fff"; ctx.textAlign = "center";
       ctx.fillText("?", sx(q.x), sy(q.y) + 4);
 
       // ---- probability bars panel ----

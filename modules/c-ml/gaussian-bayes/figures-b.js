@@ -15,9 +15,9 @@
   /* single-hue ramp: white → orange (no rainbow) */
   function ramp(t) {
     t = Math.max(0, Math.min(1, t));
-    const r = Math.round(255 + (26 - 255) * t);
-    const g = Math.round(255 + (26 - 255) * t);
-    const b = Math.round(255 + (26 - 255) * t);
+    const r = Math.round(255 + (232 - 255) * t);
+    const g = Math.round(255 + (89 - 255) * t);
+    const b = Math.round(255 + (12 - 255) * t);
     return [r, g, b];
   }
 
@@ -31,10 +31,10 @@
   function styleSel(sel) {
     sel.style.font = "600 13px Inter, -apple-system, sans-serif";
     sel.style.padding = "6px 10px";
-    sel.style.border = "1.5px solid #cccccc";
+    sel.style.border = "1.5px solid #ccc";
     sel.style.borderRadius = "8px";
-    sel.style.background = "#ffffff";
-    sel.style.color = "#111111";
+    sel.style.background = "#fff";
+    sel.style.color = "#111";
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -107,10 +107,10 @@
       ctx.lineWidth = 1.4;
       ctx.strokeRect(P.x0, P.y0, P.w, P.h);
 
-      GB.ellipse(ctx, map, mu, S, 1, "#3b3b3b", 2);
-      GB.ellipse(ctx, map, mu, S, 2, "#3b3b3b", 1.3, [4, 4]);
-      GB.meanCross(ctx, map, mu, "#3b3b3b");
-      ctx.fillStyle = "#3b3b3b";
+      GB.ellipse(ctx, map, mu, S, 1, "#7a2e00", 2);
+      GB.ellipse(ctx, map, mu, S, 2, "#7a2e00", 1.3, [4, 4]);
+      GB.meanCross(ctx, map, mu, "#7a2e00");
+      ctx.fillStyle = "#7a2e00";
       ctx.font = "600 11px Inter, sans-serif";
       ctx.textAlign = "left";
       const e = GB.eig2(S);
@@ -206,7 +206,7 @@
 
       // query
       const px = map.sx(q.x), py = map.sy(q.y);
-      LR.dot(ctx, px, py, 7, C.purple, "#ffffff");
+      LR.dot(ctx, px, py, 7, C.purple, "#fff");
       ctx.fillStyle = C.purple;
       ctx.font = "700 11.5px Inter, sans-serif";
       ctx.textAlign = "left";
@@ -412,8 +412,8 @@
       ctx.lineTo(map.sx(D), P.y0 + P.h);
       ctx.stroke();
       ctx.setLineDash([]);
-      LR.dot(ctx, map.sx(D), map.sy(Math.max(0, Math.log10(full))), 5, "#ffffff", C.orange);
-      LR.dot(ctx, map.sx(D), map.sy(Math.log10(D + 1)), 5, "#ffffff", C.green);
+      LR.dot(ctx, map.sx(D), map.sy(Math.max(0, Math.log10(full))), 5, "#fff", C.orange);
+      LR.dot(ctx, map.sx(D), map.sy(Math.log10(D + 1)), 5, "#fff", C.green);
 
       ro.set("full", full.toLocaleString("en-US"), C.orange);
       ro.set("nb", String(D + 1), C.green);
@@ -495,7 +495,7 @@
       // decision band
       for (let px = P.x0; px < P.x0 + P.w; px += 2) {
         const x = map.inv(px, 0).x;
-        ctx.fillStyle = score(1, x) > score(0, x) ? "rgba(26,26,26,0.14)" : "rgba(102,102,102,0.12)";
+        ctx.fillStyle = score(1, x) > score(0, x) ? "rgba(232,89,12,0.14)" : "rgba(47,158,68,0.12)";
         ctx.fillRect(px, P.y0, 2, 8);
       }
 
@@ -514,7 +514,7 @@
       const k = coeffs();
       const rs = roots(k).filter((r) => r > X0 && r < X1);
       rs.forEach(function (r) {
-        ctx.strokeStyle = "#333333";
+        ctx.strokeStyle = "#333";
         ctx.lineWidth = 1.7;
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
@@ -522,7 +522,7 @@
         ctx.lineTo(map.sx(r), P.y0 + P.h);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = "#333333";
+        ctx.fillStyle = "#333";
         ctx.font = "600 11px Inter, sans-serif";
         ctx.textAlign = "center";
         ctx.fillText("x = " + LR.fmtF(r, 2), map.sx(r), P.y0 + P.h - 6);

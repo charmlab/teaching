@@ -11,8 +11,8 @@
 
   const POS = C.green;                       // class +1
   const NEG = C.purple;                      // class -1
-  const POS_SOFT = "rgba(102,102,102,0.13)";
-  const NEG_SOFT = "rgba(150,150,150,0.11)";
+  const POS_SOFT = "rgba(47,158,68,0.13)";
+  const NEG_SOFT = "rgba(112,72,232,0.11)";
 
   /* ── shared linear-classifier core (also used by figures-b.js) ── */
   const LC = (LR.lc = {
@@ -306,7 +306,7 @@
         const pred = LC.sign(fit.w0 + fit.w1 * p.x);
         const wrong = pred !== p.t;
         if (wrong) errs++;
-        LR.dot(ctx, sx(p.x), sy(p.t), wrong ? 7 : 5.5, p.t === 1 ? POS : NEG, wrong ? C.red : "#ffffff");
+        LR.dot(ctx, sx(p.x), sy(p.t), wrong ? 7 : 5.5, p.t === 1 ? POS : NEG, wrong ? C.red : "#fff");
       });
 
       ctx.font = "600 12px Inter, sans-serif";
@@ -435,7 +435,7 @@
       const a = anchor();
       if (a) {
         LR.arrow(ctx, sx(a.ax), sy(a.ay), sx(a.hx), sy(a.hy), C.orange, 2.4);
-        LR.dot(ctx, sx(a.hx), sy(a.hy), 6, "#ffffff", C.orange);
+        LR.dot(ctx, sx(a.hx), sy(a.hy), 6, "#fff", C.orange);
         ctx.font = "700 12.5px Inter, sans-serif";
         ctx.fillStyle = C.orange; ctx.textAlign = "left";
         ctx.fillText("w", sx(a.hx) + 10, sy(a.hy) - 6);
@@ -446,7 +446,7 @@
       pts.forEach(function (p) {
         const right = LC.sign(LC.score2(w, p)) === p.t;
         if (right) ok++;
-        LR.dot(ctx, sx(p.x), sy(p.y), right ? 5.5 : 7, p.t === 1 ? POS : NEG, right ? "#ffffff" : C.red);
+        LR.dot(ctx, sx(p.x), sy(p.y), right ? 5.5 : 7, p.t === 1 ? POS : NEG, right ? "#fff" : C.red);
       });
 
       ctx.font = "600 12px Inter, sans-serif"; ctx.textAlign = "left";
@@ -491,13 +491,13 @@
       // data points on the line, classified by the current w0, w1
       pts1d.forEach(function (p) {
         const right = LC.sign(w[0] + w[1] * p.x) === p.t;
-        LR.dot(ctx, sx(p.x), axisY, right ? 6 : 7.5, p.t === 1 ? POS : NEG, right ? "#ffffff" : C.red);
+        LR.dot(ctx, sx(p.x), axisY, right ? 6 : 7.5, p.t === 1 ? POS : NEG, right ? "#fff" : C.red);
       });
 
       if (hasB && xb >= P.xmin && xb <= P.xmax) {
         ctx.strokeStyle = C.orange; ctx.lineWidth = 2.4;
         ctx.beginPath(); ctx.moveTo(sx(xb), axisY - 52); ctx.lineTo(sx(xb), axisY + 52); ctx.stroke();
-        LR.dot(ctx, sx(xb), axisY, 5.5, C.orange, "#ffffff");
+        LR.dot(ctx, sx(xb), axisY, 5.5, C.orange, "#fff");
         ctx.font = "700 12.5px Inter, sans-serif"; ctx.fillStyle = C.orange; ctx.textAlign = "center";
         ctx.fillText("boundary: a point, x₁ = −w₀/w₁ = " + LR.fmtF(xb, 2), sx(xb), axisY - 62);
       }
@@ -534,7 +534,7 @@
       ctx.beginPath();
       corners.forEach((c, i) => (i === 0 ? ctx.moveTo(c.px, c.py) : ctx.lineTo(c.px, c.py)));
       ctx.closePath();
-      ctx.fillStyle = "rgba(26,26,26,0.10)";
+      ctx.fillStyle = "rgba(232,89,12,0.10)";
       ctx.strokeStyle = C.orange; ctx.lineWidth = 2;
       ctx.fill(); ctx.stroke();
 
@@ -549,11 +549,11 @@
       const rand3 = LR.rng(5);
       for (let i = 0; i < 7; i++) {
         const a = proj(-2 + rand3() * 4, -1.6 + rand3() * 3.2, 0.5 + rand3() * 1.4);
-        LR.dot(ctx, a.px, a.py, 5.5, POS, "#ffffff");
+        LR.dot(ctx, a.px, a.py, 5.5, POS, "#fff");
       }
       for (let i = 0; i < 7; i++) {
         const b = proj(-2 + rand3() * 4, -1.6 + rand3() * 3.2, -0.5 - rand3() * 1.4);
-        LR.dot(ctx, b.px, b.py, 5.5, NEG, "#ffffff");
+        LR.dot(ctx, b.px, b.py, 5.5, NEG, "#fff");
       }
 
       ctx.font = "600 12.5px Inter, sans-serif";
@@ -645,7 +645,7 @@
         const y = rowY + it.jit * 34;
         const flagged = it.s >= tau;
         const wrong = (it.t === 1) !== flagged;
-        LR.dot(ctx, sxTop(it.s), y, wrong ? 6 : 4.5, it.t === 1 ? POS : NEG, wrong ? C.red : "#ffffff");
+        LR.dot(ctx, sxTop(it.s), y, wrong ? 6 : 4.5, it.t === 1 ? POS : NEG, wrong ? C.red : "#fff");
       });
       ctx.font = "600 11.5px Inter, sans-serif"; ctx.textAlign = "left";
       ctx.fillStyle = POS; ctx.fillText("diseased (t = +1)", TOP.x0 + 6, TOP.y0 + 22);
@@ -684,7 +684,7 @@
       ctx.restore();
 
       // minimum marker
-      LR.dot(ctx, SC.sx(best.t), SC.sy(best.c), 7, "#ffffff", POS);
+      LR.dot(ctx, SC.sx(best.t), SC.sy(best.c), 7, "#fff", POS);
       ctx.font = "600 11.5px Inter, sans-serif";
       ctx.fillStyle = POS; ctx.textAlign = "center";
       ctx.fillText("best τ ≈ " + LR.fmtF(best.t, 2) + " (cost " + best.c + ")", SC.sx(best.t), SC.sy(best.c) - 12);
@@ -694,7 +694,7 @@
       ctx.strokeStyle = C.orange; ctx.lineWidth = 1.4; ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(SC.sx(tau), BOT.y0); ctx.lineTo(SC.sx(tau), BOT.y0 + BOT.h); ctx.stroke();
       ctx.setLineDash([]);
-      LR.dot(ctx, SC.sx(tau), SC.sy(cNow), 6, C.orange, "#ffffff");
+      LR.dot(ctx, SC.sx(tau), SC.sy(cNow), 6, C.orange, "#fff");
 
       ro.set("fp", String(cm.fp), NEG);
       ro.set("fn", String(cm.fn), C.red);
@@ -776,7 +776,7 @@
         const y = rowY + it.jit * 52;
         const flagged = it.s >= thr;
         const wrong = (it.t === 1) !== flagged;
-        LR.dot(ctx, sx(it.s), y, wrong ? 6 : 4.5, it.t === 1 ? POS : NEG, wrong ? C.red : "#ffffff");
+        LR.dot(ctx, sx(it.s), y, wrong ? 6 : 4.5, it.t === 1 ? POS : NEG, wrong ? C.red : "#fff");
       });
 
       ctx.font = "600 11.5px Inter, sans-serif"; ctx.textAlign = "left";
@@ -886,7 +886,7 @@
       // marker at the shared threshold
       const m = LC.metrics(LC.confusion(items, LC.thr));
       if (isFinite(m.P) && isFinite(m.R)) {
-        LR.dot(ctx, SC.sx(m.R), SC.sy(m.P), 8, "#ffffff", C.orange);
+        LR.dot(ctx, SC.sx(m.R), SC.sy(m.P), 8, "#fff", C.orange);
         LR.dot(ctx, SC.sx(m.R), SC.sy(m.P), 3.5, C.orange);
         ctx.fillStyle = C.orange;
         ctx.font = "700 12px Inter, sans-serif";

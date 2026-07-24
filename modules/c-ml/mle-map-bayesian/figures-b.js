@@ -310,7 +310,7 @@
     const legend = LR.el("div", "legend-row");
     legend.innerHTML =
       '<span class="lg"><span class="sw" style="background:' + C.purple + '"></span> prior Beta(a, b)</span>' +
-      '<span class="lg"><span class="sw" style="background:#9f9f9f"></span> likelihood (normalized for display)</span>' +
+      '<span class="lg"><span class="sw" style="background:#9aa0a6"></span> likelihood (normalized for display)</span>' +
       '<span class="lg"><span class="sw" style="background:' + C.orange + '"></span> posterior Beta(N_H + a, N_T + b)</span>';
     mount.appendChild(legend);
 
@@ -342,7 +342,7 @@
 
       const clip = (f) => (x) => Math.min(f(x), ymax);
       curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, a, b)), 0, 1, C.purple, 2.2, [6, 4]);
-      curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, likA, likB)), 0, 1, "#9f9f9f", 2);
+      curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, likA, likB)), 0, 1, "#9aa0a6", 2);
       // posterior filled
       ctx.beginPath();
       ctx.moveTo(sx(0), sy(0));
@@ -352,7 +352,7 @@
       }
       ctx.lineTo(sx(1), sy(0));
       ctx.closePath();
-      ctx.fillStyle = "rgba(26,26,26, 0.10)";
+      ctx.fillStyle = "rgba(232, 89, 12, 0.10)";
       ctx.fill();
       curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, pa, pb)), 0, 1, C.orange, 2.8);
 
@@ -391,7 +391,7 @@
 
     const legend = LR.el("div", "legend-row");
     legend.innerHTML =
-      '<span class="lg"><span class="sw" style="background:#a4a4a4"></span> prior (dashed)</span>' +
+      '<span class="lg"><span class="sw" style="background:#b197fc"></span> prior (dashed)</span>' +
       '<span class="lg"><span class="sw" style="background:' + C.orange + '"></span> posterior</span>' +
       '<span class="lg"><span class="sw" style="background:' + C.green + '"></span> MLE</span>' +
       '<span class="lg"><span class="sw" style="background:' + C.orange + '"></span> MAP (mode)</span>' +
@@ -451,7 +451,7 @@
       ctx.fillText("true θ = 0.7", sx(TRUE_THETA), P.y0 + 10);
 
       // prior (dashed light purple)
-      curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, a, b)), 0, 1, "#a4a4a4", 2, [6, 4]);
+      curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, a, b)), 0, 1, "#b197fc", 2, [6, 4]);
       // posterior filled
       ctx.beginPath();
       ctx.moveTo(sx(0), sy(0));
@@ -461,7 +461,7 @@
       }
       ctx.lineTo(sx(1), sy(0));
       ctx.closePath();
-      ctx.fillStyle = "rgba(26,26,26, 0.10)";
+      ctx.fillStyle = "rgba(232, 89, 12, 0.10)";
       ctx.fill();
       curve(ctx, sx, sy, clip((x) => EST.betaPdf(x, pa, pb)), 0, 1, C.orange, 2.8);
 
@@ -580,7 +580,7 @@
         R.ctx.stroke();
       });
       // current-N cursor
-      R.ctx.strokeStyle = "#bbbbbb";
+      R.ctx.strokeStyle = "#bbb";
       R.ctx.lineWidth = 1.4;
       R.ctx.setLineDash([3, 3]);
       R.ctx.beginPath();
@@ -589,7 +589,7 @@
       R.ctx.stroke();
       R.ctx.setLineDash([]);
       [{ v: mle, col: C.green }, { v: map, col: C.orange }, { v: mean, col: C.purple }].forEach(function (m) {
-        if (isFinite(m.v)) LR.dot(R.ctx, gr.sx(N), gr.sy(m.v), 4.5, m.col, "#ffffff");
+        if (isFinite(m.v)) LR.dot(R.ctx, gr.sx(N), gr.sy(m.v), 4.5, m.col, "#fff");
       });
 
       const vals = [mle, map, mean].filter(isFinite);

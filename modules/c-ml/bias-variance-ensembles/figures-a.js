@@ -156,12 +156,12 @@
           ctx.stroke();
         });
         // bullseye = the true target
-        LR.dot(ctx, c.x, c.y, 5, C.green, "#ffffff");
+        LR.dot(ctx, c.x, c.y, 5, C.green, "#fff");
 
         // darts thrown so far
         const ds = darts[bi].slice(0, shown);
         ds.forEach(function (d) {
-          LR.dot(ctx, c.x + d.x, c.y + d.y, 4, C.orange, "#ffffff");
+          LR.dot(ctx, c.x + d.x, c.y + d.y, 4, C.orange, "#fff");
         });
 
         const st = boardStats(ds);
@@ -175,7 +175,7 @@
           ctx.lineTo(c.x + st.mx, c.y + st.my);
           ctx.stroke();
           ctx.setLineDash([]);
-          LR.dot(ctx, c.x + st.mx, c.y + st.my, 5, C.purple, "#ffffff");
+          LR.dot(ctx, c.x + st.mx, c.y + st.my, 5, C.purple, "#fff");
         }
 
         // labels
@@ -310,7 +310,7 @@
 
       // ghost fits (up to the last 15, excluding the current one)
       const ghosts = fits.slice(Math.max(0, fits.length - 16), fits.length - 1);
-      ghosts.forEach(function (w) { drawPoly(w, "rgba(26,26,26,0.16)", 1.4); });
+      ghosts.forEach(function (w) { drawPoly(w, "rgba(232,89,12,0.16)", 1.4); });
 
       // true function
       ctx.strokeStyle = C.green;
@@ -345,13 +345,13 @@
       const preds = fits.map((w) => Math.max(P.ymin, Math.min(P.ymax, LR.polyval(w, XQ))));
       preds.forEach(function (y, i) {
         const isCur = i === preds.length - 1;
-        LR.dot(ctx, sx(XQ), sy(y), isCur ? 5 : 3.4, isCur ? C.orange : "rgba(150,150,150,0.5)");
+        LR.dot(ctx, sx(XQ), sy(y), isCur ? 5 : 3.4, isCur ? C.orange : "rgba(112,72,232,0.5)");
       });
       if (preds.length > 1) {
         const m = E.mean(fits.map((w) => LR.polyval(w, XQ)));
-        LR.dot(ctx, sx(XQ), sy(Math.max(P.ymin, Math.min(P.ymax, m))), 6.5, C.purple, "#ffffff");
+        LR.dot(ctx, sx(XQ), sy(Math.max(P.ymin, Math.min(P.ymax, m))), 6.5, C.purple, "#fff");
       }
-      LR.dot(ctx, sx(XQ), sy(BV.f(XQ)), 6.5, C.green, "#ffffff");
+      LR.dot(ctx, sx(XQ), sy(BV.f(XQ)), 6.5, C.green, "#fff");
 
       ctx.restore();
 
@@ -479,7 +479,7 @@
       curve(vari, C.purple);
       if (revealed) {
         curve(total, C.orange);
-        LR.dot(ctx, sx(bestIdx), sy(total[bestIdx]), 7, "#ffffff", C.orange);
+        LR.dot(ctx, sx(bestIdx), sy(total[bestIdx]), 7, "#fff", C.orange);
         ctx.font = "600 11.5px Inter, sans-serif";
         ctx.fillStyle = C.orange;
         ctx.textAlign = "left";
@@ -506,7 +506,7 @@
       ctx.fillStyle = C.green; ctx.fillText("— bias²  (underfitting's term)", P.x0 + P.w - 232, P.y0 + 16);
       ctx.fillStyle = C.purple; ctx.fillText("— variance  (overfitting's term)", P.x0 + P.w - 232, P.y0 + 32);
       ctx.fillStyle = C.faint; ctx.fillText("· · Bayes error σ² = " + LR.fmtF(bayes, 4), P.x0 + P.w - 232, P.y0 + 48);
-      ctx.fillStyle = revealed ? C.orange : "#bbbbbb";
+      ctx.fillStyle = revealed ? C.orange : "#bbb";
       ctx.fillText(revealed ? "— total (revealed)" : "— total (hidden: click a degree)", P.x0 + P.w - 232, P.y0 + 64);
 
       if (!revealed) {
@@ -598,7 +598,7 @@
         });
         ctx.stroke();
         // floor
-        ctx.strokeStyle = "rgba(150,150,150,0.4)";
+        ctx.strokeStyle = "rgba(112,72,232,0.4)";
         ctx.lineWidth = 1.2;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
@@ -613,12 +613,12 @@
       // markers at current N
       const pInd = E.majorityWrong(N, eps);
       const pCor = corWrong(N, eps, rho);
-      LR.dot(ctx, sx(N), sy(pInd), 6, "#ffffff", C.orange);
-      if (rho > 0) LR.dot(ctx, sx(N), sy(pCor), 6, "#ffffff", C.purple);
+      LR.dot(ctx, sx(N), sy(pInd), 6, "#fff", C.orange);
+      if (rho > 0) LR.dot(ctx, sx(N), sy(pCor), 6, "#fff", C.purple);
 
       // legend
       ctx.fillStyle = C.orange; ctx.fillText("— independent errors", P.x0 + P.w - 180, P.y0 + 16);
-      ctx.fillStyle = rho > 0 ? C.purple : "#bbbbbb";
+      ctx.fillStyle = rho > 0 ? C.purple : "#bbb";
       ctx.fillText("— correlated (ρ = " + LR.fmtF(rho, 2) + ")", P.x0 + P.w - 180, P.y0 + 32);
 
       ro.set("base", LR.fmtF(eps, 3));

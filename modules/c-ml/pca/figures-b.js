@@ -374,7 +374,7 @@
       ctx.stroke();
 
       // residual segments (thin)
-      ctx.strokeStyle = "rgba(61,61,61,0.35)"; ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(224,49,49,0.35)"; ctx.lineWidth = 1;
       Xc.forEach(function (p) {
         const z = p[0] * w[0] + p[1] * w[1];
         ctx.beginPath();
@@ -385,7 +385,7 @@
 
       // u1 reference (dashed)
       ctx.setLineDash([6, 5]);
-      ctx.strokeStyle = "rgba(102,102,102,0.6)"; ctx.lineWidth = 1.6;
+      ctx.strokeStyle = "rgba(47,158,68,0.6)"; ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.moveTo(sx(-6 * e.u1[0]), sy(-6 * e.u1[1]));
       ctx.lineTo(sx(6 * e.u1[0]), sy(6 * e.u1[1]));
@@ -398,7 +398,7 @@
       Xc.forEach((p) => LR.dot(ctx, sx(p[0]), sy(p[1]), 2.8, "rgba(17,17,17,0.55)"));
 
       // drag handle
-      LR.dot(ctx, sx(HANDLE * w[0]), sy(HANDLE * w[1]), 8, C.orange, "#ffffff");
+      LR.dot(ctx, sx(HANDLE * w[0]), sy(HANDLE * w[1]), 8, C.orange, "#fff");
       ctx.restore();
 
       rows[0].fill.style.width = (100 * kept / tot) + "%";
@@ -544,7 +544,7 @@
       c = 0;
       lam.forEach(function (l, i) {
         c += l;
-        LR.dot(ctx, bx(i) + Pl.w / Dd / 2, cy(c / tot), 3.4, C.purple, "#ffffff");
+        LR.dot(ctx, bx(i) + Pl.w / Dd / 2, cy(c / tot), 3.4, C.purple, "#fff");
       });
 
       // 90% recommendation marker
