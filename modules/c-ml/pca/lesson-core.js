@@ -394,3 +394,39 @@
     setTimeout(initFigures, 0);
   });
 })();
+
+/* == code-fold == */
+(function () {
+  "use strict";
+  function fold(el, lang) {
+    var d = document.createElement("details");
+    d.className = "code-fold";
+    var s = document.createElement("summary");
+    var t = document.createElement("span");
+    t.textContent = "The code";
+    s.appendChild(t);
+    if (lang) {
+      var c = document.createElement("span");
+      c.className = "cf-lang";
+      c.textContent = lang;
+      s.appendChild(c);
+    }
+    s.setAttribute("aria-label", "Show the " + (lang || "code") + " for this section");
+    el.parentNode.insertBefore(d, el);
+    d.appendChild(s);
+    d.appendChild(el);
+  }
+  function run() {
+    document.querySelectorAll(".code-compare").forEach(function (g) {
+      if (g.closest("details") || g.closest(".fig-mount")) return;
+      var p = g.querySelector("pre.code");
+      fold(g, p ? p.getAttribute("data-lang") : null);
+    });
+    document.querySelectorAll("pre.code").forEach(function (p) {
+      if (p.closest("details") || p.closest(".code-compare") || p.closest(".fig-mount")) return;
+      fold(p, p.getAttribute("data-lang"));
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", run);
+  else run();
+})();

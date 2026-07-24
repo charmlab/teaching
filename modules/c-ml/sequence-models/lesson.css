@@ -652,3 +652,39 @@ table.seq-table td.dim { color: var(--faint); }
   background: var(--accent-soft); border: 1px solid #f3c9ad; border-radius: 8px;
   padding: 8px 12px; margin-top: 10px; min-height: 38px;
 }
+
+/* == code-fold & polish == */
+details.code-fold { margin: 0 0 22px; }
+details.code-fold > summary {
+  font-family: var(--sans); font-size: 13px; font-weight: 700;
+  color: var(--muted); cursor: pointer; list-style: none; user-select: none;
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 8px 15px; border: 1px solid var(--line); border-radius: 10px;
+  background: #fafafa;
+}
+details.code-fold > summary::-webkit-details-marker { display: none; }
+details.code-fold > summary::before {
+  content: "{ }"; font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  color: var(--accent); letter-spacing: -0.5px;
+}
+details.code-fold > summary:hover { color: var(--text); border-color: var(--accent); }
+details.code-fold[open] > summary::before { content: "\2013"; letter-spacing: 0; }
+details.code-fold > summary .cf-lang {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--faint); border: 1px solid var(--line);
+  border-radius: 5px; padding: 1.5px 6px;
+}
+details.code-fold pre.code { margin: 10px 0 0; }
+details.code-fold .code-compare { margin: 10px 0 0; }
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 2px 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.katex-display::-webkit-scrollbar, pre.code::-webkit-scrollbar { height: 6px; }
+.katex-display::-webkit-scrollbar-thumb, pre.code::-webkit-scrollbar-thumb { background: #d9d9d9; border-radius: 3px; }
+.katex-display::-webkit-scrollbar-track, pre.code::-webkit-scrollbar-track { background: transparent; }
+pre.code { scrollbar-width: thin; scrollbar-color: #3a3d44 transparent; }
+pre.code::-webkit-scrollbar-thumb { background: #3a3d44; }
+::selection { background: var(--accent-soft); color: var(--text); }
+a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible,
+input:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px;
+}
+h1, h2, h3 { text-wrap: balance; }
