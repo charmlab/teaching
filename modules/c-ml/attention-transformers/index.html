@@ -677,31 +677,31 @@ cost_per_call(12000, 500, 3.00, 15.00)   # 0.036 + 0.0075 = 0.0435, about $0.044
 
 <p>
 Run the worked example: a support bot that stuffs a 12,000-token product
-manual into every prompt and gets 500 tokens back, at $3 per million input
-tokens and $15 per million output tokens, costs
+manual into every prompt and gets 500 tokens back, at <span class="usd">$</span>3 per million input
+tokens and <span class="usd">$</span>15 per million output tokens, costs
 <span class="m">$12000 \times 3/10^6 + 500 \times 15/10^6 = \$0.036 + \$0.0075 \approx \$0.044$</span>
 per query. Harmless, until you multiply: at 100,000 queries a month that is
-about $4,400 a month, and the bill is utterly dominated by the stuffed input.
+about <span class="usd">$</span>4,400 a month, and the bill is utterly dominated by the stuffed input.
 Now notice what RAG does to it. Retrieve the two relevant paragraphs instead
 of shipping the manual, roughly a 20x cut in input tokens, and the same
-traffic costs about $930 a month. Feel the arithmetic move:
+traffic costs about <span class="usd">$</span>930 a month. Feel the arithmetic move:
 </p>
 
 <div class="figure" id="fig-cost">
   <div class="fig-mount" data-fig="cost"></div>
-  <p class="fig-caption"><b>Fig 7.1,</b> the token and cost calculator. Type or paste text to see the 1-token-per-4-characters estimate; set input and output sizes, prices, and monthly volume, and the cost per call and monthly bill are computed live from the formula above. The preset reproduces the lecture's $0.044-per-query manual-stuffing example, and the RAG toggle cuts input tokens 20x and reprices the month.</p>
+  <p class="fig-caption"><b>Fig 7.1,</b> the token and cost calculator. Type or paste text to see the 1-token-per-4-characters estimate; set input and output sizes, prices, and monthly volume, and the cost per call and monthly bill are computed live from the formula above. The preset reproduces the lecture's <span class="usd">$</span>0.044-per-query manual-stuffing example, and the RAG toggle cuts input tokens 20x and reprices the month.</p>
 </div>
 
 <div class="quiz" data-correct="b">
   <div class="quiz-label">Check your understanding</div>
-  <p class="quiz-q">A call sends 8,000 tokens in and receives 1,000 tokens out, at $2.50 per 1M input and $10 per 1M output tokens. Cost per call?</p>
+  <p class="quiz-q">A call sends 8,000 tokens in and receives 1,000 tokens out, at <span class="usd">$</span>2.50 per 1M input and <span class="usd">$</span>10 per 1M output tokens. Cost per call?</p>
   <div class="quiz-opts">
-    <button data-k="a">$0.30: (8000 + 1000) tokens at the average price</button>
-    <button data-k="b">$0.03: <span class="m">$8000 \times 2.5/10^6 + 1000 \times 10/10^6 = 0.02 + 0.01$</span></button>
-    <button data-k="c">$0.0025: only input tokens are billed</button>
+    <button data-k="a"><span class="usd">$</span>0.30: (8000 + 1000) tokens at the average price</button>
+    <button data-k="b"><span class="usd">$</span>0.03: <span class="m">$8000 \times 2.5/10^6 + 1000 \times 10/10^6 = 0.02 + 0.01$</span></button>
+    <button data-k="c"><span class="usd">$</span>0.0025: only input tokens are billed</button>
   </div>
   <div class="quiz-fb" data-k="a">Averaging the prices double-counts: input and output are billed at their own rates, and the answer is ten times smaller. Recompute each term separately.</div>
-  <div class="quiz-fb" data-k="b">Right, three cents. And note the structure: the input term is twice the output term here, so if this call is stuffing context, retrieval is where the savings live. At a million calls a month this is $30,000, which is why the formula deserves respect.</div>
+  <div class="quiz-fb" data-k="b">Right, three cents. And note the structure: the input term is twice the output term here, so if this call is stuffing context, retrieval is where the savings live. At a million calls a month this is <span class="usd">$</span>30,000, which is why the formula deserves respect.</div>
   <div class="quiz-fb" data-k="c">Output tokens are billed too, and typically at a several-times-higher rate, because generating them is the slow sequential part. Both terms count.</div>
 </div>
 
