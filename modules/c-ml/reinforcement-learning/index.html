@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reinforcement Learning — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive final lesson on reinforcement learning: multi-armed bandits and the exploration-exploitation dilemma, Markov decision processes, value functions, Bellman equations, value and policy iteration, and Q-learning, with live agents you can train.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 21 &middot; The ML Bible</div>
+  <h1>Reinforcement Learning</h1>
+  <p class="lede">
+    Every algorithm in this course so far learned from information someone
+    handed it. Supervised learning got labels: here is the input, here is the
+    right answer, match them. Unsupervised learning got structure to find:
+    here is the data, uncover its patterns. This final lecture removes both
+    crutches. The agent gets no labels and no correct answers, only a number
+    that arrives after it acts, sometimes long after: a reward. From that thin
+    signal it must learn what to do. That setting covers slot machines,
+    self-driving cars, and the chess engines that beat us at our own game, and
+    it runs on three ideas: exploration, the Markov decision process, and one
+    recursive equation that Richard Bellman wrote down in the 1950s. By the end
+    you will train an agent yourself and watch knowledge flow backward from
+    the goal.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: no labels, no answers, just reward</a></li>
+    <li><a href="#sec-bandits">Bandits: learning what pays</a></li>
+    <li><a href="#sec-states">From bandits to states</a></li>
+    <li><a href="#sec-mdp">MDPs, policies, and value functions</a></li>
+    <li><a href="#sec-planning">Planning: Bellman equations, value and policy iteration</a></li>
+    <li><a href="#sec-qlearning">Learning: Q-learning</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: no labels, no answers, just reward</h2>
+
+<p>
+Line up the three kinds of learning this course has met. Supervised learning
+matches labels: a spam filter sees emails already marked spam or not, and
+imitates the marking. Unsupervised learning uncovers patterns: customer
+segmentation finds groups nobody labelled. Reinforcement learning, the third
+family, maximizes reward: a chess AI plays, and much later a single number
+comes back, win or lose. Nobody tells it which move was the mistake.
+</p>
+
+<p>
+That last sentence is the entire difficulty, so read it again. Rewards are
+feedback from the world, not ground-truth targets. The agent receives a
+stream of inputs, acts, and its actions change the state of the world;
+occasionally a reward or penalty arrives. When the game is lost on move
+sixty, which of the sixty moves was wrong? There is no label to say. And yet
+this setting produced some of the most famous results in the field: Richard
+Sutton, who pioneered the theory, won the 2025 Turing Award for it, and Demis
+Hassabis, whose DeepMind built AlphaGo on these ideas, is a 2024 Nobel
+Laureate. So the thin signal is enough. Watch it be enough:
+</p>
+
+<div class="figure" id="fig-hook">
+  <div class="fig-mount" data-fig="hook"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> where this lesson ends up: an agent learning to act from reward alone. Press Train and a real Q-learning agent (the algorithm of section 5, running live) explores the grid, finds the goal, and builds value estimates, shown as the deepening colour, and a policy, shown as the arrows, from nothing but a reward at the goal. Early episodes wander for dozens of steps; later ones walk straight in. Nobody labelled a single move. <!-- flagged addition: the source teaches Q-learning in its final section; running it here first as a wordless preview, and this demo's specific grid size and training parameters, are my pedagogical choices. The algorithm and update rule are exactly the source's. --></p>
+</div>
+
+<p>
+Everything that just happened on that grid needs explaining. Why did the
+agent ever try a bad direction? That is exploration, and section 1 isolates
+it with the simplest possible problem, a row of slot machines. What did the
+colours mean? Those are value functions, section 3. Why did the colour spread
+backward from the goal? That is the Bellman equation doing its work, sections
+4 and 5. The lecture's spine, and this lesson's, is exactly that ladder:
+bandits introduce exploration, MDPs add state and delayed consequences, and
+Bellman equations turn long-term value into a one-step recursion that we
+either plan with, when the world's rules are known, or learn, when they are
+not.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. BANDITS ═══════════════════ -->
+<section id="sec-bandits">
+<h2><span class="secnum">1.</span> Bandits: learning what pays</h2>
+
+<h3>A casino with unknown machines</h3>
+
+<p>
+Strip away everything except the core problem. You walk into a casino with a
+row of <span class="m">$K$</span> slot machines. Each machine pays out a
+random reward from its own distribution, and you do not know any of the
+distributions. You can play as many rounds as you like, one machine per
+round, and you observe only the payout of the machine you played. Your goal:
+maximize total reward. This is the <strong>multi-armed bandit</strong>
+problem, named for the slot machine's nickname, the one-armed bandit.
+</p>
+
+<p>
+Formally, at each round <span class="m">$t$</span> the agent selects an
+action <span class="m">$a_t \in A$</span> (which machine to play) and
+receives a stochastic reward <span class="m">$r_{t+1}$</span>. Each action
+has an unknown true value, the expected reward for playing it:
+</p>
+
+$$ q_*(a) := \mathbb{E}[r_{t+1} \mid a_t = a], \qquad r_{t+1} \sim p(\cdot \mid a_t), $$
+
+<p>
+and the objective is to maximize expected cumulative reward,
+<span class="m">$\max \, \mathbb{E}\!\left[\sum_{t=0}^{T-1} r_{t+1}\right]$</span>.
+If someone told us <span class="m">$q_*(a)$</span> for every machine we would
+play the best one forever and be done. Nobody tells us, so we estimate it the
+obvious way, by the sample average of the rewards each action has produced:
+</p>
+
+$$ Q_t(a) = \frac{\sum_{i=1}^{N_t(a)} r_i(a)}{N_t(a)}, $$
+
+<p>
+where <span class="m">$N_t(a)$</span> counts how many times action
+<span class="m">$a$</span> has been played so far. Play machine 3 three
+times, see payouts 1, 0, 1, and your estimate is
+<span class="m">$Q_t(3) = 2/3 \approx 0.667$</span>. Simple. So are we done?
+Just play a bit, then commit to the machine with the best average?
+</p>
+
+<h3>The exploration-exploitation dilemma</h3>
+
+<p>
+No, and here is the trap: a high empirical average from a few plays is not
+conclusive. A mediocre machine can get lucky twice; a great machine can start
+cold. Rarely sampled actions have uncertain estimates, and the only way to
+shrink the uncertainty is to play them, which costs you rounds on the machine
+you currently believe is best. Every round forces a choice between two
+motives:
+</p>
+
+<ul>
+  <li><strong>Exploitation</strong>: play <span class="m">$a_t = \arg\max_a Q_t(a)$</span>, the best machine according to current knowledge. Uses what you know; risks committing too early to a lucky impostor.</li>
+  <li><strong>Exploration</strong>: play a less familiar machine to improve an uncertain estimate. Buys information; costs immediate reward.</li>
+</ul>
+
+<p>
+This tension is everywhere once you see it. Your favourite restaurant or the
+new one? Drill the oil site you know pays or survey a new spot? Play the
+chess move you trust or the experimental one? Show the ad with the best
+click-through rate or a different one? Test yourself on the trade-off, then
+feel it directly on a live bandit:
+</p>
+
+<div class="figure" id="fig-explore">
+  <div class="fig-mount" data-fig="explore"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the dilemma in everyday clothes. Flip each card to see its exploit and explore readings, then run the restaurant version as an actual two-armed bandit: your favourite spot has a known average, the new place is unknown, and the simulation plays 30 nights at your chosen <span class="m">$\epsilon$</span>, computed with real draws. Sometimes exploring finds a better favourite; sometimes it just costs you dinners. That is the point. <!-- flagged addition: the four scenarios are the source's own examples; the restaurant simulator's specific numbers (a 6.5-of-10 favourite, an unknown rival, 30 nights) are mine. --></p>
+</div>
+
+<h3>Two standard strategies</h3>
+
+<p>
+<strong><span class="m">$\epsilon$</span>-greedy</strong> is the blunt fix:
+with probability <span class="m">$1 - \epsilon$</span> exploit,
+<span class="m">$a_t = \arg\max_a Q_t(a)$</span>, and with probability
+<span class="m">$\epsilon$</span> pick an action uniformly at random. It is
+simple and it works, but notice what it ignores: when it explores, it
+explores blindly, paying no attention to which actions are actually
+uncertain. A machine played once and a machine played a hundred times get the
+same share of the random picks. In practice <span class="m">$\epsilon$</span>
+often decays during learning, exploring heavily early and settling down
+later.
+</p>
+
+<p>
+<strong>Upper Confidence Bound (UCB)</strong> explores with intent. Score
+each action by its estimate plus a bonus that grows with uncertainty:
+</p>
+
+$$ a_t = \arg\max_a \left[ Q_t(a) + c\sqrt{\frac{\log t}{N_t(a)}} \right]. $$
+
+<p>
+Read the bonus term: <span class="m">$N_t(a)$</span> in the denominator makes
+it large for under-sampled actions and small for well-sampled ones, while the
+slow-growing <span class="m">$\log t$</span> in the numerator keeps a little
+pressure on everything as time passes. UCB is optimism in the face of
+uncertainty: it plays the action whose plausible best case is highest, so
+uncertain actions get tried precisely because they might be great, and each
+trial shrinks their bonus. One practical note: initialize by playing every
+action once, so every <span class="m">$N_t(a) > 0$</span> before the formula
+takes over. Now play the real thing:
+</p>
+
+<div class="figure" id="fig-bandit">
+  <div class="fig-mount" data-fig="bandit"></div>
+  <p class="fig-caption"><b>Fig 1.2,</b> the bandit explorer, this lesson's first signature figure. Four machines with hidden payout distributions; pull arms yourself or let a strategy auto-play. Each bar is the live sample average <span class="m">$Q_t(a)$</span> with its count <span class="m">$N_t(a)$</span>, the purple whisker is UCB's exploration bonus <span class="m">$c\sqrt{\log t / N_t(a)}$</span>, and every payout is a genuine random draw. The regret readout tracks how much expected reward your choices left on the table versus always playing the (hidden) best arm. Watch greedy lock onto a lucky early arm, <span class="m">$\epsilon$</span>-greedy keep sampling everything forever, and UCB concentrate its trials where uncertainty is worth resolving. <!-- flagged addition: the specific arm distributions (Gaussian payouts with hidden means) and the expected-regret readout are my implementation choices; the strategies and all formulas are the source's. --></p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: who plays what next?</div>
+  <!-- flagged addition: the source specifies the epsilon-greedy and UCB rules but not this
+       counts table; the numbers are mine, chosen so greedy and UCB disagree. Spec'd as an
+       original worked example per the lesson plan. -->
+  <p>After <span class="m">$t = 9$</span> plays of a 3-armed bandit, with <span class="m">$c = 1$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    Q&#8339; = [0.7, 0.3, 0.6]&nbsp;&nbsp;&nbsp;&nbsp;N&#8339; = [6, 1, 2]
+  </p>
+  <p><b><span class="m">$\epsilon$</span>-greedy (<span class="m">$\epsilon = 0.3$</span>):</b> with probability 0.7 it exploits, arm 1 (highest average). The exploring 0.3 splits evenly, 0.1 per arm, so arm 1 is played with probability <span class="m">$0.7 + 0.1 = 0.8$</span> and each other arm with probability 0.1. Which arm is uncertain never enters the calculation.</p>
+  <p><b>UCB:</b> the bonus is <span class="m">$\sqrt{\log 9 / N_t(a)}$</span> with <span class="m">$\log 9 \approx 2.197$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    arm 1: 0.7 + &radic;(2.197/6) = 0.7 + 0.605 = 1.305<br>
+    arm 2: 0.3 + &radic;(2.197/1) = 0.3 + 1.482 = 1.782 &nbsp;&larr; max<br>
+    arm 3: 0.6 + &radic;(2.197/2) = 0.6 + 1.048 = 1.648
+  </p>
+  <p>UCB plays arm 2, the <em>worst-looking</em> arm, because one play tells us almost nothing and its plausible upside is still the largest. Greedy would never touch it again. That single disagreement is the whole philosophy gap between the two strategies.</p>
+</div>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def ucb_select(Q, N, t, c):
+    # Q: sample-average estimates, N: play counts, t: current round
+    # play any unplayed arm first so N > 0 everywhere
+    if np.any(N == 0):
+        return int(np.argmin(N))
+    bonus = c * np.sqrt(np.log(t) / N)
+    return int(np.argmax(Q + bonus))
+
+Q = np.array([0.7, 0.3, 0.6])
+N = np.array([6, 1, 2])
+ucb_select(Q, N, t=9, c=1.0)   # -> 1 (arm 2: biggest bonus wins)</code></pre>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A 3-armed bandit has estimates <span class="m">$Q_t = [0.7, 0.3, 0.6]$</span> with counts <span class="m">$N_t = [6, 1, 2]$</span> at <span class="m">$t = 9$</span>, <span class="m">$c = 1$</span>. Which arm does a greedy player pick, and which does UCB pick?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both pick arm 1: it has the best average, and averages are what we trust</button>
+    <button data-k="b">Greedy picks arm 1; UCB picks arm 3, the second-best average</button>
+    <button data-k="c">Greedy picks arm 1; UCB picks arm 2, because its single play leaves the biggest uncertainty bonus</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Greedy does pick arm 1, but UCB adds <span class="m">$\sqrt{\log t / N_t(a)}$</span> to each estimate first. Arm 2's count of 1 makes its bonus 1.482, lifting 0.3 to 1.782, the maximum. Uncertainty is worth reward to UCB.</div>
+  <div class="quiz-fb" data-k="b">Arm 3's bonus is <span class="m">$\sqrt{2.197/2} \approx 1.048$</span>, giving 1.648. Arm 2's is <span class="m">$\sqrt{2.197/1} \approx 1.482$</span>, giving 1.782. The least-played arm wins the argmax, not the runner-up average.</div>
+  <div class="quiz-fb" data-k="c">Right: 1.305 vs 1.782 vs 1.648. And the deeper point: with only one play, arm 2's 0.3 is nearly meaningless. Its true value could plausibly be the best of the three, and UCB is built to find out.</div>
+</div>
+
+<details class="check">
+  <summary>Check: why can't we conclude the highest-average arm is best?</summary>
+  <div>
+    <p>Arm 1 has the highest sample average after nine plays. Why is committing to it forever a mistake?</p>
+    <p><b>Answer.</b> Because <span class="m">$Q_t(a)$</span> is an estimate of <span class="m">$q_*(a)$</span>, and its reliability depends on <span class="m">$N_t(a)$</span>. Arm 2's average rests on a single random draw; one unlucky payout put it at 0.3, and no future play will ever correct that if we go greedy, since greedy never plays it again. The estimate stays frozen at its unlucky value, a self-fulfilling verdict. This is the exploration-exploitation dilemma in one sentence: the data you collect depends on the actions you take, so acting only on current estimates can lock in early noise. Both fixes in this section are ways of refusing to let that happen, blindly (<span class="m">$\epsilon$</span>-greedy) or with intent (UCB).</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 2. FROM BANDITS TO STATES ═══════════════════ -->
+<section id="sec-states">
+<h2><span class="secnum">2.</span> From bandits to states</h2>
+
+<p>
+The bandit taught us exploration, but look at what it lacks. Whatever machine
+you play, the casino is unchanged next round: same machines, same odds. In
+the bandit, the reward depends only on the action,
+<span class="m">$r_{t+1} \sim p(\cdot \mid a_t)$</span>, and an action
+affects the current reward but not the next decision. Almost nothing
+interesting is like that. In chess, a move changes the board you face next.
+In driving, an acceleration changes the situation you must handle next.
+Actions have consequences, and consequences are exactly what the bandit
+throws away. Climb the ladder one rung at a time:
+</p>
+
+<div class="figure" id="fig-ladder">
+  <div class="fig-mount" data-fig="ladder"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the bandit-to-MDP ladder. Switch between the three settings and watch what the reward is allowed to depend on: action only (bandit), state and action (contextual bandit), and state and action with the action also producing the <em>next</em> state (MDP), which closes the loop and makes decisions sequential. Press Pulse (or Step) to animate one round through each diagram.</p>
+</div>
+
+<p>
+The middle rung, the <strong>contextual bandit</strong>, lets the reward
+depend on a state as well as the action,
+<span class="m">$r_{t+1} \sim p(\cdot \mid s_t, a_t)$</span>: which ad works
+depends on which user is looking. But the state still arrives from outside;
+your action does not shape it. The top rung is the full
+<strong>Markov decision process</strong>, where the action also affects the
+next state:
+</p>
+
+$$ (r_{t+1}, s_{t+1}) \sim p(\cdot, \cdot \mid s_t, a_t). $$
+
+<p>
+That one addition changes everything, because now a decision's consequences
+ripple forward. The interaction becomes a loop: at each step, the agent in
+state <span class="m">$s_t$</span> takes action <span class="m">$a_t$</span>,
+receives reward <span class="m">$r_{t+1}$</span>, and moves to state
+<span class="m">$s_{t+1}$</span>. This loop is the spine of everything that
+follows, so watch it run:
+</p>
+
+<div class="figure" id="fig-loop">
+  <div class="fig-mount" data-fig="loop"></div>
+  <p class="fig-caption"><b>Fig 2.2,</b> the agent-environment loop, animated on a real environment. The agent sends an action; the environment answers with a reward and the next state; repeat. Step it and the trajectory log fills with an actual <span class="m">$s_t, a_t, r_{t+1}, s_{t+1}$</span> sequence from the gridworld used throughout this lesson, one genuine transition per press.</p>
+</div>
+
+<p>
+A sequential decision problem, viewed through this loop, has three parts, and
+the vocabulary is worth fixing now. A <strong>policy</strong> is the agent's
+behaviour, its rule for choosing actions from states. A
+<strong>value function</strong> evaluates situations: how good is this state,
+given how I will act from here on? A <strong>model</strong> is the
+environment's side of the loop: how the world responds to actions. Section 3
+makes each precise.
+</p>
+
+<details class="check">
+  <summary>Check: where exactly did "state" enter, and what did it cost us?</summary>
+  <div>
+    <p>Between the bandit and the MDP, what structurally changed, and why does it make learning harder?</p>
+    <p><b>Answer.</b> Two insertions. First, the reward became conditional on a state as well as an action (the contextual rung): the right choice now varies with the situation, so instead of one best action we need a best action <em>per state</em>, a policy. Second, the action began producing the next state (the MDP rung): consequences became sequential. The cost is delayed consequences: a bad action might pay well now and ruin the states we reach later, so judging an action by its immediate reward, which was the entire bandit game, is no longer valid. We will need a quantity that folds the future back into the present. That quantity is the value function, and building it is the next section's whole job.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. MDPs ═══════════════════ -->
+<section id="sec-mdp">
+<h2><span class="secnum">3.</span> MDPs, policies, and value functions</h2>
+
+<h3>Policies: deterministic and stochastic</h3>
+
+<p>
+A <strong>policy</strong> <span class="m">$\pi : S \to A$</span> selects
+actions from states. It can be deterministic,
+<span class="m">$a_t = \pi(s_t)$</span>, always the same action in the same
+state, like a train following fixed signals. Or it can be stochastic,
+<span class="m">$a_t \sim \pi(a \mid s)$</span>, a probability distribution
+over actions, like a recommender system that deliberately adds diversity
+rather than always serving the single top item. The
+<strong>optimal policy</strong> is the one that maximizes total reward. But
+"total reward" hides a problem: over an unbounded future,
+<span class="m">$\sum_k r_{t+k}$</span> may be infinite, and comparing
+infinities gets us nowhere. The fix is to discount:
+</p>
+
+$$ \arg\max_\pi \; \mathbb{E}\big[r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \cdots\big], \qquad 0 \le \gamma &lt; 1. $$
+
+<p>
+The <strong>discount factor</strong> <span class="m">$\gamma$</span> does
+three jobs at once. It makes the sum converge, since
+<span class="m">$\gamma^k$</span> shrinks geometrically. It sets the
+effective planning horizon: small <span class="m">$\gamma$</span> makes the
+agent near-sighted, caring mostly about immediate rewards, while
+<span class="m">$\gamma$</span> near 1 makes it far-sighted, weighing
+long-term consequences almost fully. And it lets the agent balance immediate
+against future reward with a single dial. Turn that dial:
+</p>
+
+<div class="figure" id="fig-discount">
+  <div class="fig-mount" data-fig="discount"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the discount factor as a planning horizon. The bars are the weights <span class="m">$\gamma^k$</span> on rewards <span class="m">$k$</span> steps ahead, recomputed as you slide <span class="m">$\gamma$</span>; the readouts evaluate two concrete reward streams live: a steady +1 per step, whose return approaches <span class="m">$1/(1-\gamma)$</span>, and a single +10 arriving three steps from now, worth <span class="m">$10\gamma^3$</span> today. At <span class="m">$\gamma = 0.9$</span> those are 10 and 7.29; drop to <span class="m">$\gamma = 0.5$</span> and patience stops paying. <!-- flagged addition: the two illustrative reward streams are my choices; the discounted-return formula and the role of gamma are the source's. --></p>
+</div>
+
+<h3>Value functions: folding the future into the present</h3>
+
+<p>
+With the discounted return defined, we can say precisely how good a
+situation is. <strong>Value functions</strong> predict expected discounted
+future reward:
+</p>
+
+$$ V^\pi(s) := \mathbb{E}\!\left[\sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \,\Big|\, s_t = s, \pi\right], \qquad
+   Q^\pi(s, a) := \mathbb{E}\!\left[\sum_{k=0}^{\infty} \gamma^k r_{t+k+1} \,\Big|\, s_t = s, a_t = a, \pi\right]. $$
+
+<p>
+<span class="m">$V^\pi(s)$</span>, the state-value, answers "how much reward
+should I expect from state <span class="m">$s$</span> onward, if I follow
+policy <span class="m">$\pi$</span>?". <span class="m">$Q^\pi(s, a)$</span>,
+the action-value, answers the finer question "and what if I first take
+action <span class="m">$a$</span>, then follow <span class="m">$\pi$</span>?".
+Note the family resemblance to the bandit's <span class="m">$Q_t(a)$</span>:
+same letter, same meaning, expected return of an action, but now indexed by
+state, because in an MDP the same action can be brilliant in one state and
+fatal in another.
+</p>
+
+<p>
+Why does the agent need this machinery at all? Picture a maze: the states are
+the agent's location, the actions are <span class="m">$\{N, E, S, W\}$</span>,
+and the rewards are <span class="m">$-1$</span> per step,
+<span class="m">$-1$</span> for bumping a wall, and <span class="m">$+100$</span>,
+plus termination, for reaching the goal. The agent observes only its current
+square and applies its policy locally; it cannot see the goal from where it
+stands. Local decisions, global objective. The value function is precisely
+the device that informs local choices of their global consequences: if each
+square's value already summarizes the discounted future from that square,
+then steering uphill in value is globally correct while looking only one
+step ahead.
+</p>
+
+<h3>The MDP, formally, and the Markov property</h3>
+
+<p>
+A <strong>Markov decision process</strong> packages the whole setting into a
+5-tuple <span class="m">$\langle S, A, P, R, \gamma \rangle$</span>:
+</p>
+
+<ul>
+  <li><span class="m">$S$</span>: the set of states; <span class="m">$A$</span>: the set of actions.</li>
+  <li><span class="m">$P(s' \mid s, a)$</span>: the transition model, the probability of landing in <span class="m">$s'$</span> after taking <span class="m">$a$</span> in <span class="m">$s$</span>.</li>
+  <li><span class="m">$R(s, a, s')$</span>: the reward for the transition <span class="m">$s \xrightarrow{a} s'$</span>.</li>
+  <li><span class="m">$\gamma \in [0, 1)$</span>: the discount factor.</li>
+</ul>
+
+<p>
+The name carries an assumption, the <strong>Markov property</strong>: the
+current state summarizes all past information needed to predict the next,
+</p>
+
+$$ P(s_{t+1} \mid s_0, a_0, \dots, s_t, a_t) = P(s_{t+1} \mid s_t, a_t). $$
+
+<p>
+You have met this move before. The n-gram models of the language-modeling
+lecture made exactly this bet: recent context replaces full history, and
+predicting the next word needs only the last few. Here, predicting the next
+state needs only the current state and action, not the whole trajectory that
+led there. It is a modelling choice, and it is what will let us write value
+recursively in section 4: if the state is a sufficient summary, then value
+can be computed state by state instead of trajectory by trajectory.
+</p>
+
+<p>
+Make the 5-tuple concrete with the lecture's car. States: the engine is
+Cool, Warm, or Overheated. Actions: drive Slow or Fast. Going fast pays
+double, <span class="m">$+2$</span> against <span class="m">$+1$</span>,
+while the engine holds, but fast driving heats the engine, and from Warm it
+is certain doom: the engine overheats and the drive ends with a
+<span class="m">$-10$</span> penalty. Explore the model, then drive it:
+</p>
+
+<div class="figure" id="fig-car">
+  <div class="fig-mount" data-fig="carmdp"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> the car MDP as a live transition explorer. Pick a state and an action to see every possible transition with its probability <span class="m">$P(s' \mid s, a)$</span> and reward <span class="m">$R(s, a, s')$</span>; then press Drive to sample real transitions and watch the empirical frequencies converge toward the model's probabilities. Driving Fast from Warm is deterministic doom: <span class="m">$P(\text{Overheated} \mid \text{Warm}, \text{Fast}) = 1.0$</span> with reward <span class="m">$-10$</span>. <!-- flagged addition: the source states P(Warm|Warm,Slow)=0.5, P(Overheated|Warm,Fast)=1.0, R(Overheated|Warm,Fast)=-10, the +2/+1 fast/slow rewards, and the optimal actions; the remaining entries needed to complete the transition table (Cool,Slow stays Cool w.p. 1; Cool,Fast splits 0.5/0.5 between Cool and Warm; Warm,Slow cools w.p. 0.5) follow the standard version of this example and are flagged as my completion. --></p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked from the model: three questions about the car</div>
+  <p><b>A transition probability.</b> <span class="m">$P(\text{Warm} \mid \text{Warm}, \text{Slow}) = 0.5$</span>: driving slow from Warm, the coin decides whether the engine cools or stays warm.</p>
+  <p><b>A reward.</b> <span class="m">$R(\text{Warm}, \text{Fast}, \text{Overheated}) = -10$</span>: the blown engine, and the drive terminates.</p>
+  <p><b>The optimal actions.</b> In Cool, go Fast: it pays +2, and the worst case is landing in Warm, still safe. In Warm, go Slow: +1 with a chance to cool off, against a certain <span class="m">$-10$</span> for Fast. The optimal policy is not "always cautious" or "always greedy"; it is state-dependent, which is exactly why policies map states to actions.</p>
+</div>
+
+<h3>Planning versus learning</h3>
+
+<p>
+One fork in the road decides the rest of this lesson. If we possess the
+complete MDP, all five pieces including <span class="m">$P$</span> and
+<span class="m">$R$</span>, then nothing is unknown about how the world
+works, and finding the optimal policy is pure computation. We
+<strong>plan</strong>, with model-based methods: value iteration and policy
+iteration, section 4. If we lack full knowledge of
+<span class="m">$P$</span> and/or <span class="m">$R$</span>, the real
+reinforcement-learning setting, then the agent must <strong>learn</strong>
+from interaction, with model-free methods: Q-learning (and its relative
+SARSA), section 5.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Driving the car from Warm, why is Slow optimal even though Fast pays double?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It is not: expected immediate reward is what matters, and 2 &gt; 1</button>
+    <button data-k="b">Because Fast from Warm leads to Overheated with probability 1, ending the drive at <span class="m">$-10$</span>: the action's value includes the state it produces, not just its immediate payout</button>
+    <button data-k="c">Because slow driving raises <span class="m">$\gamma$</span>, making the agent more patient</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That is bandit thinking, judging an action by its immediate reward alone. In an MDP the action also picks your next state, and Fast from Warm buys a guaranteed <span class="m">$-10$</span> plus the end of all future reward. The +2 never gets a chance to repeat.</div>
+  <div class="quiz-fb" data-k="b">Right. <span class="m">$Q(\text{Warm}, \text{Fast})$</span> folds the future in: certain transition to Overheated, reward <span class="m">$-10$</span>, game over. <span class="m">$Q(\text{Warm}, \text{Slow})$</span> earns +1 and keeps the drive alive, with a coin-flip chance to reach Cool where Fast becomes safe and lucrative. Delayed consequences are why we needed value functions.</div>
+  <div class="quiz-fb" data-k="c"><span class="m">$\gamma$</span> is part of the problem definition, not something actions change. Slow wins because of what it does to the next state, which the action-value <span class="m">$Q(s, a)$</span> accounts for and immediate reward does not.</div>
+</div>
+
+<details class="check">
+  <summary>Check: state the Markov property in one sentence, and connect it to n-grams</summary>
+  <div>
+    <p><b>Answer.</b> The Markov property says the current state and action contain everything the past could tell you about the next state: <span class="m">$P(s_{t+1} \mid s_0, a_0, \dots, s_t, a_t) = P(s_{t+1} \mid s_t, a_t)$</span>. In one sentence: the present is a sufficient summary of the past. The n-gram language models made the same assumption about text, predicting the next word from only the last <span class="m">$n-1$</span> words rather than the whole document. Both are deliberate simplifications that buy tractability: n-grams got countable tables, and MDPs will get, in the next section, a value recursion that works one step at a time. And in both cases the assumption can be wrong in the same way, by hiding relevant history; the fix in both worlds is to enrich the state (longer context, more state variables) until the summary really is sufficient.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 4. PLANNING ═══════════════════ -->
+<section id="sec-planning">
+<h2><span class="secnum">4.</span> Planning: Bellman equations, value and policy iteration</h2>
+
+<h3>The one-step trick</h3>
+
+<p>
+Suppose we know the full MDP. How do we actually compute
+<span class="m">$V^\pi$</span>, an expectation over infinitely long futures?
+Reasoning over whole trajectories is hopeless; the number of paths explodes.
+Richard Bellman's insight, the foundation of dynamic programming, is that
+the Markov property lets us cut the infinite sum after one step. Write the
+return recursively:
+</p>
+
+$$ G_t = r_{t+1} + \gamma G_{t+1}. $$
+
+<p>
+The return from now is the immediate reward plus the discounted return from
+next step onward, and thanks to the Markov property "from next step onward"
+depends only on where you land. Take expectations and the value function
+inherits the same shape, the <strong>Bellman equations</strong>:
+</p>
+
+$$ V^\pi(s) = \sum_{a \in A} \pi(a \mid s) \sum_{s' \in S} P(s' \mid s, a)\big[R(s, a, s') + \gamma V^\pi(s')\big], $$
+$$ V_*(s) := \max_\pi V^\pi(s) = \max_{a \in A} \sum_{s' \in S} P(s' \mid s, a)\big[R(s, a, s') + \gamma V_*(s')\big]. $$
+
+<p>
+Read the first one aloud: under a fixed policy, a state's value is the
+expected immediate reward plus the discounted value of wherever you land.
+The second, the Bellman <em>optimality</em> equation, replaces the policy's
+average over actions with a max: the best value of a state is achieved by
+taking the best action. (Notation: <span class="m">$V_*$</span> and
+<span class="m">$Q_*$</span> abbreviate <span class="m">$V^{\pi_*}$</span>
+and <span class="m">$Q^{\pi_*}$</span>, the values of the optimal policy.)
+An infinite-horizon problem just became a local consistency condition
+between each state and its neighbours. Everything else in this lesson is a
+way of solving that condition.
+</p>
+
+<h3>Value iteration</h3>
+
+<p>
+The optimality equation defines <span class="m">$V_*$</span> implicitly, as
+the values that are consistent with themselves. <strong>Value Iteration
+(VI)</strong> solves it by brute repetition: initialize
+<span class="m">$V_0(s)$</span> arbitrarily, say all zeros, then repeatedly
+apply the right-hand side as an update to every state:
+</p>
+
+$$ V_{k+1}(s) = \max_a \sum_{s'} P(s' \mid s, a)\big[R(s, a, s') + \gamma V_k(s')\big], $$
+
+<p>
+sweeping until the biggest change in any state is tiny,
+<span class="m">$\lVert V_{k+1} - V_k \rVert_\infty \le \epsilon$</span>,
+then extracting the policy by acting greedily on the converged values,
+<span class="m">$\pi_*(s) = \arg\max_a \sum_{s'} P(s' \mid s, a)[R(s, a, s') + \gamma V_*(s')]$</span>.
+Why does hammering the same update work? Because each sweep propagates
+long-term consequences one step backward. After one sweep, states adjacent
+to reward know about it. After two, their neighbours do. Information radiates
+outward from wherever reward lives. Watch it radiate:
+</p>
+
+<div class="figure" id="fig-vi">
+  <div class="fig-mount" data-fig="vimaze"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> value iteration on the lecture's 3&times;3 maze, this lesson's core planning figure. Rewards are <span class="m">$-1$</span> per move, <span class="m">$-1$</span> for walking into a wall (you stay put), <span class="m">$+10$</span> at the goal, <span class="m">$\gamma = 0.9$</span>, deterministic moves. Press Sweep and every state applies one Bellman backup, all values computed live: the goal-adjacent states hit <span class="m">$8$</span> on sweep 1, the <span class="m">$6.2$</span> ring appears on sweep 2, and by <span class="m">$k = 4$</span> the grid has converged to 3.12, 4.58, 6.2, 8 fanning out from the goal, with the greedy policy arrows pointing home. Then re-run it your way: drag <span class="m">$\gamma$</span>, the step cost, or the goal reward and watch the value landscape and the policy reshape.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the first two sweeps</div>
+  <p>Start from <span class="m">$V_0 = 0$</span> everywhere (the goal square is pinned at its reward, 10). Take a state adjacent to the goal. Its four candidate backups include moving into the goal and moving to a zero-valued neighbour:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    V&#8321; = max{ -1 + 0.9&middot;0,&nbsp; -1 + 0.9&middot;10 } = max{ -1, 8 } = <b>8</b>
+  </p>
+  <p>Sweep 2, one ring further out. The best neighbour now carries value 8:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    V&#8322; = max{ -1 + 0.9&middot;8,&nbsp; ... } = <b>6.2</b>
+  </p>
+  <p>Sweep 3 gives <span class="m">$-1 + 0.9 \times 6.2 = 4.58$</span>, sweep 4 gives <span class="m">$-1 + 0.9 \times 4.58 = 3.12$</span>, and the far corner is reached: the whole 3&times;3 grid is converged by <span class="m">$k = 4$</span>. Each sweep is cheap, one backup per state, and each pushes the goal's influence exactly one step further back.</p>
+</div>
+
+<h3>Reading a backup off the grid</h3>
+
+<p>
+The update formula and the coloured grid are the same object, and you should
+be able to translate between them fluently. Click any state and read its
+backup, term by term:
+</p>
+
+<div class="figure" id="fig-bellman">
+  <div class="fig-mount" data-fig="bellman"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> the Bellman backup inspector. Choose a sweep <span class="m">$k$</span>, then click (or focus and press Enter on) any state: the panel expands its update <span class="m">$\max_a \sum_{s'} P(s' \mid s, a)[R + \gamma V_k(s')]$</span> into the four candidate actions with live numbers from the current grid, highlighting the winning max. Transitions here are deterministic, so each sum over <span class="m">$s'$</span> collapses to a single term, one reward plus <span class="m">$\gamma$</span> times one neighbour's value.</p>
+</div>
+
+<h3>Policy iteration, and the comparison</h3>
+
+<p>
+Value iteration never writes a policy down until the very end. <strong>Policy
+Iteration (PI)</strong> takes the opposite route: keep an explicit policy at
+all times, and alternate two moves. Start from a random policy
+<span class="m">$\pi_0$</span>, then repeat:
+</p>
+
+<ul>
+  <li><strong>Policy evaluation</strong>: compute this policy's value by sweeping its own Bellman equation (no max, the policy chooses the action): <span class="m">$V_{k+1}(s) = \sum_{s'} P(s' \mid s, \pi_k(s))\big[R(s, \pi_k(s), s') + \gamma V_k(s')\big]$</span>.</li>
+  <li><strong>Policy improvement</strong>: act greedily against those values to get a better policy: <span class="m">$\pi_{k+1}(s) = \arg\max_a \sum_{s'} P(s' \mid s, a)\big[R(s, a, s') + \gamma V_{k+1}(s')\big]$</span>.</li>
+</ul>
+
+<p>
+So VI directly computes optimal values via the Bellman optimality equation
+and extracts a policy once at the end: many cheap iterations, no explicit
+intermediate policies. PI alternates evaluating and improving an explicit
+policy: fewer outer iterations, but each one contains a full evaluation,
+which is itself many sweeps. Both lean on the same Bellman machinery, both
+are guaranteed to converge to the optimal policy, and on the same problem
+they deliver similar policies. Race them:
+</p>
+
+<div class="figure" id="fig-vipi">
+  <div class="fig-mount" data-fig="vipi"></div>
+  <p class="fig-caption"><b>Fig 4.3,</b> value iteration and policy iteration racing on the same maze. Left: VI updates values every step and only implies a policy. Right: PI starts from a deliberately bad fixed policy, fully evaluates it (inner sweeps counted), improves, and repeats. The counters tally each method's work live: VI takes more, cheaper steps; PI takes fewer, costlier ones; and the finish line is the same optimal policy, arrow for arrow.</p>
+</div>
+
+<p>
+The code is short enough to read in one breath, and it runs for real below:
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def value_iteration(P, R, gamma, eps=1e-6):
+    # P[s][a] -> list of (prob, s_next); R[s][a][s_next] -> reward
+    V = np.zeros(len(P))
+    while True:
+        V_new = np.array([
+            max(sum(p * (R[s][a][s2] + gamma * V[s2]) for p, s2 in P[s][a])
+                for a in range(len(P[s])))
+            for s in range(len(P))
+        ])
+        if np.max(np.abs(V_new - V)) &lt;= eps:      # ||V_{k+1} - V_k||_inf
+            break
+        V = V_new
+    policy = [int(np.argmax([sum(p * (R[s][a][s2] + gamma * V[s2])
+                                 for p, s2 in P[s][a])
+                             for a in range(len(P[s]))]))
+              for s in range(len(P))]
+    return V, policy</code></pre>
+
+<div class="figure" id="fig-vicode">
+  <div class="fig-mount" data-fig="vicode"></div>
+  <p class="fig-caption"><b>Fig 4.4,</b> <code>value_iteration</code>, executed for real on the 3&times;3 maze. Choose <span class="m">$\gamma$</span>, press Run, and the printed sweeps come from the actual computation: watch convergence take 4 sweeps at <span class="m">$\gamma = 0.9$</span>, and see how a smaller <span class="m">$\gamma$</span> shrinks the values (the goal's pull fades with distance) while the policy arrows survive.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In the 3&times;3 maze (<span class="m">$\gamma = 0.9$</span>, step reward <span class="m">$-1$</span>, goal 10), a state's best neighbour has converged value 8. What does one Bellman backup assign this state, and from which candidates?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$V = 6.2$</span>: the max over actions of <span class="m">$-1 + 0.9 \cdot V(\text{neighbour})$</span>, won by the neighbour worth 8</button>
+    <button data-k="b"><span class="m">$V = 8.9$</span>: the neighbour's 8 plus its own step reward discounted, <span class="m">$8 + 0.9$</span></button>
+    <button data-k="c"><span class="m">$V = 7.2$</span>: just <span class="m">$0.9 \times 8$</span>, since discounting is the only operation</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right: <span class="m">$-1 + 0.9 \times 8 = 6.2$</span>, beating the wall option <span class="m">$-1 + 0.9 \times V(\text{self})$</span> and any worse neighbour. Exactly the number the maze shows on its second ring, and exactly one application of the update rule.</div>
+  <div class="quiz-fb" data-k="b">The backup is reward plus <em>discounted</em> next value, <span class="m">$R + \gamma V(s')$</span>, not value plus discounted reward. Order matters: <span class="m">$-1 + 0.9 \times 8 = 6.2$</span>.</div>
+  <div class="quiz-fb" data-k="c">You dropped the step cost. Every move charges <span class="m">$-1$</span> here, which is what makes shorter paths more valuable: <span class="m">$-1 + 7.2 = 6.2$</span>.</div>
+</div>
+
+<details class="check">
+  <summary>Check: how do value iteration and policy iteration actually differ?</summary>
+  <div>
+    <p>Both converge to the optimal policy on this maze. What is each one doing differently along the way?</p>
+    <p><b>Answer.</b> VI iterates on <em>values</em>: it applies the Bellman optimality backup (with its max over actions) to every state, over and over, and no policy exists until the final greedy extraction. Each iteration is cheap, one backup per state, but many iterations may be needed for values to converge. PI iterates on <em>policies</em>: it holds a concrete policy, computes that policy's exact value by sweeping the Bellman expectation equation (no max, the policy has already chosen), then improves the policy greedily. Its outer loop typically converges in very few rounds, but each round hides a full evaluation, which is many sweeps of work. Same Bellman core, two schedules: continuous small corrections versus deliberate evaluate-then-improve strokes. Fig 4.3's counters make the trade concrete, and both finish at the same arrows.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 5. Q-LEARNING ═══════════════════ -->
+<section id="sec-qlearning">
+<h2><span class="secnum">5.</span> Learning: Q-learning</h2>
+
+<h3>Losing the model, keeping the recursion</h3>
+
+<p>
+Now delete the map. Suppose <span class="m">$P$</span> and
+<span class="m">$R$</span> are unknown: the agent can act and observe, but
+it cannot look up what any action will do. Value iteration is dead on
+arrival, its update sums over transitions we cannot enumerate. What survives?
+Here is the elegant move: learn action values directly. Define, for the
+deterministic world where taking <span class="m">$a$</span> in
+<span class="m">$s$</span> leads to the (unknown) state
+<span class="m">$\delta(s, a)$</span>:
+</p>
+
+$$ Q_*(s, a) = r(s, a) + \gamma V_*(\delta(s, a)). $$
+
+<p>
+Why is this the right object? Because if we somehow possessed
+<span class="m">$Q_*$</span>, acting optimally would need no model at all:
+<span class="m">$\pi_*(s) = \arg\max_a Q_*(s, a)$</span>, just compare the
+entries for the current state and take the best. The model got baked into
+the table. And since <span class="m">$V_*(s) = \max_a Q_*(s, a)$</span>,
+substituting gives <span class="m">$Q_*$</span> its own self-referential
+Bellman equation, with no <span class="m">$V$</span> and no
+<span class="m">$P$</span> in sight:
+</p>
+
+$$ Q_*(s_t, a_t) = r(s_t, a_t) + \gamma \max_{a'} Q_*(s_{t+1}, a'). $$
+
+<p>
+Everything on the right is observable in a single step of experience: take
+the action, receive <span class="m">$r$</span>, see where you land, look up
+your own table there. That observation becomes the
+<strong>Q-learning training rule</strong>. Keep an estimate
+<span class="m">$\hat{Q}$</span>, and after each transition, overwrite one
+entry with what the experience says it should be:
+</p>
+
+$$ \hat{Q}(s, a) \leftarrow r(s, a) + \gamma \max_{a'} \hat{Q}(s', a'), $$
+
+<p>
+where <span class="m">$s'$</span> is the state actually reached. The full
+algorithm is barely longer: initialize every
+<span class="m">$\hat{Q}(s, a) = 0$</span>; from an initial state, repeatedly
+select and execute an action, receive <span class="m">$r$</span>, observe
+<span class="m">$s'$</span>, apply the update, set
+<span class="m">$s \leftarrow s'$</span>; when an absorbing state is reached,
+restart the episode. Each step changes only the single entry
+<span class="m">$\hat{Q}(s, a)$</span>, and with non-negative rewards the
+estimates only rise from 0 toward the true <span class="m">$Q$</span>.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one Q-learning update</div>
+  <p>The lecture's grid: rewards are 0 everywhere except entering the goal, <span class="m">$\gamma = 0.9$</span>. From state <span class="m">$s_1$</span> the agent moves right into <span class="m">$s_2$</span>, receiving <span class="m">$r = 0$</span>. The entries already stored for <span class="m">$s_2$</span>'s three actions are 63, 81, and 100. The rule overwrites one number:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    Q&#770;(s&#8321;, a<sub>right</sub>) &larr; r + 0.9 &middot; max{63, 81, 100} = 0 + 0.9 &middot; 100 = <b>90</b>
+  </p>
+  <p>Nothing else in the table moves. Notice what the update did: it pulled the goal's value one state further from the goal, discounted once. That is the same backward radiation as value iteration, except it happens only along the path the agent actually walked.</p>
+</div>
+
+<h3>Watching knowledge propagate backward</h3>
+
+<p>
+That last observation deserves to be seen, because it explains why early
+training looks so useless. All entries start at 0, and rewards are 0 until
+the goal, so during the entire first episode every update writes
+<span class="m">$0 + \gamma \max\{0, \dots\} = 0$</span>. Nothing happens.
+Only the very last transition of episode one, the step into the goal, writes
+something: the goal reward. In the next episode, information reaches one step
+further back: the transition into <em>that</em> state now sees a non-zero
+<span class="m">$\max_{a'} \hat{Q}$</span> and captures its discount. Episode
+by episode, non-zero values crawl backward from the goal until reward
+information fills the state-action space. Train it and watch:
+</p>
+
+<div class="figure" id="fig-qlearn">
+  <div class="fig-mount" data-fig="qlearn"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> a Q-learning agent in an unknown gridworld, this lesson's final signature figure. Reward 100 at the goal, 0 elsewhere, <span class="m">$\gamma = 0.9$</span>. Every cell shows its four <span class="m">$\hat{Q}(s, a)$</span> entries at its edges, the fill colour is <span class="m">$\max_a \hat{Q}$</span>, and every number on screen comes from real updates as the agent walks. Run an episode at a time and watch the first episode light only the goal's doorstep at 100, the next reach 90, then 81, then 72.9: knowledge propagating backward, one episode per ring. The <span class="m">$k$</span> slider controls softmax exploration (low <span class="m">$k$</span> wanders, high <span class="m">$k$</span> commits), and the stochastic toggle makes moves slip 20% of the time, switching the update to the learning-rate rule with <span class="m">$\alpha_n = 1/(1 + \text{visits}_n(s,a))$</span>. <!-- flagged addition: the source's propagation example is a generic small grid; this figure's 4x4 layout, start position, 20% slip probability, and the exact k slider range are my implementation choices. The rewards, gamma, both update rules, the softmax policy, and the alpha_n formula are the source's. --></p>
+</div>
+
+<h3>Exploration, again, and a familiar face</h3>
+
+<p>
+How should the agent pick actions while it learns? Acting greedily on
+<span class="m">$\hat{Q}$</span> is risky for exactly the bandit reason: an
+early accident writes a mediocre value, greed never revisits, and the error
+freezes. The lecture's fix is a stochastic policy that prefers good-looking
+actions without ever fully abandoning the rest:
+</p>
+
+$$ P(a_i \mid s) = \frac{\exp\big(k\,\hat{Q}(s, a_i)\big)}{\sum_j \exp\big(k\,\hat{Q}(s, a_j)\big)}. $$
+
+<p>
+Look familiar? It should: this is the softmax, the same normalized
+exponential that turned scores into class probabilities in logistic
+regression and into soft cluster responsibilities in soft K-means. Here it
+turns Q-values into action probabilities, and the constant
+<span class="m">$k$</span> plays the sharpening role: small
+<span class="m">$k$</span> flattens the distribution toward uniform, pure
+exploration, while large <span class="m">$k$</span> spikes it onto the
+argmax, pure exploitation. Vary <span class="m">$k$</span> over time, small
+early and large late, and you get the same anneal-from-exploration schedule
+as a decaying <span class="m">$\epsilon$</span>, but graded by quality:
+second-best actions keep more probability than terrible ones.
+</p>
+
+<h3>When the world is random: slow down the pen</h3>
+
+<p>
+One last upgrade. In a non-deterministic world the same action in the same
+state can land in different places, so <span class="m">$V$</span> and
+<span class="m">$Q$</span> are redefined as expectations,
+<span class="m">$Q(s, a) = \mathbb{E}\big[r(s, a) + \gamma \sum_{s'} P(s' \mid s, a) \max_{a'} Q(s', a')\big]$</span>.
+The deterministic update now fails to converge, and you can hear why: it
+<em>overwrites</em> the entry with each new sample, so the estimate forever
+chases the latest lucky or unlucky transition instead of settling on the
+average. The repair is to blend rather than overwrite, with a learning rate
+that shrinks as a pair is revisited:
+</p>
+
+$$ \hat{Q}_n(s, a) \leftarrow (1 - \alpha_n)\,\hat{Q}_{n-1}(s, a) + \alpha_n\big[r + \gamma \max_{a'} \hat{Q}_{n-1}(s', a')\big], \qquad
+   \alpha_n = \frac{1}{1 + \text{visits}_n(s, a)}. $$
+
+<p>
+Early visits move the estimate a lot, later visits barely nudge it, and the
+entry converges to the running average of its sampled targets, which is the
+expectation we redefined <span class="m">$Q$</span> to be. (First visit:
+<span class="m">$\alpha_1 = 1/2$</span>. Fourth visit:
+<span class="m">$\alpha_4 = 1/5$</span>. The pen slows as evidence
+accumulates, the same instinct as the bandit's sample average.) Flip the
+stochastic toggle in Fig 5.1 to feel the difference: values wobble, then
+settle.
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def q_update(Q, s, a, r, s_next, gamma, alpha=None):
+    target = r + gamma * np.max(Q[s_next])
+    if alpha is None:
+        Q[s, a] = target                                # deterministic world
+    else:
+        Q[s, a] = (1 - alpha) * Q[s, a] + alpha * target  # stochastic world
+    return Q
+
+# the worked example: r=0, gamma=0.9, next state's entries {63, 81, 100}
+Q = np.zeros((10, 4)); Q[2] = [63, 81, 100, 0]
+q_update(Q, s=1, a=0, r=0, s_next=2, gamma=0.9)[1, 0]   # -> 90.0</code></pre>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Deterministic world, <span class="m">$\gamma = 0.9$</span>. The agent takes <span class="m">$a$</span> in <span class="m">$s$</span>, receives <span class="m">$r = 2$</span>, and lands in <span class="m">$s'$</span> whose stored entries are <span class="m">$\{40, 50, 10\}$</span>. What does the Q-learning update write into <span class="m">$\hat{Q}(s, a)$</span>?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$2 + 0.9 \times 40 = 38$</span>: use the entry for the action the agent will actually take next</button>
+    <button data-k="b"><span class="m">$2 + 0.9 \times 50 = 47$</span>: reward plus discounted max over the next state's entries</button>
+    <button data-k="c"><span class="m">$0.9 \times (2 + 50) = 46.8$</span>: discount the whole target</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Q-learning backs up the <em>max</em>, <span class="m">$\max_{a'} \hat{Q}(s', a') = 50$</span>, regardless of what the exploring agent does next. (Backing up the action actually taken is SARSA, the on-policy relative.) Here: <span class="m">$2 + 0.9 \times 50 = 47$</span>.</div>
+  <div class="quiz-fb" data-k="b">Right: <span class="m">$r + \gamma \max_{a'} \hat{Q}(s', a') = 2 + 45 = 47$</span>, same arithmetic as the lecture's <span class="m">$0 + 0.9\max\{63, 81, 100\} = 90$</span>. One entry overwritten, everything else untouched.</div>
+  <div class="quiz-fb" data-k="c">The immediate reward is not discounted; it is already in the present. Only the future carries <span class="m">$\gamma$</span>: <span class="m">$r + \gamma \max = 2 + 45 = 47$</span>.</div>
+</div>
+
+<details class="check">
+  <summary>Check: why backward from the goal, and why does randomness demand a learning rate?</summary>
+  <div>
+    <p>Two behaviours from Fig 5.1 to explain: values fill in goal-first, and the stochastic toggle needs <span class="m">$\alpha_n$</span>.</p>
+    <p><b>Backward propagation.</b> The update's only source of non-zero information is <span class="m">$r + \gamma \max_{a'} \hat{Q}(s', a')$</span>. With rewards 0 away from the goal and a table initialized to 0, that expression is non-zero only where <span class="m">$r &gt; 0$</span> (entering the goal) or where <span class="m">$s'$</span> already has a non-zero entry. Episode one can satisfy only the first condition, at the final step; each later episode satisfies the second one step further back. Information has no other channel: it must arrive via the next state's entries, so it crawls goal-outward, one transition per episode along the travelled path.</p>
+    <p><b>The learning rate.</b> In a stochastic world the sampled target <span class="m">$r + \gamma \max_{a'} \hat{Q}(s', a')$</span> is a random variable: the same <span class="m">$(s, a)$</span> yields different targets on different visits because <span class="m">$s'$</span> varies. The deterministic rule assigns the newest sample as the whole truth, so the entry oscillates forever with the luck of the draw and never converges. Blending with <span class="m">$\alpha_n = 1/(1 + \text{visits}_n(s, a))$</span> makes the entry the average of all sampled targets (the same arithmetic as the bandit's incremental sample average), and averages converge to the expectation that stochastic <span class="m">$Q$</span> is defined to be.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Coding check: finish the update</summary>
+  <div>
+    <p>A colleague writes the stochastic-world update as <code>Q[s, a] = r + gamma * np.max(Q[s_next])</code> and cannot understand why the values keep oscillating during training. Fix the line and explain the two changes any correct fix must contain.</p>
+    <p><b>Answer.</b> The line is the deterministic rule in a stochastic world. The fix is the blended update with a decaying learning rate:</p>
+    <p style="font-family:var(--mono);font-size:13.5px">
+      alpha = 1 / (1 + visits[s, a])<br>
+      Q[s, a] = (1 - alpha) * Q[s, a] + alpha * (r + gamma * np.max(Q[s_next]))
+    </p>
+    <p>Change one: the new sample must be <em>mixed into</em> the old estimate, not replace it, so the entry tracks an average of targets rather than the latest draw. Change two: the mixing weight must shrink over visits (here <span class="m">$1/(1 + \text{visits})$</span>), so early evidence moves the estimate freely and later noise cannot un-learn it. Keep <code>visits</code> incremented per <span class="m">$(s, a)$</span> pair, not globally, since each entry needs its own evidence count.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">6.</span> Summary and method card</h2>
+
+<p>
+Three settings, one thread. Bandits have no meaningful state: the challenge
+is that reward distributions are unknown, the tools are
+<span class="m">$\epsilon$</span>-greedy and UCB, and what gets learned is
+the immediate action value <span class="m">$Q(a)$</span>. Planning in MDPs
+has state and a fully known model: the challenge is uncertain and delayed
+consequences, and the tools are value iteration and policy iteration, both
+powered by Bellman's one-step recursion. Reinforcement learning proper has
+state and an unknown model: the challenge is learning a good policy from
+interaction alone, and the tool is Q-learning, the same Bellman recursion
+turned into an update rule driven by experience. Bandits learn
+<span class="m">$Q(a)$</span>; MDPs need <span class="m">$Q(s, a)$</span>
+because actions affect future states; known models let us plan; unknown ones
+force us to learn.
+</p>
+
+<p>
+Why is RL considered hard, harder than the supervised learning this course
+began with? Four structural reasons. Exploration versus exploitation: the
+agent chooses its own training data, and safe choices starve it of
+information. Delayed, sparse rewards: the credit-assignment problem of
+deciding which of sixty moves lost the game. Sample inefficiency: real
+interactions are expensive, and RL tends to need many. And stability and
+generalization: methods are sensitive to approximation error and
+distribution shift, since improving the policy changes the data the agent
+sees. Which points at the core difficulty, worth committing to memory:
+<strong>the agent must learn what to do while its own actions determine what
+it observes.</strong>
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Name two structural reasons reinforcement learning is harder than supervised learning.</p>
+  <div class="quiz-opts">
+    <button data-k="a">RL needs bigger neural networks, and GPUs handle labels more efficiently than rewards</button>
+    <button data-k="b">RL has no mathematical foundations, so nothing is guaranteed to converge</button>
+    <button data-k="c">Rewards are delayed and sparse, so credit assignment is hard; and the agent's own actions determine the data it observes, entangling exploration with learning</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Neither is structural. Tabular Q-learning uses no network at all, and the difficulty exists on a 3&times;3 grid: it is about the information in the signal, not the compute.</div>
+  <div class="quiz-fb" data-k="b">The opposite: tabular value iteration, policy iteration, and Q-learning all carry convergence guarantees, which is precisely a strength of the framework. The hardness lives elsewhere.</div>
+  <div class="quiz-fb" data-k="c">Right, and the other two from the lecture complete the list: sample inefficiency (interaction is costly) and stability under approximation and distribution shift. All four trace to one root: no teacher hands over the right answer, and acting changes what you get to see.</div>
+</div>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Reinforcement Learning</div>
+  <table>
+    <tr><th>Assumption</th><td>The environment is Markovian, with discrete states and actions, and rewards encode the desired behaviour.</td></tr>
+    <tr><th>Model class</th><td>An MDP <span class="m">$\langle S, A, P, R, \gamma \rangle$</span> with a policy and state/action value functions.</td></tr>
+    <tr><th>Learning / selection</th><td>Apply Bellman backups via value or policy iteration when <span class="m">$P$</span> and <span class="m">$R$</span> are known; otherwise estimate <span class="m">$Q(s, a)$</span> from sampled transitions while balancing exploration and exploitation.</td></tr>
+    <tr><th>Prediction</th><td>Act by <span class="m">$\pi(s) = \arg\max_a Q(s, a)$</span>; during learning, soften with <span class="m">$\epsilon$</span>-greedy or softmax exploration.</td></tr>
+    <tr><th>Strengths</th><td>Explicitly captures uncertainty, delayed consequences, and sequential decisions; tabular methods have strong convergence guarantees.</td></tr>
+    <tr><th>Limitations</th><td>Scales poorly to large state-action spaces and may need extensive interaction, careful exploration, and informative rewards.</td></tr>
+    <tr><th>Next step</th><td>Replace lookup tables with function approximation and deep reinforcement learning for large or continuous problems.</td></tr>
+  </table>
+</div>
+
+<p>
+That last row is the doorway out of this course. Every method in this lesson
+stored one number per state or per state-action pair. Chess has more states
+than atoms in the observable universe; no table fits. The escape is the
+course's other half: replace the table with a function approximator, a
+neural network that maps states to values, and you have deep reinforcement
+learning, the combination that took DeepMind from Atari to AlphaGo. The two
+halves of this course, function approximation and decision making, were
+always heading toward each other.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">7.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then four transfer questions that ask you to connect and
+decide, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A bandit algorithm learns <span class="m">$Q(a)$</span>; Q-learning learns <span class="m">$Q(s, a)$</span>. What exactly forces the extra argument?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Bookkeeping convenience: more indices make the table easier to search</button>
+    <button data-k="b">In an MDP the action affects the next state, so an action's worth depends on where it is taken and on the future it opens; in a bandit no such dependence exists</button>
+    <button data-k="c">MDPs have more actions than bandits, so the table needs another dimension</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The extra argument multiplies the table size by <span class="m">$|S|$</span>; nobody pays that for convenience. It is forced by the structure of the problem.</div>
+  <div class="quiz-fb" data-k="b">Right. The bandit's reward depends only on <span class="m">$a_t$</span>, so one value per action suffices. Once <span class="m">$(r_{t+1}, s_{t+1}) \sim p(\cdot, \cdot \mid s_t, a_t)$</span>, the same action has different consequences in different states, and value must be indexed by both.</div>
+  <div class="quiz-fb" data-k="c">A bandit can have a thousand arms and an MDP two actions. The dimension count is not about how many actions exist but about what the reward and the future depend on.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">You are handed a complete, trusted MDP for a warehouse robot: exact <span class="m">$P$</span>, exact <span class="m">$R$</span>. Do you reach for Q-learning or value iteration, and why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Value iteration: with the model known, the optimal policy is pure computation, no interaction or exploration needed</button>
+    <button data-k="b">Q-learning: model-free methods are newer and strictly more general, so they should be preferred</button>
+    <button data-k="c">Neither works until the robot collects real experience first</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. Planning applies when the MDP is fully specified: sweep Bellman backups offline until convergence, extract the greedy policy, done. Q-learning would spend costly interaction rediscovering, sample by sample, what the model already states.</div>
+  <div class="quiz-fb" data-k="b">More general does not mean better here: generality is what you pay for when you lack a model. With <span class="m">$P$</span> and <span class="m">$R$</span> in hand, Q-learning's exploration and sample cost buy nothing that a few cheap offline sweeps do not already deliver, with guarantees.</div>
+  <div class="quiz-fb" data-k="c">Experience is the substitute for a model, not a prerequisite on top of one. A complete MDP already contains every fact experience could teach; value iteration just extracts the consequences.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): the Markov property, from n-grams to MDPs</summary>
+  <div>
+    <p>The n-gram lesson assumed the next word depends only on recent context; this lesson assumed the next state depends only on the current state and action. Make the parallel precise: what is the shared assumption, what does each model buy with it, and what is the shared failure mode?</p>
+    <p><b>Answer.</b> Both are Markov assumptions: a bounded present, the last <span class="m">$n-1$</span> words or the current <span class="m">$(s_t, a_t)$</span>, is treated as a sufficient statistic for the entire history when predicting what comes next. The n-gram buys tractable estimation: probabilities become countable tables over short contexts instead of over all possible documents. The MDP buys the Bellman recursion: because the future factors through the present state, value satisfies a one-step equation, <span class="m">$G_t = r_{t+1} + \gamma G_{t+1}$</span>, and planning becomes local backups instead of trajectory enumeration. The shared failure mode is hidden history: when relevant information lives outside the summary (a long-range dependency in text; an unobserved variable like engine wear in the car), predictions are systematically wrong. And the shared repair is enriching the state, longer contexts for n-grams, more informative state variables for MDPs, trading table size for fidelity, the same trade both lessons keep making.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): plan or learn? Two problems, two verdicts</summary>
+  <div>
+    <p>Problem A: schedule elevator cars in a building whose arrival patterns you have modelled precisely from years of logs. Problem B: teach a robot hand to manipulate objects whose friction and weight vary unpredictably. For each, plan or learn, and what would change your answer?</p>
+    <p><b>Answer.</b> A is planning territory: with a trusted <span class="m">$P$</span> and <span class="m">$R$</span>, run value iteration (or policy iteration) offline and deploy the extracted policy; interaction adds cost and risk while teaching nothing the model does not already say. B is learning territory: friction and weight variation mean no reliable transition model exists, so the robot must estimate action values from its own experience, Q-learning style, balancing exploration against wear and breakage. What flips the verdicts is model quality. If the elevator model is stale (a new tenant changes traffic), the plan quietly degrades and learning from live data becomes attractive; if the robot's dynamics get captured in a good simulator, planning inside the simulator (or training there before transfer) recovers most of the model-based advantages. The decision rule from the lecture is the durable one: known <span class="m">$P$</span> and <span class="m">$R$</span>, plan; unknown, learn; partially known, expect hybrids.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): one softmax, three lessons</summary>
+  <div>
+    <p>The exploration policy <span class="m">$P(a_i \mid s) = \exp(k\hat{Q}(s, a_i)) / \sum_j \exp(k\hat{Q}(s, a_j))$</span> looks exactly like formulas from logistic regression and soft K-means. What is the shared mechanism, and what does the constant <span class="m">$k$</span> correspond to in each setting?</p>
+    <p><b>Answer.</b> The shared mechanism is the softmax: exponentiate a vector of scores, normalize to a probability distribution. It solves the same problem all three times, converting "how good is each option" numbers into calibrated probabilities that preserve ranking, stay positive, and sum to 1. In logistic regression the scores are class logits <span class="m">$w_c^\top x$</span> and the output is the probability of each label. In soft K-means the scores are negative scaled distances to centroids and the output is each point's cluster responsibilities, with the stiffness parameter sharpening or softening assignments. Here the scores are Q-values and the output is a stochastic policy. In every case <span class="m">$k$</span> (or its twin, the stiffness or inverse temperature) controls commitment: <span class="m">$k \to 0$</span> flattens toward uniform, ignore the scores entirely, and <span class="m">$k \to \infty$</span> collapses onto the argmax, trust them absolutely. RL adds one twist the other two lack: it varies <span class="m">$k$</span> <em>over time</em>, exploring while <span class="m">$\hat{Q}$</span> is unreliable and hardening as evidence accumulates. Soft K-means pulled the same annealing trick with its stiffness. Nothing in this course stays in its own chapter.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 6 (transfer): where the table breaks, and what deep RL does about it</summary>
+  <div>
+    <p>Tabular Q-learning provably converges on the gridworlds of this lesson. Sketch why it collapses for chess or for a robot with camera input, and what structure the fix exploits.</p>
+    <p><b>Answer.</b> Two collapses, one worse than the other. Storage: the table needs one entry per state-action pair, and chess has roughly <span class="m">$10^{43}$</span> board states while a modest camera image has more possible values than could ever be enumerated; no memory holds the table. Coverage is the deeper failure: tabular updates touch only entries the agent has visited, and in a space that vast the agent will essentially never see the same state twice, so almost every lookup at decision time hits an untouched zero. The table has no mechanism to say "this position resembles one I know"; every state is a stranger. The fix replaces the table with a function approximator, <span class="m">$Q(s, a; \theta)$</span> as a neural network, so that similar states map to similar values and experience in one state informs millions of unvisited neighbours. That is deep reinforcement learning, the marriage of this lesson's decision framework with the representation learning of the neural-network lectures, and it is what carried these ideas from 3&times;3 grids to Atari and AlphaGo. The cost, as the lecture warned: approximation surrenders the clean tabular convergence guarantees, which is where the stability challenges of modern RL begin.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>And that is the course. Twenty-one lectures ago, the first algorithm we ever built answered questions by trusting labelled neighbours; it needed someone to have written down every answer in advance. Since then the supervision kept thinning: regression fit curves to targets, classifiers drew boundaries between given classes, unsupervised methods found clusters and components with no labels at all. This final lesson took the last step: no labels, no targets, just a number that arrives after you act, and from that alone an agent taught itself the way home, watching value radiate backward from the goal, one Bellman backup at a time. From matching answers, to finding structure, to learning behaviour. The tables will not scale, so these ideas now ride on the neural networks from the middle of the course, and that combination, decisions plus deep function approximation, is where this field is still being written. Go build something that learns.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../clustering/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 20: Clustering, K-Means &amp; GMMs</div>
+  </a>
+  <span class="spacer"></span>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 21 &middot; Reinforcement Learning</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>
