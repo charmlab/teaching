@@ -107,7 +107,7 @@ tasks beyond classification look like.
 Part I ended on a riddle: does a <span class="m">$1 \times 1$</span>
 convolution ever make sense? A kernel that sees one pixel cannot detect an
 edge, a corner, or any spatial pattern at all. It looks useless. The
-resolution is the third dimension. A kernel's depth always equals its
+answer is the third dimension. A kernel's depth always equals its
 input's depth, so on a stack of <span class="m">$M$</span> feature maps a
 "<span class="m">$1 \times 1$</span>" kernel is really
 <span class="m">$1 \times 1 \times M$</span>: at every location it computes
@@ -285,7 +285,7 @@ finish training helps nobody. Play with the balance:
 
 <div class="figure" id="fig-scaling">
   <div class="fig-mount" data-fig="scaling"></div>
-  <p class="fig-caption"><b>Fig 3.1,</b> the scale-together playground. Three sliders, dataset size, model size, and training compute, drive a stylized validation-error surface: the curve shows error against compute for the current data and model budget, and the diagnosis names the binding constraint. Push the model far beyond the data and watch the overfitting gap open. The shape is qualitative, meant to build intuition about balance, not to report measured numbers.</p>
+  <p class="fig-caption"><b>Fig 3.1,</b> the scale-together playground. Three sliders, dataset size, model size, and training compute, drive a pair of stylized error curves, validation and training, plotted against compute for the current data and model budget, and the diagnosis names the binding constraint. Push the model far beyond the data and watch the overfitting gap open. The shape is qualitative, meant to build intuition about balance, not to report measured numbers.</p>
 </div>
 
 <div class="quiz" data-correct="c">
@@ -316,7 +316,7 @@ that explains the oddest fact in it: the 2014 network is deeper than the
 
 <div class="figure" id="fig-timeline">
   <div class="fig-mount" data-fig="timeline"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> the architecture timeline, LeNet-1 (1988) to ResNet (2015). Click a node for its year, depth, parameter count, error, and signature idea; the linked chart below plots parameters on a log scale across the generations, with ILSVRC top-5 error marked where the lecture reports it. Every number is from the lecture's comparison table.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> the architecture timeline, LeNet-1 (1988) to ResNet (2015). Click a node for its year, depth, parameter count, error, and signature idea; the linked chart below plots parameters on a log scale across the generations, with the top-5 / test errors marked where the lecture reports them. Every number is from the lecture's comparison table.</p>
 </div>
 
 <h3>LeNet: the proof it could work at all</h3>
@@ -451,7 +451,7 @@ where its weights sit. Check it live:
 
 <div class="figure" id="fig-flops">
   <div class="fig-mount" data-fig="flops"></div>
-  <p class="fig-caption"><b>Fig 4.2,</b> parameters versus connections for one conv layer. Sliders for input size, kernel, filters, and stride; both counts are computed from the formulas above and drawn as log-scale bars. Grow the input and watch connections climb while parameters sit still; then compare a conv layer against a dense layer, where the two counts are the same thing.</p>
+  <p class="fig-caption"><b>Fig 4.2,</b> parameters versus connections for one conv layer. Sliders for input size, kernel, filters, input depth, and stride; both counts are computed from the formulas above and drawn as log-scale bars. Grow the input and watch connections climb while parameters sit still; then compare a conv layer against a dense layer, where the two counts are the same thing.</p>
 </div>
 
 <p>
@@ -472,7 +472,7 @@ below actually executes:
 
 <div class="figure" id="fig-layerreport">
   <div class="fig-mount" data-fig="layerreport"></div>
-  <p class="fig-caption"><b>Fig 4.3,</b> <code>layer_report</code>, live. Choose a configuration (the presets are LeNet-5's C1 and C2 from the worked table, plus an AlexNet-scale first layer) and Run: the printout comes from executing the arithmetic above, and the bars compare parameters against connections. C1's numbers should match the worked table exactly.</p>
+  <p class="fig-caption"><b>Fig 4.3,</b> <code>layer_report</code>, live. Choose a configuration (the presets are LeNet-5's C1, C2, and C3 from the worked table, plus an AlexNet-scale first layer) and Run: the printout comes from executing the arithmetic above, and the bars compare parameters against connections. C1's numbers should match the worked table exactly.</p>
 </div>
 
 <div class="quiz" data-correct="a">
@@ -549,7 +549,7 @@ the lecture's guidance is:
 <ul>
   <li><strong>Fewer new examples: freeze more.</strong> Every unfrozen layer is capacity your tiny dataset must fill; with very little data, train the new head only.</li>
   <li><strong>More dissimilar data: fine-tune more.</strong> Microscopy slides or radar maps share less with ImageNet photos than pet pictures do, so deeper layers' photo-specific features need adjusting, unfreeze further down.</li>
-  <li><strong>Use a smaller learning rate than training from scratch.</strong> Fine-tuning happens late in training in disguise: the weights already sit near a good optimum, and recall the shape of loss surfaces around optima, big steps near a minimum overshoot and destroy the pre-trained knowledge you came for.</li>
+  <li><strong>Use a smaller learning rate than training from scratch.</strong> Fine-tuning is late-stage training in disguise: the weights already sit near a good optimum. Recall the shape of loss surfaces around optima: big steps near a minimum overshoot and destroy the pre-trained knowledge you came for.</li>
 </ul>
 
 <div class="figure" id="fig-transfer">

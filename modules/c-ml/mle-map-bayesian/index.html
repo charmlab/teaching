@@ -548,7 +548,7 @@ on data is bookkeeping. See the algebra as shapes:
 
 <div class="figure" id="fig-conjugacy">
   <div class="fig-mount" data-fig="conjugacy"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> conjugate means the posterior stays in the family. The purple curve is the Beta prior, the grey curve is the Bernoulli likelihood (normalized for display so the shapes are comparable), and the orange curve is their product, renormalized: the posterior. It is exactly <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span>, with parameters printed live. Slide the prior and the counts and watch a Beta times a Bernoulli remain a Beta, every time.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> conjugate means the posterior stays in the family. The purple curve is the Beta prior, the grey curve is the Bernoulli likelihood (normalized for display so the shapes are comparable), and the orange curve is their product, renormalized: the posterior. It is exactly <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span>, with parameters printed live. Slide the prior and edit the counts and watch a Beta times a Bernoulli remain a Beta, every time.</p>
 </div>
 
 <p>
@@ -696,7 +696,7 @@ the disagreement evaporates.
 
 <div class="figure" id="fig-threeway">
   <div class="fig-mount" data-fig="threeway"></div>
-  <p class="fig-caption"><b>Fig 5.1,</b> MLE vs MAP vs Bayesian, side by side and live. Set the counts and the prior; the panel computes <span class="m">$\hat\theta_{ML}$</span>, <span class="m">$\hat\theta_{MAP}$</span>, and the posterior predictive <span class="m">$p(x_{\text{new}} = H \mid D)$</span>, plots all three on the posterior, and tracks them as <span class="m">$N$</span> grows at a fixed heads ratio. Small <span class="m">$N$</span>: the three disagree, and the gaps are the uncertainty MLE pretends not to have. Large <span class="m">$N$</span>: the posterior sharpens and the three estimators converge to the same value.</p>
+  <p class="fig-caption"><b>Fig 5.1,</b> MLE vs MAP vs Bayesian, side by side and live. Set the sample size, the heads ratio, and the prior; the panel computes <span class="m">$\hat\theta_{ML}$</span>, <span class="m">$\hat\theta_{MAP}$</span>, and the posterior predictive <span class="m">$p(x_{\text{new}} = H \mid D)$</span>, plots all three on the posterior, and tracks them as <span class="m">$N$</span> grows at a fixed heads ratio. Small <span class="m">$N$</span>: the three disagree, and the gaps are the uncertainty MLE pretends not to have. Large <span class="m">$N$</span>: the posterior sharpens and the three estimators converge to the same value.</p>
 </div>
 
 <h3>Predicting a whole dataset, and the pouch's final verdict</h3>
