@@ -239,7 +239,7 @@ individual points and learn, physically, which ones matter:
 
 <div class="figure" id="fig-maxmargin">
   <div class="fig-mount" data-fig="maxmargin"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the max-margin explorer. Drag the square handle to slide the boundary and the round handle to rotate it; the readout shows your margin, computed as the true distance from your line to the nearest point. Press Solve and the exact max-margin boundary appears with its support vectors ringed and <span class="m">$M = 2/\lVert w \rVert$</span> live. Then drag points: a non-support point does nothing until it enters the margin, while a support vector drags the entire boundary with it.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the max-margin explorer. Drag the square handle to slide the boundary and the round handle to rotate it; the readout shows your margin width, the full symmetric buffer your line earns, computed live as twice the distance to its nearest point. Press Solve and the exact max-margin boundary appears with its support vectors ringed and <span class="m">$M = 2/\lVert w \rVert$</span> live. Then drag points: a non-support point does nothing until it enters the margin, while a support vector drags the entire boundary with it.</p>
 </div>
 
 <div class="quiz" data-correct="b">
@@ -515,7 +515,7 @@ end of this section shows exactly how an over-flexible feature space fails.
 <h3>The kernel trick: similarity without coordinates</h3>
 
 <p>
-Feature maps have a cost problem. Useful maps explode the dimension, a
+Feature maps have a cost problem. Useful maps explode the dimension: a
 degree-<span class="m">$d$</span> polynomial map over many inputs generates
 combinatorially many features, and we would have to build and store every
 lifted vector. Now recall the observation from section 3: the SVM dual, and

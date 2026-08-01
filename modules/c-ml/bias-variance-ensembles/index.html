@@ -190,9 +190,9 @@ is too sensitive to the particular training sample; it can represent the
 truth, but it also represents every accident of the draw. That is
 <strong>overfitting</strong>. Bayes error is unavoidable label noise, and the
 only "fix" is better features or a better measurement process, not a better
-learner. Model selection, choosing complexity, regularization, depth limits,
-is the art of balancing the first two terms for low test error and a small
-generalization gap.
+learner. Model selection, meaning choices like complexity, regularization
+strength, and depth limits, is the art of balancing the first two terms for
+low test error and a small generalization gap.
 </p>
 
 <p>
@@ -205,8 +205,8 @@ language survives: "too simple", "too sensitive to the sample", and
 
 <p>
 Now watch the accounting happen. The figure below reran the Fig 1.1
-experiment 60 times at every polynomial degree and measured each term of the
-decomposition for real. Before it shows you the total, commit to a guess:
+experiment 60 times at each polynomial degree from 0 to 6 and measured each
+term of the decomposition for real. Before it shows you the total, commit to a guess:
 </p>
 
 <div class="figure" id="fig-decomp">
@@ -373,7 +373,7 @@ building many independent bags and watching their answers disagree:
 
 <div class="figure" id="fig-bagging">
   <div class="fig-mount" data-fig="bagging"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> bagging, live. At <span class="m">$m = 1$</span> the boundary is one tree's jagged guess, and the variance at the &times; probe is large. Slide <span class="m">$m$</span> up: the faint single-tree boundaries keep wobbling, the orange averaged boundary settles, and the measured variance falls, tracking (but not quite reaching) the <span class="m">$\operatorname{Var}/m$</span> benchmark because bootstrap trees are correlated. The mean prediction readout barely moves: bias stays put.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> bagging, live. At <span class="m">$m = 1$</span> the boundary is one tree's jagged guess, and the variance at the &times; probe is large. Slide <span class="m">$m$</span> up: the faint single-tree boundaries still disagree with each other, the orange averaged boundary settles, and the measured variance falls, tracking (but not quite reaching) the <span class="m">$\operatorname{Var}/m$</span> benchmark because bootstrap trees are correlated. The mean prediction readout barely moves: bias stays put.</p>
 </div>
 
 <p>

@@ -625,7 +625,7 @@
     LR.header(
       mount,
       "What a deep unit can see",
-      "Click any unit in any layer. The exact patch of the original image it depends on is computed by walking the architecture backwards."
+      "Click any unit in layers 1 to 3. The exact patch of the original image it depends on is computed by walking the architecture backwards."
     );
 
     // architecture: sizes and the op that produced each layer

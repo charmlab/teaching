@@ -115,7 +115,7 @@ combination of the inputs, with no interactions between them. Each feature
 pushes the verdict up or down on its own, independent of what the others are
 doing. That worldview is often fine, and when it fails, it fails for
 identifiable reasons: noise in the inputs, noise in the labels, missing or
-latent variables the model never sees, or plain model mismatch, the true rule
+latent variables the model never sees, or plain model mismatch: the true rule
 just is not additive. One honest caution before we fight for separability:
 perfectly separating a noisy training set may only mean you overfit the noise.
 The XOR wall is not that. XOR fails for the cleanest reason on the list, model
@@ -247,7 +247,7 @@ Watch the lift happen. The interaction feature raises exactly one point,
 
 <div class="figure" id="fig-lift">
   <div class="fig-mount" data-fig="lift"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the feature-map lift. Slide the lift to raise each point to height <span class="m">$x_1 x_2$</span> and watch (1,&thinsp;1) climb across the separating plane; the readout counts how many points the plane classifies correctly at each moment. Dropping the plane back into the input plane leaves a curved boundary, exactly the SVM lecture's kernel picture.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the feature-map lift. Slide the lift to raise each point to height <span class="m">$x_1 x_2$</span>, and toggle the separating plane on to watch (1,&thinsp;1) climb across it; the readout counts how many points the rule classifies correctly at each moment. The right pane shows the same rule dropped back into the input plane, where the boundary is a curve, exactly the SVM lecture's kernel picture.</p>
 </div>
 
 <p>
@@ -431,7 +431,7 @@ has become easy. Build one and push numbers through it:
 
 <div class="figure" id="fig-builder">
   <div class="fig-mount" data-fig="builder"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> the network builder. Set the hidden width, pick a preset or randomize the weights, choose an input, and run the forward pass; activations light up layer by layer and every number is genuinely computed. The parameter counter updates live as <span class="m">$N_i \times N_{i-1}$</span> changes with the width.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> the network builder. Set the hidden width, pick a weight preset (two random nets and a sharp-sigmoid XOR), choose an input, and run the forward pass; activations light up layer by layer and every number is genuinely computed. The parameter counter updates live as <span class="m">$N_i \times N_{i-1}$</span> changes with the width.</p>
 </div>
 
 <p>
@@ -554,7 +554,7 @@ $$ \text{Sigmoid: } \sigma(z) = \frac{1}{1 + e^{-z}}, \qquad
 <p>
 So how expressive is a network once the activations are genuinely nonlinear?
 The classical answer: a network with at least one hidden layer, two weight
-layers, is a <strong>universal function approximator</strong>, it can
+layers, is a <strong>universal function approximator</strong>: it can
 approximate any function arbitrarily well. In fact a single hidden layer can
 already perfectly discriminate any training set. The fine print is the width:
 that one layer may need to be extremely wide, in the worst case behaving like

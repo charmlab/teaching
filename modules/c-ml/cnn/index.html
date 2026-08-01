@@ -229,8 +229,8 @@ Convolution implements locality plus weight sharing in one move: take a small
 array of weights <span class="m">$w$</span>, slide it over the input, and at
 each position compute how strongly the local patch matches the filter. The
 grid of responses it produces is called a <strong>feature map</strong>: a map
-of where in the input the filter's pattern was found. It is a dot product
-between the same learned filter and every local patch.
+of where in the input the filter's pattern was found. Every entry of that map
+is a dot product between the same learned filter and one local patch.
 </p>
 
 <h3>One dimension first</h3>
@@ -670,7 +670,7 @@ whole regions, can respond to parts and objects. Trace it exactly:
 
 <div class="figure" id="fig-rfgrowth">
   <div class="fig-mount" data-fig="rfgrowth"></div>
-  <p class="fig-caption"><b>Fig 5.3,</b> receptive-field growth through conv 3&times;3, pool 2&times;2, conv 3&times;3. Click any unit in any layer and the exact region of the original image it depends on is computed and highlighted: 3&times;3 for depth one, 4&times;4 after pooling, 8&times;8 at depth three. Depth literally widens what a unit can see.</p>
+  <p class="fig-caption"><b>Fig 5.3,</b> receptive-field growth through conv 3&times;3, pool 2&times;2, conv 3&times;3. Click any unit in the three computed layers and the exact region of the original image it depends on is computed and highlighted: 3&times;3 for depth one, 4&times;4 after pooling, 8&times;8 at depth three. Depth literally widens what a unit can see.</p>
 </div>
 
 <h3>Translation: what convolution and pooling each buy</h3>
