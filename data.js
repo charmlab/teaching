@@ -353,6 +353,7 @@ const MODULES = [
     resources:[
       { title:"★ Interactive Lesson — Principal Component Analysis (Lecture 18)", type:"website", url:"modules/c-ml/pca/index.html" },
       { title:"★ Interactive Lesson — Autoencoders & VAEs (Lecture 19)", type:"website", url:"modules/c-ml/autoencoders/index.html" },
+      { title:"★ Interactive Lesson — Clustering: K-Means & GMMs (Lecture 20)", type:"website", url:"modules/c-ml/clustering/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
@@ -364,6 +365,7 @@ const MODULES = [
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
     aud:["student"], prereqs:["junc-f2c"],
     resources:[
+      { title:"★ Interactive Lesson — Reinforcement Learning (Lecture 21)", type:"website", url:"modules/c-ml/reinforcement-learning/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
