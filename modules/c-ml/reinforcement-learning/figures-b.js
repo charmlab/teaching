@@ -256,7 +256,7 @@
       } else if (isDefault && k === 2) {
         msg.show("Sweep 2: the second ring found the 8s, V₂ = −1 + 0.9·8 = 6.2. The goal's influence has travelled exactly two steps.", "info");
       } else if (isDefault && delta <= 1e-4) {
-        msg.show("Converged by k = 4: values 3.12, 4.58, 6.2, 8 fan out from the goal, and every arrow points along a shortest path home.", "good");
+        msg.show("Converged: values 3.12, 4.58, 6.2, 8 fan out from the goal (final since sweep 4; the last sweep confirms Δ = 0), and every arrow points along a shortest path home.", "good");
       } else if (delta <= 1e-4) {
         msg.show("Converged in " + k + " sweeps with your settings. Compare the value landscape against the defaults: γ and the rewards reshape how far the goal's pull reaches.", "good");
       }
@@ -540,7 +540,7 @@
         }).join(" ") + "]");
       }
       L.push(pol.join("\n"));
-      L.push("# gamma=0.9 reproduces the lecture: 8 after sweep 1, 6.2 after sweep 2, converged by 4");
+      L.push("# gamma=0.9 reproduces the lecture: 8 after sweep 1, 6.2 after sweep 2, values final by sweep 4");
       out.textContent = L.join("\n");
     }
   };

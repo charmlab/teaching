@@ -286,7 +286,7 @@ yourself:
 
 <div class="figure" id="fig-restart">
   <div class="fig-mount" data-fig="restart"></div>
-  <p class="fig-caption"><b>Fig 2.2,</b> local minima are real. Every press of "Random restart" seeds three centroids at fresh random positions and runs K-means to convergence, live. The bars log the final inertia of each run: some restarts find the natural three-clump answer (the low bars, marked with the star), others converge with two centroids sharing one clump (the tall bars), and both are fixed points of the loop. Multiple restarts plus keep-the-best is the standard defence.</p>
+  <p class="fig-caption"><b>Fig 2.2,</b> local minima are real. Every press of "Random restart" seeds three centroids at fresh random positions and runs K-means to convergence, live. The bars log the final inertia of each run: some restarts find the natural three-clump answer (the low bars; the best run so far is starred), others converge with two centroids sharing one clump (the tall bars), and both are fixed points of the loop. Multiple restarts plus keep-the-best is the standard defence.</p>
 </div>
 
 <p>
@@ -394,7 +394,7 @@ little, in proportion to its responsibility.
 
 <div class="figure" id="fig-soft">
   <div class="fig-mount" data-fig="soft"></div>
-  <p class="fig-caption"><b>Fig 3.1,</b> the stiffness dial, this lesson's softmax made visible. Every point is painted with the live blend of the three cluster colours weighted by its responsibilities, so a 50/30/20 point is visibly a mix of orange, green, and purple. Slide <span class="m">$\beta$</span> down and the whole plane washes toward an even blend; slide it up and the colours snap crisp, hard K-means recovered as the limit. Click any point to read its actual responsibility numbers as bars, and press Iterate to run real soft update steps at the current stiffness.</p>
+  <p class="fig-caption"><b>Fig 3.1,</b> the stiffness dial, this lesson's softmax made visible. Every point is painted with the live blend of the three cluster colours weighted by its responsibilities, so a 50/30/20 point is visibly a mix of orange, green, and purple. Slide <span class="m">$\beta$</span> down and every point washes toward an even blend; slide it up and the colours snap crisp, hard K-means recovered as the limit. Click any point to read its actual responsibility numbers as bars, and press Iterate to run real soft update steps at the current stiffness.</p>
 </div>
 
 <div class="worked">
@@ -432,7 +432,11 @@ every direction and every cluster identically? Soft K-means has no
 principled reply, because it was built by tweaking a procedure rather than
 by stating a model. Those open questions are precisely what pushes us to the
 generative reformulation in the next section, where every one of them gets
-an answer for free. For completeness, the clustering toolbox holds more than
+an answer for free.
+</p>
+
+<p>
+For completeness, the clustering toolbox holds more than
 these two: hierarchical clustering builds a tree of clusters and suits
 problems with genuine hierarchy or an unknown cluster count, and DBSCAN
 finds arbitrarily shaped clusters, tolerates noise, and scales well. This
@@ -504,7 +508,7 @@ refit the parameters from the current sources, and repeat.
 
 <div class="figure" id="fig-chicken">
   <div class="fig-mount" data-fig="chicken"></div>
-  <p class="fig-caption"><b>Fig 4.1,</b> the chicken and the egg as two live panels. Left: "if you knew the labels", press Fit and each colour group gets its Gaussian fitted by the closed-form MLE, mean and variance per group, drawn as a curve. Right: "if you knew the Gaussians", press Colour and every grey point is shaded by its Bayes posterior under the two given curves. Each panel's button needs exactly what the other panel produces, and the arrows in the middle close the loop that EM will run.</p>
+  <p class="fig-caption"><b>Fig 4.1,</b> the chicken and the egg as two live panels. Left: "if you knew the labels", press Fit and each colour group gets its Gaussian fitted by the closed-form MLE, mean and variance per group, drawn as a curve. Right: "if you knew the Gaussians", press Colour and every grey point is shaded by its Bayes posterior under the two given curves. Each panel's button needs exactly what the other panel produces; EM is the loop that feeds each panel's output to the other.</p>
 </div>
 
 <p>

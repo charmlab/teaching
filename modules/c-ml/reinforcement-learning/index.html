@@ -166,7 +166,7 @@ feel it directly on a live bandit:
 
 <div class="figure" id="fig-explore">
   <div class="fig-mount" data-fig="explore"></div>
-  <p class="fig-caption"><b>Fig 1.1,</b> the dilemma in everyday clothes. Flip each card to see its exploit and explore readings, then run the restaurant version as an actual two-armed bandit: your favourite spot has a known average, the new place is unknown, and the simulation plays 30 nights at your chosen <span class="m">$\epsilon$</span>, computed with real draws. Sometimes exploring finds a better favourite; sometimes it just costs you dinners. That is the point. <!-- flagged addition: the four scenarios are the source's own examples; the restaurant simulator's specific numbers (a 6.5-of-10 favourite, an unknown rival, 30 nights) are mine. --></p>
+  <p class="fig-caption"><b>Fig 1.1,</b> the dilemma in everyday clothes. Each card pairs a choice's exploit reading with its explore reading; below them, run the restaurant version as an actual two-armed bandit: your favourite spot has a known average, the new place is unknown, and the simulation plays 30 nights at your chosen <span class="m">$\epsilon$</span>, computed with real draws. Sometimes exploring finds a better favourite; sometimes it just costs you dinners. That is the point. <!-- flagged addition: the four scenarios are the source's own examples; the restaurant simulator's specific numbers (a 6.5-of-10 favourite, an unknown rival, 30 nights) are mine. --></p>
 </div>
 
 <h3>Two standard strategies</h3>
@@ -364,7 +364,7 @@ against future reward with a single dial. Turn that dial:
 
 <div class="figure" id="fig-discount">
   <div class="fig-mount" data-fig="discount"></div>
-  <p class="fig-caption"><b>Fig 3.1,</b> the discount factor as a planning horizon. The bars are the weights <span class="m">$\gamma^k$</span> on rewards <span class="m">$k$</span> steps ahead, recomputed as you slide <span class="m">$\gamma$</span>; the readouts evaluate two concrete reward streams live: a steady +1 per step, whose return approaches <span class="m">$1/(1-\gamma)$</span>, and a single +10 arriving three steps from now, worth <span class="m">$10\gamma^3$</span> today. At <span class="m">$\gamma = 0.9$</span> those are 10 and 7.29; drop to <span class="m">$\gamma = 0.5$</span> and patience stops paying. <!-- flagged addition: the two illustrative reward streams are my choices; the discounted-return formula and the role of gamma are the source's. --></p>
+  <p class="fig-caption"><b>Fig 3.1,</b> the discount factor as a planning horizon. The bars are the weights <span class="m">$\gamma^k$</span> on rewards <span class="m">$k$</span> steps ahead, recomputed as you slide <span class="m">$\gamma$</span>; the return readout evaluates two concrete reward streams live (toggle between them): a steady +1 per step, whose return approaches <span class="m">$1/(1-\gamma)$</span>, and a single +10 arriving three steps from now, worth <span class="m">$10\gamma^3$</span> today. At <span class="m">$\gamma = 0.9$</span> those are 10 and 7.29; drop to <span class="m">$\gamma = 0.5$</span> and patience stops paying. <!-- flagged addition: the two illustrative reward streams are my choices; the discounted-return formula and the role of gamma are the source's. --></p>
 </div>
 
 <h3>Value functions: folding the future into the present</h3>
@@ -446,7 +446,7 @@ is certain doom: the engine overheats and the drive ends with a
 
 <div class="figure" id="fig-car">
   <div class="fig-mount" data-fig="carmdp"></div>
-  <p class="fig-caption"><b>Fig 3.2,</b> the car MDP as a live transition explorer. Pick a state and an action to see every possible transition with its probability <span class="m">$P(s' \mid s, a)$</span> and reward <span class="m">$R(s, a, s')$</span>; then press Drive to sample real transitions and watch the empirical frequencies converge toward the model's probabilities. Driving Fast from Warm is deterministic doom: <span class="m">$P(\text{Overheated} \mid \text{Warm}, \text{Fast}) = 1.0$</span> with reward <span class="m">$-10$</span>. <!-- flagged addition: the source states P(Warm|Warm,Slow)=0.5, P(Overheated|Warm,Fast)=1.0, R(Overheated|Warm,Fast)=-10, the +2/+1 fast/slow rewards, and the optimal actions; the remaining entries needed to complete the transition table (Cool,Slow stays Cool w.p. 1; Cool,Fast splits 0.5/0.5 between Cool and Warm; Warm,Slow cools w.p. 0.5) follow the standard version of this example and are flagged as my completion. --></p>
+  <p class="fig-caption"><b>Fig 3.2,</b> the car MDP as a live transition explorer. Pick an action from the current state to see every possible transition with its probability <span class="m">$P(s' \mid s, a)$</span> and reward <span class="m">$R(s, a, s')$</span>; then press Drive to sample real transitions and watch the readout's empirical frequency for staying Warm under Slow converge toward the model's 0.5. Driving Fast from Warm is deterministic doom: <span class="m">$P(\text{Overheated} \mid \text{Warm}, \text{Fast}) = 1.0$</span> with reward <span class="m">$-10$</span>. <!-- flagged addition: the source states P(Warm|Warm,Slow)=0.5, P(Overheated|Warm,Fast)=1.0, R(Overheated|Warm,Fast)=-10, the +2/+1 fast/slow rewards, and the optimal actions; the remaining entries needed to complete the transition table (Cool,Slow stays Cool w.p. 1; Cool,Fast splits 0.5/0.5 between Cool and Warm; Warm,Slow cools w.p. 0.5) follow the standard version of this example and are flagged as my completion. --></p>
 </div>
 
 <div class="worked">
@@ -641,7 +641,7 @@ def value_iteration(P, R, gamma, eps=1e-6):
 
 <div class="figure" id="fig-vicode">
   <div class="fig-mount" data-fig="vicode"></div>
-  <p class="fig-caption"><b>Fig 4.4,</b> <code>value_iteration</code>, executed for real on the 3&times;3 maze. Choose <span class="m">$\gamma$</span>, press Run, and the printed sweeps come from the actual computation: watch convergence take 4 sweeps at <span class="m">$\gamma = 0.9$</span>, and see how a smaller <span class="m">$\gamma$</span> shrinks the values (the goal's pull fades with distance) while the policy arrows survive.</p>
+  <p class="fig-caption"><b>Fig 4.4,</b> <code>value_iteration</code>, executed for real on the 3&times;3 maze. Choose <span class="m">$\gamma$</span>, press Run, and the printed sweeps come from the actual computation: at <span class="m">$\gamma = 0.9$</span> the values settle by sweep 4 (a fifth sweep confirms nothing changes), and a smaller <span class="m">$\gamma$</span> shrinks the values (the goal's pull fades with distance) while the policy arrows survive.</p>
 </div>
 
 <div class="quiz" data-correct="a">

@@ -220,7 +220,7 @@ boundary directly.
 
 <div class="figure" id="fig-bayes1d">
   <div class="fig-mount" data-fig="bayes1d"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the Bayes classifier on a number line, this lesson's first signature figure. The curves are prior-weighted class-likelihoods <span class="m">$p(x \mid C)\,p(C)$</span>; drag the query <span class="m">$x$</span> (or use arrow keys) to read both likelihoods, both posteriors, and the live verdict. The decision points sit where the curves cross, and the shaded regions are each class's winning territory. Move the means, stretch the variances, slide the prior, and watch the territory get renegotiated; the Diabetes preset reproduces the worked example digit for digit.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the Bayes classifier on a number line, this lesson's first signature figure. The curves are prior-weighted class-likelihoods <span class="m">$p(x \mid C)\,p(C)$</span>; drag the query <span class="m">$x$</span> (or use arrow keys) to read both likelihoods, both posteriors, and the live verdict. The decision points sit where the curves cross, and the coloured band along the top of the plot marks each class's winning territory. Move the means, stretch the variances, slide the prior, and watch the territory get renegotiated; the Diabetes preset reproduces the worked example digit for digit.</p>
 </div>
 
 <div class="quiz" data-correct="b">
@@ -467,7 +467,7 @@ section 7:
 
 <div class="figure" id="fig-gdacode">
   <div class="fig-mount" data-fig="gdacode"></div>
-  <p class="fig-caption"><b>Fig 5.2,</b> a live <code>gda_predict</code>. Press Run and the functions above execute for real on a fixed two-class toy dataset: the printed <span class="m">$\hat{\mu}_k$</span>, <span class="m">$\hat{\Sigma}_k$</span>, priors, per-class log-posterior scores, and the argmax verdict for the chosen query all come from the computation. The covariance-mode select re-fits with a shared or shared-diagonal <span class="m">$\Sigma$</span> and re-scores; watch the query near the boundary change its verdict between modes.</p>
+  <p class="fig-caption"><b>Fig 5.2,</b> a live <code>gda_predict</code>. Press Run and the functions above execute for real on a fixed two-class toy dataset: the printed <span class="m">$\hat{\mu}_k$</span>, <span class="m">$\hat{\Sigma}_k$</span>, priors, per-class log-posterior scores, and the argmax verdict for the chosen query all come from the computation. Switch the covariance-mode select to a shared or shared-diagonal <span class="m">$\Sigma$</span> and press Run again to re-fit and re-score; watch the query near the boundary change its verdict between modes.</p>
 </div>
 
 <details class="check">
@@ -667,7 +667,7 @@ is a single <strong>linear</strong> threshold. Watch the cancellation happen:
 
 <div class="figure" id="fig-boundary1d">
   <div class="fig-mount" data-fig="boundary1d"></div>
-  <p class="fig-caption"><b>Fig 7.1,</b> the equal-posterior condition becoming a quadratic. The coefficients <span class="m">$a, b, c$</span> are computed live from the two Gaussians and priors, the roots are solved and drawn as boundary lines, and the shaded regions show each class's winning territory, two boundary points when the variances differ. Drag the variance sliders toward each other, or press Equalize, and watch <span class="m">$a \to 0$</span>: the quadratic degenerates and exactly one linear boundary survives.</p>
+  <p class="fig-caption"><b>Fig 7.1,</b> the equal-posterior condition becoming a quadratic. The coefficients <span class="m">$a, b, c$</span> are computed live from the two Gaussians and priors, the roots are solved and drawn as boundary lines, and the coloured band along the top shows each class's winning territory, two boundary points when the variances differ. Drag the variance sliders toward each other, or press Equalize, and watch <span class="m">$a \to 0$</span>: the quadratic degenerates and exactly one linear boundary survives.</p>
 </div>
 
 <p>
@@ -701,8 +701,8 @@ aimed for one. The covariance assumption is the boundary dial:
 
 <p>
 One dataset can wear all of these. The figure below fits it each way and
-morphs between the results, which is Fig 0.1's gallery, now with every gear
-visible:
+morphs between the results, the same story Fig 0.1 promised, now with every
+gear visible:
 </p>
 
 <div class="figure" id="fig-morph">

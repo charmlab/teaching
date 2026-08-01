@@ -59,8 +59,8 @@
 
 <p>
 Start with the destination. Below is a small handwritten-style digit, stored
-the honest way: one number per pixel, a vector in a space with hundreds of
-dimensions. Now watch what happens when I throw almost all of those
+the honest way: one number per pixel, a vector in a 196-dimensional space.
+Now watch what happens when I throw almost all of those
 dimensions away. Keep 1 direction and the reconstruction is a blur. Keep 5
 and the shape is back. Keep 15 and you would struggle to tell the copy from
 the original. Slide <span class="m">$K$</span> yourself:
@@ -703,7 +703,7 @@ are deleted wholesale. Try both hats on the digit:
 
 <div class="figure" id="fig-digits">
   <div class="fig-mount" data-fig="digits"></div>
-  <p class="fig-caption"><b>Fig 6.1,</b> compression and denoising with one eigendecomposition, on the synthetic digit set from Fig 0.1. Slide <span class="m">$K$</span> to trade fidelity for size and watch detail return as components are added; the readouts price the trade in real numbers (dimensions kept, variance kept). Then switch on noise: the corrupted image goes through the same project-and-reconstruct pipeline, and at moderate <span class="m">$K$</span> the reconstruction sits visibly closer to the clean original than the noisy input does, because the discarded low-eigenvalue directions carried mostly noise. The per-pixel errors are computed live.</p>
+  <p class="fig-caption"><b>Fig 6.1,</b> compression and denoising with one eigendecomposition, on the synthetic digit set from Fig 0.1. Slide <span class="m">$K$</span> to trade fidelity for size and watch detail return as components are added; the variance-kept readout and the status line price the trade in real numbers (<span class="m">$K$</span> numbers stored per image instead of 196). Then switch on noise: the corrupted image goes through the same project-and-reconstruct pipeline, and at moderate <span class="m">$K$</span> the reconstruction sits visibly closer to the clean original than the noisy input does, because the discarded low-eigenvalue directions carried mostly noise. The per-pixel errors are computed live.</p>
 </div>
 
 <details class="check">
