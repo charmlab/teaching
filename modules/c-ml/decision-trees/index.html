@@ -619,8 +619,8 @@ structure and simple enough to generalize, and those pull in opposite
 directions. Too small a tree <strong>underfits</strong>: its leaves stay
 impure because it never got to ask enough questions, and it misses structure
 that is genuinely there. Too large a tree <strong>overfits</strong>: its
-leaves become pure for the wrong reasons, purified by memorizing noise, and
-as a bonus it becomes unreadable, which throws away the interpretability that
+leaves become pure for the wrong reasons, purified by memorizing noise. As a
+bonus it becomes unreadable, which throws away the interpretability that
 made us like trees in the first place. The tie-breaking principle is
 <strong>Occam's razor</strong>: prefer the simplest tree that explains the
 data. In practice that means small trees with the informative splits near the
@@ -700,7 +700,7 @@ shapes but nearly always rank splits the same way:
 
 <div class="figure" id="fig-gini">
   <div class="fig-mount" data-fig="gini"></div>
-  <p class="fig-caption"><b>Fig 6.3,</b> Gini vs entropy. Left: both curves over <span class="m">$p$</span>; toggle the &divide;2 scaling to see how close their shapes are. Right: both criteria scoring the same candidate split on the seven fruits from Fig 5.2, with the best split under each marked. Here, as usually, they agree.</p>
+  <p class="fig-caption"><b>Fig 6.3,</b> Gini vs entropy. Left: both curves over <span class="m">$p$</span>; toggle the &divide;2 scaling to see how close their shapes are. Right: both criteria scoring the same candidate split on the seven fruits from Fig 5.2. The readout names the best threshold under each ruler, and the marked split is where both agree; here, as they usually do, the two rulers pick the same one.</p>
 </div>
 
 <h3>k-NN or a tree? Same data, different bets</h3>

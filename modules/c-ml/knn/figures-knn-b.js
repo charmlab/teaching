@@ -601,8 +601,8 @@
 
     const pane = LR.el("div", "dual-pane");
     mount.appendChild(pane);
-    const lb = LR.el("div"); lb.appendChild(LR.el("div", "pane-label", "Raw units — salary owns the vote"));
-    const rb = LR.el("div"); rb.appendChild(LR.el("div", "pane-label", "Standardized — both features speak"));
+    const lb = LR.el("div"); lb.appendChild(LR.el("div", "pane-label", "Raw units: salary owns the vote"));
+    const rb = LR.el("div"); rb.appendChild(LR.el("div", "pane-label", "Standardized: both features speak"));
     pane.appendChild(lb); pane.appendChild(rb);
     const LC = LR.canvas(lb, 400, 330, { aria: "Raw-unit scatter where nearest neighbours are chosen almost entirely by salary" });
     const RC = LR.canvas(rb, 400, 330, { aria: "Standardized scatter where nearest neighbours reflect both features" });
@@ -710,7 +710,7 @@
       ro.set("train", "0  (lazy: training = storing)", C.green);
       ro.set("dist", dDone.toLocaleString("en-CA") + " / " + distOps.toLocaleString("en-CA"), phase === "dist" ? C.orange : undefined);
       ro.set("sort", sDone.toLocaleString("en-CA") + " / " + sortOps.toLocaleString("en-CA"), phase === "sort" ? C.orange : undefined);
-      ro.set("total", (dDone + sDone).toLocaleString("en-CA") + (phase === "done" ? "  — for a single prediction" : ""), phase === "done" ? C.red : undefined);
+      ro.set("total", (dDone + sDone).toLocaleString("en-CA") + (phase === "done" ? ", for a single prediction" : ""), phase === "done" ? C.red : undefined);
     }
 
     function draw() {

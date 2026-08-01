@@ -64,9 +64,9 @@
     const pane = LR.el("div", "dual-pane");
     mount.appendChild(pane);
     const leftBox = LR.el("div");
-    leftBox.appendChild(LR.el("div", "pane-label", "Data space — a model is a line"));
+    leftBox.appendChild(LR.el("div", "pane-label", "Data space: a model is a line"));
     const rightBox = LR.el("div");
-    rightBox.appendChild(LR.el("div", "pane-label", "Weight space — a model is a point"));
+    rightBox.appendChild(LR.el("div", "pane-label", "Weight space: a model is a point"));
     pane.appendChild(leftBox); pane.appendChild(rightBox);
 
     const L = LR.canvas(leftBox, 400, 350, { aria: "Data space: scatter with draggable regression line" });
@@ -410,7 +410,7 @@
     LR.header(
       mount,
       "The loss bowl",
-      "The real surface J(w₀, w₁) for the dataset below. Drag to rotate. Drop the ball, pick α, and watch it roll — or overshoot."
+      "The real surface J(w₀, w₁) for the dataset below. Drag to rotate. Drop the ball, pick α, and watch it roll, or overshoot."
     );
 
     const pts = LR.houseData(12, 3, 0.6);
@@ -677,7 +677,7 @@
 
     /* ---- Mission 1: fix the line ---- */
     const box1 = LR.el("div");
-    box1.appendChild(LR.el("div", "pane-label", "Mission 1 — fix the fit"));
+    box1.appendChild(LR.el("div", "pane-label", "Mission 1: fix the fit"));
     pane.appendChild(box1);
 
     const pts = LR.houseData(10, 77, 0.5);
@@ -729,7 +729,7 @@
       const w = lw();
       const J = LR.loss1d(pts, w.w0, w.w1);
       if (J <= bestJ * 1.06) {
-        msg1.show("✓ Nailed it. Your J = " + LR.fmtF(J, 4) + " vs the optimum " + LR.fmtF(bestJ, 4) + " — within 6%. The normal equation agrees with your eyes.", "good");
+        msg1.show("✓ Nailed it. Your J = " + LR.fmtF(J, 4) + " vs the optimum " + LR.fmtF(bestJ, 4) + ", within 6%. The normal equation agrees with your eyes.", "good");
       } else if (J <= bestJ * 1.5) {
         msg1.show("Close: J = " + LR.fmtF(J, 4) + ", optimum is " + LR.fmtF(bestJ, 4) + ". Tilt or shift a little more.", "info");
       } else {
@@ -759,7 +759,7 @@
 
     /* ---- Mission 2: walk the ball down ---- */
     const box2 = LR.el("div");
-    box2.appendChild(LR.el("div", "pane-label", "Mission 2 — walk the ball to the minimum"));
+    box2.appendChild(LR.el("div", "pane-label", "Mission 2: walk the ball to the minimum"));
     pane.appendChild(box2);
 
     // 1D cross-section of the same loss: J(w1) with w0 held at optimum
@@ -1001,7 +1001,7 @@
     LR.header(
       mount,
       "The λ dial",
-      "Degree 9, ten points, guaranteed overfit — until the penalty λ·wᵀw enters. Slide ln λ and watch the weights shrink."
+      "Degree 9, ten points, guaranteed overfit, until the penalty λ·wᵀw enters. Slide ln λ and watch the weights shrink."
     );
 
     const TRUE = (x) => Math.sin(2 * Math.PI * x);

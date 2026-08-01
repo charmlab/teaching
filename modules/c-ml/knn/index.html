@@ -26,8 +26,8 @@
     no equations to fit and no parameters to train. It just remembers everything
     it has seen and answers every question the same way: find the most similar
     past examples and copy their answer. That one idea forces us to invent most
-    of machine learning's vocabulary, data as vectors, distance, decision
-    boundaries, hyperparameters, validation, so this lesson builds all of it
+    of machine learning's vocabulary: data as vectors, distance, decision
+    boundaries, hyperparameters, validation. This lesson builds all of it
     from zero, with an interactive figure for every concept.
   </p>
 </header>
@@ -260,7 +260,7 @@ different nearest neighbour:
 
 <div class="figure" id="fig-metrics">
   <div class="fig-mount" data-fig="metrics"></div>
-  <p class="fig-caption"><b>Fig 2.1,</b> the distance-metric explorer. Drag either point; all three distances update live, and the unit ball of the selected metric is drawn around the anchor. The cosine readout shows the angle between the two points seen from the origin, a different question entirely.</p>
+  <p class="fig-caption"><b>Fig 2.1,</b> the distance-metric explorer. Drag either point; all three distances update live, and the selected metric's ball is drawn around A, passing through B, so its shape shows what that metric calls equally near. The cosine readout shows the angle between the two points seen from the origin, a different question entirely.</p>
 </div>
 
 <p>
@@ -473,7 +473,7 @@ training point, sort, take <span class="m">$k$</span>, count votes:
 
 <div class="figure" id="fig-codeex">
   <div class="fig-mount" data-fig="codeex"></div>
-  <p class="fig-caption"><b>Fig 3.3,</b> a live <code>knn_classify</code>. Change <span class="m">$k$</span> and drag the query sliders; the function actually runs against the fixed training set and prints its prediction. Set <span class="m">$k=3$</span> and then <span class="m">$k=5$</span> on the default query and watch the answer flip, matching the worked vote above.</p>
+  <p class="fig-caption"><b>Fig 3.3,</b> a live <code>knn_classify</code>. Change <span class="m">$k$</span>, set the query with the sliders, and press Run; the function actually executes against the fixed training set and prints its prediction. Run <span class="m">$k=3$</span> and then <span class="m">$k=5$</span> on the default query and watch the answer flip, matching the worked vote above.</p>
 </div>
 
 <p>
@@ -623,7 +623,7 @@ matters, the choice of distance measure matters right along with it.
 
 <div class="figure" id="fig-standardize">
   <div class="fig-mount" data-fig="standardize"></div>
-  <p class="fig-caption"><b>Fig 5.2,</b> the standardization demo. Left: raw units, where the large-scale feature owns the neighbour choice and the query's true nearest points by both features are invisible. Toggle standardize: the axes equalize, the neighbour set changes. The transform <span class="m">$\tilde{x} = (x-\mu)/\sigma$</span> is printed with the real <span class="m">$\mu, \sigma$</span>.</p>
+  <p class="fig-caption"><b>Fig 5.2,</b> the standardization demo. Left: raw units, where the large-scale feature owns the neighbour choice. Right: the same data standardized, where the axes equalize and the neighbour set changes. The readout counts how many neighbours survive the switch, and prints the real <span class="m">$\mu, \sigma$</span> used in <span class="m">$\tilde{x} = (x-\mu)/\sigma$</span>.</p>
 </div>
 
 <pre class="code" data-lang="python"><code>X_std = (X - X.mean(axis=0)) / X.std(axis=0)   # per-feature standardization</code></pre>
@@ -673,7 +673,7 @@ when a query shows up. Count the work for one prediction:
 
 <div class="figure" id="fig-cost">
   <div class="fig-mount" data-fig="cost"></div>
-  <p class="fig-caption"><b>Fig 5.3,</b> lazy learning's bill. One query animates against a growing dataset: every distance computation ticks the counter (<span class="m">$O(ND)$</span>), then the sort (<span class="m">$O(N\log N)$</span>). Slide <span class="m">$N$</span> up and watch a single prediction get expensive.</p>
+  <p class="fig-caption"><b>Fig 5.3,</b> lazy learning's bill. Press Run and one query animates against the stored dataset: every distance computation ticks the counter (<span class="m">$O(ND)$</span>), then the sort (<span class="m">$O(N\log N)$</span>). Slide <span class="m">$N$</span> up and watch a single prediction get expensive.</p>
 </div>
 
 <p>
