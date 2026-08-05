@@ -47,6 +47,14 @@
   .chapter { gap: 14px; }
   .ch-num { font-size: 20px; min-width: 26px; }
 }
+.course-close { margin: 40px 0 24px; padding: 24px 26px; border: 1px solid var(--line); border-radius: 12px; background: #fafafa; }
+.course-close p { font-size: 15.5px; color: #444444; line-height: 1.62; margin: 0 0 14px; }
+.feedback-btn {
+  display: inline-block; font-family: var(--sans); font-size: 13.5px; font-weight: 700;
+  color: #ffffff; background: var(--accent); text-decoration: none;
+  padding: 10px 18px; border-radius: 10px;
+}
+.feedback-btn:hover { filter: brightness(0.92); }
 </style>
 <script>
 /* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
@@ -296,6 +304,22 @@
   </a>
 
 </div>
+
+<div class="course-close">
+  <div class="contents-label">After the course</div>
+  <p>
+    Made it through all twenty chapters, or even just the ones you needed?
+    Tell us what worked and what did not. It takes two minutes and shapes the
+    next iteration of the guide.
+  </p>
+  <a class="feedback-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSfQf29qnQIBTMcMnoFnpZMJkctRaSLoTO4fXbGpchcd1_sanQ/viewform" target="_blank" rel="noopener">Give course feedback &rarr;</a>
+</div>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Course lessons</div>
 </footer>
 
 </body>
