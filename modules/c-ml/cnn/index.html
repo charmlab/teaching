@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Convolutional Neural Networks — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on convolutional neural networks: locality, weight sharing, the sliding dot product, padding and stride, filter banks, ReLU, pooling, and growing receptive fields.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 11 &middot; The ML Bible</div>
+  <h1>Convolutional Neural Networks</h1>
+  <p class="lede">
+    Backpropagation ended with a blank cheque: it can train any weights we care
+    to wire up. This lecture is about wiring them up well. Feed an image to the
+    fully connected networks we already have and the parameter count explodes,
+    while everything we know about images, that patterns are local, that the
+    same pattern repeats, that a small shift should not matter, gets thrown
+    away. Two ideas, local receptive fields and weight sharing, fix both
+    problems at once, and their combination has a name: convolution. This is
+    Part I, the foundations, with an interactive figure for every concept.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: 120,000 numbers before we start</a></li>
+    <li><a href="#sec-images">What makes images special</a></li>
+    <li><a href="#sec-ideas">Two ideas: local receptive fields and weight sharing</a></li>
+    <li><a href="#sec-conv">Convolution: the sliding dot product</a></li>
+    <li><a href="#sec-layers">Convolutional layers</a></li>
+    <li><a href="#sec-deep">Going deep: ReLU, pooling, receptive fields</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: 120,000 numbers before we start</h2>
+
+<p>
+Count the cost of doing what we already know. A modest colour photo is
+<span class="m">$200 \times 200$</span> pixels with three colour channels, so
+flattening it into the input vector our networks expect gives
+<span class="m">$200 \times 200 \times 3 = 120{,}000$</span> values. Now
+connect that vector to a single fully connected hidden layer of 1,000 units,
+exactly the way the last three lectures would. Every unit sees every pixel,
+so the layer needs <span class="m">$120{,}000 \times 1{,}000 =
+120{,}000{,}000$</span> weights, plus a thousand biases, before it has
+produced a single feature. One layer. A thumbnail-sized image.
+</p>
+
+<p>
+And here is the insult on top of the injury: all 120 million of those weights
+are spent learning nothing about what an image <em>is</em>. A fully connected
+layer treats its input as an arbitrary list of numbers.
+<!-- flagged addition: the pixel-shuffling framing is my elaboration of the
+     source's "images are not arbitrary lists of numbers / a fully connected
+     layer ignores all of this"; it is not stated in the slides. -->
+Shuffle every image in the dataset with the same fixed pixel permutation and
+the fully connected network would train exactly as well, because it never
+knew pixel (3, 4) sat beside pixel (3, 5) in the first place. We are paying
+an enormous price for a model that cannot see structure we get for free.
+Feel the explosion yourself:
+</p>
+
+<div class="figure" id="fig-params">
+  <div class="fig-mount" data-fig="params"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the parameter-count shock. Slide the image size and the layer width: the fully connected count (orange) grows with the <em>square</em> of the image side, while the convolutional count (green) for the same width does not move, because it depends only on the kernel size and the number of filters. Both counts are computed live from the formulas in section 4.</p>
+</div>
+
+<p>
+The green line is where this lecture is going. There has to be an
+architecture that spends its parameters on the structure of images instead of
+in spite of it, and by section 4 you will be able to compute both of those
+counts by hand.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. WHAT MAKES IMAGES SPECIAL ═══════════════════ -->
+<section id="sec-images">
+<h2><span class="secnum">1.</span> What makes images special</h2>
+
+<p>
+Why is object recognition even hard? Because the visual world is brutal to a
+classifier: there are thousands of object classes, huge variation within
+every class, one "dog" is a chihuahua in sunlight and another is a husky in
+snow, and the same object appears against endlessly diverse scenes. The neural
+networks lecture gave us the right response to hard inputs: learn a
+representation, raw input to features to decision, instead of hand-crafting
+features. Backpropagation gave us the training algorithm. What is missing is
+an architecture that makes the feature-learning problem easier by respecting
+what images are.
+</p>
+
+<p>
+Because images are not arbitrary lists of numbers. They come with three
+regularities so reliable you can bet an architecture on them:
+</p>
+
+<div class="hook-grid">
+  <div class="hook-card">
+    <div class="hook-emoji">🔍</div>
+    <div class="hook-q">Locality</div>
+    <div class="hook-a">Nearby pixels form meaningful patterns. An edge, a corner, a patch of fur: each lives in a small neighbourhood, not spread across the whole frame.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🔁</div>
+    <div class="hook-q">Reuse</div>
+    <div class="hook-a">The same pattern can appear in many locations. An edge detector that works in the top-left corner is exactly the detector you want everywhere else.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🎯</div>
+    <div class="hook-q">Stability</div>
+    <div class="hook-a">Small shifts should not change the prediction. Move the cat two pixels left and it is still a cat, and the model should not have to relearn that fact.</div>
+  </div>
+</div>
+
+<p>
+Hold a fully connected layer up against that list and it fails all three
+tests. It has no notion of "nearby", so locality is invisible to it. It
+learns a separate weight for every pixel-unit pair, so a pattern learned in
+one corner teaches it nothing about the same pattern anywhere else. And a
+two-pixel shift scrambles which weights see which values, so stability has to
+be memorized example by example instead of being built in. The rest of this
+lecture builds the architecture that passes all three tests, and the big idea
+is worth stating up front: <strong>CNNs work because they build these
+assumptions about images directly into the architecture</strong>. Locality,
+weight sharing, translation robustness. Keep those three phrases; the
+summary will return to them as the CNN inductive bias.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. TWO IDEAS ═══════════════════ -->
+<section id="sec-ideas">
+<h2><span class="secnum">2.</span> Two ideas: local receptive fields and weight sharing</h2>
+
+<p>
+First, a definition we will use constantly. The <strong>receptive
+field</strong> of an activation is the region of the input image that
+influences it. For a fully connected unit, the receptive field is the entire
+image, which is exactly the problem.
+</p>
+
+<p>
+<strong>Idea 1: local receptive fields.</strong> Connect each hidden unit
+only to a small patch of the image, say a few pixels on a side, instead of to
+everything. This is not just a parameter-saving trick, it encodes a prior:
+useful visual patterns, edges, corners, textures, object parts, are local.
+It also respects that nearby pixels are more related to each other than
+distant ones. One unit looking at a small patch needs a small
+patch worth of weights, not 120,000 of them.
+</p>
+
+<p>
+<strong>Idea 2: weight sharing.</strong> The object can be anywhere in the
+frame, so a pattern worth detecting at one location is worth detecting at
+every location. Instead of giving each patch its own private weights, reuse
+the <em>same</em> local weights across all locations. Now the number of
+weights does not depend on how many locations there are at all, which is how
+the green line in Fig 0.1 stays flat.
+</p>
+
+<p>
+What do the shared weights actually do? They act as <strong>pattern
+detectors</strong>. A neuron computes
+</p>
+
+$$ z = f(w^\top x + b) $$
+
+<p>
+where <span class="m">$x$</span> is the input patch, <span class="m">$w$</span>
+is the weight pattern, <span class="m">$b$</span> is a bias, and
+<span class="m">$f$</span> is an activation function. The dot product
+<span class="m">$w^\top x$</span> is large exactly when the patch aligns with
+the weight pattern. Take <span class="m">$w = [1,1,1,1,1,1]$</span>, a
+detector for "uniformly bright". The patch
+<span class="m">$x_1 = [5,5,5,5,5,5]$</span> gives
+<span class="m">$w^\top x_1 = 30$</span>, while the half-lit patch
+<span class="m">$x_2 = [0,0,0,5,5,5]$</span> gives only
+<span class="m">$w^\top x_2 = 15$</span>. The aligned patch activates twice
+as strongly. Build your own detector and test it:
+</p>
+
+<div class="figure" id="fig-detector">
+  <div class="fig-mount" data-fig="detector"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> weights as pattern detectors. Click cells to edit the patch <span class="m">$x$</span> and the filter <span class="m">$w$</span>; the response <span class="m">$z = w^\top x + b$</span> is computed live, term by term. Load the lecture's two patches and watch the aligned one score 30 against 15.</p>
+</div>
+
+<details class="check">
+  <summary>Check: design a detector that fires on a step, not on brightness</summary>
+  <div>
+    <p>The all-ones filter scores 15 on the step patch <span class="m">$[0,0,0,5,5,5]$</span> but it scores 30 on a flat bright patch, so it is really a brightness detector. Design a <span class="m">$w$</span> that responds strongly to the dark-to-bright step and gives exactly zero on <em>any</em> flat patch.</p>
+    <p><b>Answer.</b> <span class="m">$w = [-1,-1,-1,1,1,1]$</span>. On the step: <span class="m">$-0-0-0+5+5+5 = 15$</span>. On a flat patch <span class="m">$[c,c,c,c,c,c]$</span>: <span class="m">$-3c + 3c = 0$</span> for every <span class="m">$c$</span>, so uniform brightness is invisible to it. It answers "is the right half brighter than the left half", which is the beginning of an edge detector, and section 3 slides exactly this kind of filter across a whole image. Verify both numbers in Fig 2.1.</p>
+  </div>
+</details>
+
+<p>
+So the plan is set: small filters (Idea 1) reused everywhere (Idea 2), each
+one a learned pattern detector, with backpropagation from last lecture doing
+the learning. What we need now is the operation that applies one filter at
+every location of an image in a single, well-defined sweep. That operation
+is convolution.
+</p>
+</section>
+
+<!-- ═══════════════════ 3. CONVOLUTION ═══════════════════ -->
+<section id="sec-conv">
+<h2><span class="secnum">3.</span> Convolution: the sliding dot product</h2>
+
+<p>
+Convolution implements locality plus weight sharing in one move: take a small
+<strong>kernel</strong> (also called a <strong>filter</strong>), a little
+array of weights <span class="m">$w$</span>, slide it over the input, and at
+each position compute how strongly the local patch matches the filter. The
+grid of responses it produces is called a <strong>feature map</strong>: a map
+of where in the input the filter's pattern was found. Every entry of that map
+is a dot product between the same learned filter and one local patch.
+</p>
+
+<h3>One dimension first</h3>
+
+<p>
+For an input signal <span class="m">$x$</span> and a kernel
+<span class="m">$w$</span> of length <span class="m">$k$</span>, the
+convolution is
+</p>
+
+$$ (x * w)[t] = \sum_{\tau=0}^{k-1} x[t - \tau]\, w[\tau] $$
+
+<p>
+Read it slowly: to produce output element <span class="m">$t$</span>, take
+the kernel entries <span class="m">$w[\tau]$</span> and multiply each against
+the input entry <span class="m">$\tau$</span> steps <em>back</em> from
+<span class="m">$t$</span>, then add. Near the ends of the signal the index
+<span class="m">$t - \tau$</span> runs off the array, so we
+<strong>zero-pad</strong> <span class="m">$x$</span>, extend it with zeros,
+which adds no new information. Two mental pictures both compute the same
+thing: <em>flip-and-filter</em>, where you reverse the kernel, slide it along
+the input, and take dot products, and <em>translate-and-scale</em>, where each
+input entry <span class="m">$x[i]$</span> stamps a copy of the whole kernel
+at position <span class="m">$i$</span>, scaled by <span class="m">$x[i]$</span>,
+and the copies add up.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: [1, 1] * [2, &minus;2] = [2, 0, &minus;2]</div>
+  <p>Let <span class="m">$x = [1, 1]$</span> and <span class="m">$w = [2, -2]$</span>. Both have length 2, so the full output has <span class="m">$2 + 2 - 1 = 3$</span> entries, and out-of-range values of <span class="m">$x$</span> are zero:</p>
+  <p style="font-family:var(--mono);font-size:14.5px">
+    y[0] = x[0]&thinsp;w[0]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= (1)(2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 2<br>
+    y[1] = x[1]&thinsp;w[0] + x[0]&thinsp;w[1] = (1)(2) + (1)(&minus;2) = 0<br>
+    y[2] = x[1]&thinsp;w[1]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= (1)(&minus;2)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= &minus;2
+  </p>
+  <p>So <span class="m">$[1,1] * [2,-2] = [2, 0, -2]$</span>. Notice what the kernel <span class="m">$[2,-2]$</span> is: a difference detector. Sliding it across the constant signal <span class="m">$[1,1]$</span> reports "change on the way in, nothing in the middle, change on the way out."</p>
+</div>
+
+<p>
+Two properties to file away. Convolution is <strong>commutative</strong>,
+<span class="m">$x * y = y * x$</span>, so it does not matter which array you
+call the signal and which the kernel. And it is <strong>linear</strong>:
+</p>
+
+$$ a * (\lambda_1 b + \lambda_2 c) = \lambda_1\, (a * b) + \lambda_2\, (a * c) $$
+
+<p>
+which is worth remembering for exactly the reason linear layers were worth
+worrying about: a stack of linear operations is still linear. Section 5
+cashes that observation in. Now watch the sliding sum happen, step by step,
+on the worked example:
+</p>
+
+<div class="figure" id="fig-conv1d">
+  <div class="fig-mount" data-fig="conv1d"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the 1-D convolution stepper. At each step the flipped kernel sits under the padded input, the aligned pairs multiply (shown term by term), and the sum lands in the output. Step through <span class="m">$[1,1] * [2,-2]$</span> and check it against the worked math above, then try the longer example.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Compute the full convolution <span class="m">$[1, 2] * [1, -1]$</span> by hand.</p>
+  <div class="quiz-opts">
+    <button data-k="a">[1, &minus;1, 2, &minus;2]</button>
+    <button data-k="b">[1, 1, &minus;2]</button>
+    <button data-k="c">[1, &minus;2]</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Too many entries: two length-2 arrays give a full output of length 2 + 2 &minus; 1 = 3. Each output is a <em>sum</em> of aligned products, not the products listed separately.</div>
+  <div class="quiz-fb" data-k="b">Right. y[0] = (1)(1) = 1; y[1] = x[1]w[0] + x[0]w[1] = (2)(1) + (1)(&minus;1) = 1; y[2] = x[1]w[1] = (2)(&minus;1) = &minus;2. You can replay the same mechanics in Fig 3.1.</div>
+  <div class="quiz-fb" data-k="c">That is the elementwise product. Convolution slides one array across the other, so the ends overlap partially and the output is longer than either input.</div>
+</div>
+
+<h3>Two dimensions: the same idea, over patches</h3>
+
+<p>Images are 2-D grids, so the kernel becomes a small grid too, and the sum runs over both directions:</p>
+
+$$ (x * w)[i, j] = \sum_s \sum_t x[i - s,\, j - t]\, w[s, t] $$
+
+<p>
+In practice you should think of it exactly as section 2 set up: place the
+kernel on an image patch, multiply elementwise, add up, write one number to
+the feature map, then slide over one pixel and repeat.
+<!-- flagged addition: the source does not discuss the flip-vs-correlation
+     convention; this clarifying sentence is mine. For the symmetric kernels
+     used in the figures the two conventions agree up to a sign/flip, and
+     deep-learning libraries learn the weights either way. -->
+(Strictly, the minus signs in the formula flip the kernel before the slide;
+deep-learning code usually skips the flip and slides the kernel as-is, and
+since the weights are learned anyway, the distinction changes nothing about
+what the layer can do.) Because every output is a plain weighted sum of
+inputs, convolution is a linear operation, and it can even be written as one
+big matrix multiplication with a highly repetitive, mostly zero matrix.
+</p>
+
+<p>
+This is the centrepiece of the lecture. One small image, one
+<span class="m">$3 \times 3$</span> kernel, every number real:
+</p>
+
+<div class="figure" id="fig-conv2d">
+  <div class="fig-mount" data-fig="conv2d"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> 2-D convolution, the signature figure. Drag the highlighted patch or press Sweep; at each position the elementwise products and their sum are shown, and the sum fills one cell of the feature map. Try the presets: the edge kernels light up exactly where the bright square's edges are, blur averages, sharpen exaggerates. Then click kernel cells to invent your own detector. <!-- flagged addition: the specific preset kernel values (Prewitt-style edge filters, 1/9 box blur, 5-centre sharpen) are standard examples chosen by me; the source names no specific kernels. --></p>
+</div>
+
+<details class="check">
+  <summary>Check: apply a 3&times;3 edge kernel to a patch, by hand</summary>
+  <div>
+    <p>Apply the vertical-edge kernel <span class="m">$w = \begin{bmatrix} 1 & 0 & -1 \\ 1 & 0 & -1 \\ 1 & 0 & -1 \end{bmatrix}$</span> to the patch <span class="m">$x = \begin{bmatrix} 5 & 5 & 0 \\ 5 & 5 & 0 \\ 5 & 5 & 0 \end{bmatrix}$</span> (bright on the left, dark on the right). What single number comes out, and what does its sign mean?</p>
+    <p><b>Answer.</b> Multiply elementwise and add. The left column contributes <span class="m">$5 + 5 + 5 = 15$</span>, the middle column is multiplied by zeros, and the right column contributes <span class="m">$0 \cdot (-1) \times 3 = 0$</span>. Total: <span class="m">$\mathbf{15}$</span>. The kernel computes "left column minus right column", so a positive response means bright-to-dark going rightward. Flip the patch and you get <span class="m">$-15$</span>: same edge, opposite polarity. Park Fig 3.2's kernel on the bright square's right edge and you will see exactly these <span class="m">$\pm$</span> responses.</p>
+  </div>
+</details>
+
+<h3>Padding and stride</h3>
+
+<p>
+Two knobs control the sweep. <strong>Stride</strong> <span class="m">$S$</span>
+is how far the filter moves each step: stride 1 visits every position, stride
+2 skips every other one and halves the output width. <strong>Padding</strong>
+<span class="m">$P$</span> is how many rings of zeros we add around the
+border, the same zero-padding as in 1-D, so the kernel can sit centred on
+edge pixels instead of stopping short; the zeros add no new information. A
+<span class="m">$5 \times 5$</span> input with a
+<span class="m">$3 \times 3$</span> kernel, padding 1, stride 1 gives a
+<span class="m">$5 \times 5$</span> output, the same size as the input, which
+is why that combination is everywhere. The formula that predicts the output
+size is coming in section 4; first, feel it:
+</p>
+
+<div class="figure" id="fig-padstride">
+  <div class="fig-mount" data-fig="padstride"></div>
+  <p class="fig-caption"><b>Fig 3.3,</b> the padding-and-stride explorer. Slide <span class="m">$K$</span>, <span class="m">$P$</span>, and <span class="m">$S$</span> over a fixed <span class="m">$7 \times 7$</span> input and watch the kernel positions and the live output size <span class="m">$\hat W = (W - K + 2P)/S + 1$</span>. When the division does not come out whole, the last position does not land flush and the figure says so.</p>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. CONVOLUTIONAL LAYERS ═══════════════════ -->
+<section id="sec-layers">
+<h2><span class="secnum">4.</span> Convolutional layers</h2>
+
+<p>
+Now turn the operation into a layer. There are three rungs on the ladder from
+what we had to what we want. A <strong>fully connected layer</strong> lets
+each hidden unit see the whole image: maximum flexibility, catastrophic
+parameter count, no structure. A <strong>locally connected layer</strong>
+restricts each unit to a small region, Idea 1 alone: far fewer weights, but
+each location still learns its own private detector, so a pattern learned on
+the left is relearned from scratch on the right. A <strong>convolutional
+layer</strong> takes the last step: each unit sees a small region
+<em>and</em> the weights are shared across all locations. Ideas 1 and 2
+together. One filter, slid everywhere, is exactly the convolution of
+section 3.
+</p>
+
+<p>
+One filter detects one pattern, and one pattern is not a representation. So a
+conv layer applies a whole <strong>bank</strong> of learned filters, each
+producing its own feature map, implementing local receptive fields and weight
+sharing at scale. Each conv neuron computes a linear map followed by an
+activation, just like every neuron we have met; only the wiring changed.
+Stack the resulting feature maps and you get the layer's output volume:
+</p>
+
+<div class="figure" id="fig-filterbank">
+  <div class="fig-mount" data-fig="filterbank"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> a filter bank in action. Three filters convolve the same input (all values computed live), producing three feature maps that stack into a <span class="m">$6 \times 6 \times 3$</span> volume: the next layer's input. Output depth equals the number of filters, and each kernel's depth must equal its input's depth.</p>
+</div>
+
+<p>
+That figure quietly answers the two bookkeeping questions students trip on.
+How deep is the output? <em>As deep as the number of filters</em>: 3 filters,
+3 feature maps. How deep is each kernel? <em>As deep as its input</em>: on a
+grayscale image a kernel is <span class="m">$K \times K \times 1$</span>, on
+an RGB image it is <span class="m">$K \times K \times 3$</span>, and on the
+<span class="m">$6 \times 6 \times 3$</span> volume above, the next layer's
+kernels are <span class="m">$K \times K \times 3$</span> again. A conv
+layer's <strong>hyperparameters</strong> are therefore: the kernel height and
+width <span class="m">$K$</span>, the padding <span class="m">$P$</span>, the
+stride <span class="m">$S$</span>, the depth <span class="m">$M$</span>
+(how many kernels, i.e. filters), and the activation function.
+</p>
+
+<h3>Output sizing</h3>
+
+<p>
+Take an input of size <span class="m">$W \times H \times J$</span> (for RGB,
+<span class="m">$J = 3$</span>) through <span class="m">$M$</span> filters of
+size <span class="m">$K \times K$</span> with padding
+<span class="m">$P$</span> and stride <span class="m">$S$</span>. The output
+volume is <span class="m">$\hat W \times \hat H \times I$</span> where
+</p>
+
+$$ \hat{W} = \frac{W - K + 2P}{S} + 1, \qquad
+   \hat{H} = \frac{H - K + 2P}{S} + 1, \qquad I = M $$
+
+<p>
+The logic behind the formula is the sweep you watched in Fig 3.3: the padded
+input is <span class="m">$W + 2P$</span> wide, the kernel uses up
+<span class="m">$K$</span> of that before it can take its first step, and
+every stride of <span class="m">$S$</span> buys one more output. Worked on
+the example from section 3: <span class="m">$W = 5$</span>,
+<span class="m">$K = 3$</span>, <span class="m">$P = 1$</span>,
+<span class="m">$S = 1$</span> gives
+<span class="m">$\hat W = (5 - 3 + 2)/1 + 1 = 5$</span>. Same size out as in,
+as promised.
+</p>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A <span class="m">$7 \times 7$</span> input goes through a <span class="m">$3 \times 3$</span> kernel with padding 1 and stride 2. What is the output size?</p>
+  <div class="quiz-opts">
+    <button data-k="a">4 &times; 4</button>
+    <button data-k="b">3 &times; 3</button>
+    <button data-k="c">7 &times; 7</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right: <span class="m">$(7 - 3 + 2 \cdot 1)/2 + 1 = 6/2 + 1 = 4$</span>. The stride halves the count of positions, the +1 pays for the very first position. Set Fig 3.3 to K=3, P=1, S=2 and count the stops.</div>
+  <div class="quiz-fb" data-k="b">Close, but do not forget the +1: the first kernel position is free, and each stride of 2 after it adds one more output. <span class="m">$(7-3+2)/2 + 1 = 4$</span>.</div>
+  <div class="quiz-fb" data-k="c">Same-size output needs stride 1. With <span class="m">$S=2$</span> the kernel visits every other position: <span class="m">$(7-3+2)/2+1 = 4$</span>.</div>
+</div>
+
+<h3>Parameter efficiency: why CNNs win</h3>
+
+<p>
+Now the payoff calculation, the one Fig 0.1 was computing behind the scenes.
+Compare a fully connected layer against a conv layer mapping the same input
+size <span class="m">$W \times H \times J$</span> to the same output size
+<span class="m">$\hat W \times \hat H \times I$</span>:
+</p>
+
+$$ \text{FC weights} = W \hat{W} H \hat{H} I J + \hat{W}\hat{H}I, \qquad
+   \text{Conv weights} = K^2 I J + I $$
+
+<p>
+The FC count multiplies every input coordinate against every output
+coordinate (plus one bias per output unit). The conv count is one
+<span class="m">$K \times K \times J$</span> kernel plus one bias for each of
+the <span class="m">$I$</span> filters, and, critically, <em>the image size
+appears nowhere in it</em>. Make the image bigger and a conv layer's weight
+count does not move; only the kernel size and the number of filters matter.
+That is the whole point.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked with concrete numbers: 25 million against 224</div>
+  <!-- flagged addition: the source gives the two formulas but no worked numeric
+       instance; the 32×32×3 → 32×32×8 example and its arithmetic are mine. -->
+  <p>Map a <span class="m">$32 \times 32 \times 3$</span> image to a <span class="m">$32 \times 32 \times 8$</span> output, so <span class="m">$W = \hat W = H = \hat H = 32$</span>, <span class="m">$J = 3$</span>, <span class="m">$I = 8$</span>, and for the conv layer use <span class="m">$K = 3$</span>, <span class="m">$P = 1$</span>, <span class="m">$S = 1$</span> (which the sizing formula confirms keeps 32).</p>
+    <p style="font-family:var(--mono);font-size:14px">
+    FC:&nbsp;&nbsp;&nbsp;32&middot;32&middot;32&middot;32&middot;8&middot;3 + 32&middot;32&middot;8 = 25,165,824 + 8,192 = 25,174,016<br>
+    Conv:&nbsp;3&sup2;&middot;8&middot;3 + 8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = 216 + 8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 224
+  </p>
+  <p>Identical input and output shapes, and the conv layer uses <span class="m">$25{,}174{,}016 / 224 = 112{,}384$</span> times fewer parameters. Fewer parameters means less data needed, less overfitting, and detectors that are forced to be reusable.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A conv layer takes a <span class="m">$28 \times 28 \times 3$</span> input through <span class="m">$M = 16$</span> filters of size <span class="m">$5 \times 5$</span>. How many parameters (weights and biases) does it have?</p>
+  <div class="quiz-opts">
+    <button data-k="a">28 &middot; 28 &middot; 16 = 12,544</button>
+    <button data-k="b">5&sup2; &middot; 16 = 400</button>
+    <button data-k="c">5&sup2; &middot; 16 &middot; 3 + 16 = 1,216</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That counts output units, not parameters. Weight sharing means the output grid size never enters the parameter count.</div>
+  <div class="quiz-fb" data-k="b">Almost, but each kernel must be as deep as its input: <span class="m">$J = 3$</span> channels, so each filter carries <span class="m">$5 \cdot 5 \cdot 3 = 75$</span> weights, and each filter gets one bias.</div>
+  <div class="quiz-fb" data-k="c">Right: <span class="m">$K^2 I J + I = 25 \cdot 16 \cdot 3 + 16 = 1{,}216$</span>. A fully connected layer with the same input and output sizes would need about 29.5 million. Note also what is absent from the arithmetic: the 28s.</div>
+</div>
+
+<h3>The code: conv2d from scratch</h3>
+
+<p>
+Everything above fits in a page of plain Python, no libraries. First the
+sizing helper, which is the formula verbatim:
+</p>
+
+<pre class="code" data-lang="python"><code>def output_size(W, K, P, S):
+    return (W - K + 2*P) // S + 1     # e.g. output_size(5, 3, 1, 1) = 5</code></pre>
+
+<p>
+Then convolution itself: pad, then two loops over output positions, and for
+each position a little dot product between the kernel and the patch under it:
+</p>
+
+<pre class="code" data-lang="python"><code>def conv2d(image, kernel, stride=1, pad=0):
+    K = len(kernel)
+    if pad &gt; 0:                        # ring of zeros: no new information
+        W = len(image[0])
+        blank = [0.0] * (W + 2*pad)
+        image = ([list(blank) for _ in range(pad)]
+                 + [[0.0]*pad + list(row) + [0.0]*pad for row in image]
+                 + [list(blank) for _ in range(pad)])
+    H_out = (len(image) - K) // stride + 1
+    W_out = (len(image[0]) - K) // stride + 1
+    out = [[0.0] * W_out for _ in range(H_out)]
+    for i in range(H_out):
+        for j in range(W_out):
+            s = 0.0
+            for a in range(K):         # dot product with the patch
+                for b in range(K):
+                    s += image[i*stride + a][j*stride + b] * kernel[a][b]
+            out[i][j] = s
+    return out</code></pre>
+
+<p>
+Do not just read it, run it. The version below executes for real against a
+fixed <span class="m">$6 \times 6$</span> image:
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> a live <code>conv2d</code>. Pick a kernel, a padding, and a stride, press Run, and the nested loops above actually execute: the output matrix and the sizing arithmetic are printed from the computation. Try pad 0 versus pad 1 and watch the output grow back to full size.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding (coding)</div>
+  <p class="quiz-q">The accumulation line inside <code>conv2d</code> is blanked out: <code>s += image[ ? ][ ? ] * kernel[a][b]</code>. Which indexing is correct?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><code>image[i + a][j + b]</code></button>
+    <button data-k="b"><code>image[i*stride + a][j*stride + b]</code></button>
+    <button data-k="c"><code>image[a][b]</code></button>
+  </div>
+  <div class="quiz-fb" data-k="a">Correct only when stride = 1. Output cell (i, j) must anchor its patch at row i&middot;stride, column j&middot;stride, or every stride bigger than 1 silently reads the wrong pixels.</div>
+  <div class="quiz-fb" data-k="b">Right. The output index times the stride locates the patch's top-left corner, and (a, b) walks the K&times;K patch from there. This one line is the whole "sliding" in sliding dot product.</div>
+  <div class="quiz-fb" data-k="c">That reads the same top-left patch for every output cell, so the "feature map" would be one value copied everywhere. The kernel has to move with (i, j).</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. GOING DEEP ═══════════════════ -->
+<section id="sec-deep">
+<h2><span class="secnum">5.</span> Going deep: ReLU, pooling, receptive fields</h2>
+
+<p>
+One conv layer gives us a stack of feature maps: filter
+<span class="m">$m$</span> produces
+<span class="m">$z_m = w_m * x + b_m$</span>, and the
+<span class="m">$M$</span> maps together become the next layer's input. Feed
+that into another conv layer, and another, and the thing starting to take
+shape is a CNN. But two ingredients are still missing, and both come from
+problems we have already met.
+</p>
+
+<h3>Nonlinearity, or the linear-collapse trap again</h3>
+
+<p>
+Section 3 flagged that convolution is linear. The neural networks lecture
+proved what happens when you stack linear operations: they collapse into a
+single linear operation, and the depth buys nothing. Convolutions are not
+exempt. Two conv layers back to back with no activation between them are
+exactly equal to <em>one</em> conv layer with a single, slightly larger
+equivalent kernel. So before the next layer we apply a pointwise
+nonlinearity, and the standard choice is ReLU:
+</p>
+
+$$ a_m[i, j] = \operatorname{ReLU}(z_m[i, j]) = \max\{0,\ z_m[i, j]\} $$
+
+<p>
+Do not take the collapse on faith. The figure below runs both pipelines on
+real numbers and lets you toggle the activation:
+</p>
+
+<div class="figure" id="fig-nonlinear">
+  <div class="fig-mount" data-fig="nonlinear"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> why the nonlinearity is not optional. Top path: edge detect, then activation, then blur, two real convolutions. Bottom path: one single 5&times;5 kernel, computed live by convolving the two kernels together. With the identity activation the two paths agree to machine precision, the stack collapsed. Switch on ReLU and no single kernel can reproduce the result.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why do we need a nonlinearity between conv layers?</p>
+  <div class="quiz-opts">
+    <button data-k="a">To keep the numbers from overflowing as maps pass through many layers</button>
+    <button data-k="b">Because convolution only works on non-negative inputs</button>
+    <button data-k="c">Because convolution is linear, so any stack of pure convolutions equals one convolution: without a nonlinearity, depth adds parameters but no expressive power</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Numerical range is a real engineering concern but not the reason. A rescaling would fix overflow; it would not fix linearity.</div>
+  <div class="quiz-fb" data-k="b">Convolution is a weighted sum and is perfectly happy with negative inputs; Fig 3.2's edge maps are full of negative values.</div>
+  <div class="quiz-fb" data-k="c">Exactly, and it is the same linear-collapse argument as for plain linear layers in the neural networks lecture. Fig 5.1 exhibits the single equivalent kernel explicitly, then breaks the collapse with ReLU.</div>
+</div>
+
+<h3>Pooling: buying stability</h3>
+
+<p>
+The third promise from section 1, stability, is still unpaid. Convolution
+alone is precise about position: an eye detector should fire whether the eye
+sits a few pixels left or right, but its feature map moves when the eye
+moves. <strong>Pooling</strong> fixes this by summarizing a local group of
+activations into one number. Two standard summaries:
+</p>
+
+<ul>
+  <li><b>Max pooling</b>: <span class="m">$y_i = \max_{j \in \text{group}} z_j$</span>. Reports whether the feature is <em>present</em> in the group at all, and ignores everything else. Good when the background matters less, and suited to high-frequency features like edges and textures.</li>
+  <li><b>Average pooling</b>: <span class="m">$y_i = \operatorname{mean}_{j \in \text{group}} z_j$</span>. Lets every activation contribute, so it preserves background and enforces smoothness when the exact location is unimportant.</li>
+</ul>
+
+<pre class="code" data-lang="python"><code>def max_pool(fmap, size=2):
+    n = len(fmap) // size
+    return [[max(fmap[i*size + a][j*size + b]
+                 for a in range(size) for b in range(size))
+             for j in range(n)] for i in range(n)]
+
+def avg_pool(fmap, size=2):
+    n = len(fmap) // size
+    return [[sum(fmap[i*size + a][j*size + b]
+                 for a in range(size) for b in range(size)) / size**2
+             for j in range(n)] for i in range(n)]</code></pre>
+
+<p>
+The stability claim is testable: shift the input a pixel and see how much the
+pooled output changes. Do it below, and keep score for both summaries:
+</p>
+
+<div class="figure" id="fig-pooling">
+  <div class="fig-mount" data-fig="pooling"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the pooling demo. An activation blob (an "eye detector" firing), a max/average toggle, a pool-size slider, and a shift slider. Every pooled value is computed from the map; the counters show max pooling changing fewer cells, and its strongest response holding at exactly 1.00 while average pooling's drifts. The detector keeps firing: that is approximate translation invariance.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Task 1: flag whether a thin scratch (a sharp edge) appears <em>anywhere</em> in each region of a scanned part. Task 2: produce a smooth low-resolution summary where the overall background tone matters. Which pooling suits which task?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Max pooling for the scratch, average pooling for the summary</button>
+    <button data-k="b">Average pooling for the scratch, max pooling for the summary</button>
+    <button data-k="c">Either works equally well for both: pooling only changes the output size</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. The scratch is a high-frequency, presence-style feature: one strong activation should decide the answer, and background should not dilute it, so take the max. The tonal summary wants every pixel's contribution and smoothness, so average.</div>
+  <div class="quiz-fb" data-k="b">Backwards: averaging a single strong scratch activation with a quiet background waters it down toward zero, exactly what a presence detector cannot afford. Try it in Fig 5.2 and watch the blob's peak survive max pooling but shrink under averaging.</div>
+  <div class="quiz-fb" data-k="c">The two summaries answer different questions: "was it there?" versus "how much, on average?". Fig 5.2's changed-cell counts show they behave differently, not just size-wise.</div>
+</div>
+
+<h3>Receptive fields grow with depth</h3>
+
+<p>
+Here is the quiet consequence of stacking conv and pooling layers, and it is
+the reason depth builds a hierarchy. A first-layer unit sees a
+<span class="m">$3 \times 3$</span> patch of the image, its receptive field.
+A unit one pooling layer up summarizes several such units, so it depends on a
+larger region of the original image. A unit in the next conv layer combines
+several of <em>those</em>, and its receptive field is larger still. Early
+layers see edges and textures; later layers, whose receptive fields span
+whole regions, can respond to parts and objects. Trace it exactly:
+</p>
+
+<div class="figure" id="fig-rfgrowth">
+  <div class="fig-mount" data-fig="rfgrowth"></div>
+  <p class="fig-caption"><b>Fig 5.3,</b> receptive-field growth through conv 3&times;3, pool 2&times;2, conv 3&times;3. Click any unit in the three computed layers and the exact region of the original image it depends on is computed and highlighted: 3&times;3 for depth one, 4&times;4 after pooling, 8&times;8 at depth three. Depth literally widens what a unit can see.</p>
+</div>
+
+<h3>Translation: what convolution and pooling each buy</h3>
+
+<p>
+Two different translation properties are in play, and naming them separately
+prevents a very common muddle. Convolution is translation
+<strong>equivariant</strong>: shift the input two pixels right and the
+feature map shifts two pixels right, because the same shared filter computed
+the same dot products, just elsewhere. The response moves <em>with</em> the
+pattern. Pooling adds approximate local translation
+<strong>invariance</strong>: within a pooling group, a small shift leaves the
+max unchanged, so the pooled output is roughly unaffected by small
+translations, which is precisely what Fig 5.2 measured. Together they deliver
+section 1's stability. Note the fine print, though: these properties help
+with <em>translation</em> and nothing else. Scale the object up, rotate it,
+change the lighting, and neither convolution nor pooling promises a thing;
+the end quiz returns to this.
+</p>
+</section>
+
+<!-- ═══════════════════ 6. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">6.</span> Summary and method card</h2>
+
+<p>
+Three design principles carried this whole lecture. <strong>Local receptive
+fields</strong>: nearby pixels are more related than distant ones, so
+detectors look at small patches. <strong>Weight sharing</strong>: useful
+patterns can appear anywhere, so the same detector is reused at every
+location. <strong>Translation robustness</strong>: small shifts should not
+change the prediction, so pooling summarizes nearby activations. Together
+these are the CNN <strong>inductive bias</strong>, the assumptions the
+architecture makes so the data does not have to teach them. That is the
+deepest lesson here: choosing an architecture is really a decision about the
+structure of your data. Yann LeCun's insight, the one that made CNNs the
+default for vision, was exactly that images deserved an architecture of their
+own.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Convolutional Neural Networks (foundations)</div>
+  <table>
+    <tr><th>Assumption</th><td>Images have spatial structure: nearby pixels are related, useful patterns are local, and the same pattern may appear in many places.</td></tr>
+    <tr><th>Model class</th><td>Structured networks of convolutional filters, nonlinear activations, pooling, and stacked feature maps.</td></tr>
+    <tr><th>Learning / selection</th><td>Learn local pattern detectors by backpropagation; choose kernel size, stride, padding, depth, and pooling by design.</td></tr>
+    <tr><th>Prediction</th><td>Sweep filter banks over the input, <span class="m">$z_m = w_m * x + b_m$</span>, apply ReLU, pool, repeat; deeper maps feed the decision.</td></tr>
+    <tr><th>Strengths</th><td>Parameter-efficient (<span class="m">$K^2IJ + I$</span>, independent of image size), exploits locality and weight sharing, builds hierarchical visual features, robust to small translations.</td></tr>
+    <tr><th>Limitations</th><td>Less natural for data without grid structure; still needs architectural choices; pooling and aggressive downsampling can lose information; helps with translation, not scale.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Kernel size <span class="m">$K$</span>, padding <span class="m">$P$</span>, stride <span class="m">$S$</span>, filter count <span class="m">$M$</span>, activation, pooling type and size.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: backpropagation gave us the learning
+algorithm, and this lecture gave us the first architecture designed around
+the data itself. The filters in every figure above are the kind of thing
+backprop learns automatically; nobody hand-designs edge detectors anymore,
+they fall out of training. Part II assembles these pieces, conv, ReLU, pool,
+repeat, into full end-to-end vision systems.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">7.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+predict, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">You double an image's width and height from <span class="m">$100 \times 100$</span> to <span class="m">$200 \times 200$</span>. What happens to the parameter count of (i) a fully connected layer of fixed width and (ii) a conv layer with the same filters?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both quadruple: more pixels means more weights everywhere</button>
+    <button data-k="b">The FC count roughly quadruples (it scales with pixel count); the conv count does not change at all</button>
+    <button data-k="c">Both stay the same: parameter counts are set at design time</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Only the FC layer touches every pixel with a private weight. The conv layer's parameters are <span class="m">$K^2IJ + I$</span>: no image dimensions in sight.</div>
+  <div class="quiz-fb" data-k="b">Right. FC weights scale with <span class="m">$W \times H$</span>, which quadrupled. The conv layer reuses the same kernels over a bigger sweep: more <em>computation</em> and a bigger feature map, but exactly zero new parameters. Fig 0.1 is this fact drawn as a curve.</div>
+  <div class="quiz-fb" data-k="c">True for the conv layer, false for the FC layer: its weight matrix has one column per input pixel, and the pixel count just quadrupled.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">An input image is shifted 2 pixels to the right. Which statement correctly describes the network's internals?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The feature maps are unchanged, because convolution is translation invariant</button>
+    <button data-k="b">The feature maps and pooled outputs both shift by exactly 2 pixels, so nothing was gained</button>
+    <button data-k="c">The feature maps shift with the input (equivariance); after pooling, small shifts leave the output roughly unchanged (approximate invariance)</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Convolution is <em>equivariant</em>, not invariant: the shared filter finds the pattern at its new location, so the response moves with it. Invariance only appears after pooling summarizes.</div>
+  <div class="quiz-fb" data-k="b">The pre-pooling maps do shift, but pooling groups absorb shifts smaller than the group: the max of the group often does not change. Fig 5.2's counter measured exactly this.</div>
+  <div class="quiz-fb" data-k="c">Right, and the two words carry the distinction: convolution moves the answer with the pattern (equivariance), pooling makes small movements not matter (approximate local invariance).</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a filter, predict its feature map</summary>
+  <div>
+    <p>Design a <span class="m">$3 \times 3$</span> filter that detects vertical edges (bright on the left, dark on the right), and predict what its feature map looks like when convolved over an image containing one bright square on a dark background. Where are the strong positive responses, the strong negatives, and the zeros?</p>
+    <p><b>Answer</b> (one good version). Take <span class="m">$w = \begin{bmatrix} 1 & 0 & -1 \\ 1 & 0 & -1 \\ 1 & 0 & -1 \end{bmatrix}$</span>: it computes "left column minus right column", so it responds only where brightness changes horizontally. Prediction for the bright square: a column of strong <em>positive</em> responses along the square's right edge (bright left of the kernel, dark right), a column of strong <em>negative</em> responses along its left edge (dark to bright), and zero everywhere brightness is locally constant, including deep inside the square, because <span class="m">$c - c = 0$</span> on any flat patch. The top and bottom edges of the square are horizontal changes, which this filter ignores; its transposed sibling catches those. Load the vertical-edge preset in Fig 3.2 and sweep: the feature map is exactly the two opposite-signed stripes. A corner detector follows the same recipe: combine a horizontal and a vertical difference so the response is large only where both change, e.g. positive weights in one quadrant and negatives along both adjoining sides.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): the 1&times;1 convolution riddle</summary>
+  <div>
+    <p>The parting riddle from the lecture: does it ever make sense to use a <span class="m">$1 \times 1$</span> convolution? A kernel that sees a single pixel surely cannot detect any spatial pattern. When would you use one?</p>
+    <p><b>Answer.</b> Yes, and the trick is remembering the third dimension. A kernel's depth always equals its input's depth, so on a stack of <span class="m">$M$</span> feature maps a "<span class="m">$1 \times 1$</span>" kernel is really <span class="m">$1 \times 1 \times M$</span>: at each location it computes a weighted combination of all <span class="m">$M$</span> channels. It sees no spatial context, but it <em>mixes across the channel dimension</em>, letting the network build new features out of combinations of existing detectors ("edge here AND red here"). And with <span class="m">$I$</span> such filters, the output has <span class="m">$I$</span> channels, so a <span class="m">$1 \times 1$</span> conv layer changes the number of feature maps: with <span class="m">$I < M$</span> it compresses the stack cheaply, at a cost of just <span class="m">$1^2 \cdot IM + I$</span> parameters. Spatially trivial, depthwise powerful.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): what convolution and pooling do NOT give you</summary>
+  <div>
+    <p>A colleague says: "our CNN is robust to transformations, convolution and pooling handle that." Explain precisely which transformations the architecture helps with, which it does not, and what you would do about the rest.</p>
+    <p><b>Answer.</b> The architecture helps with <em>translation</em>, and only locally at that: convolution's weight sharing makes feature maps shift with the input (equivariance), and pooling makes small shifts approximately invisible (approximate local invariance). Nothing in either operation addresses <em>scale</em>: a face twice as large no longer fits the <span class="m">$3 \times 3$</span> patterns the early filters learned, and no pooling group restores that. The same goes for rotation, viewpoint, and lighting: the inductive bias simply does not cover them. What to do about the rest is a preview of Part II and of practical deep learning: expose the network to the variation you need (data augmentation with rescaled, rotated, re-lit copies), and build depth, since stacked layers with growing receptive fields (Fig 5.3) can learn features at multiple scales, at the price of learning them from data rather than getting them free from the architecture. The honest one-line summary: CNNs get translation robustness by design, and everything else the hard way.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the foundation of convolutional networks: images have structure, so build the structure into the model. Local receptive fields make detectors cheap, weight sharing makes them reusable, convolution sweeps them everywhere, ReLU keeps depth from collapsing, pooling buys stability, and stacked layers grow receptive fields until units see objects instead of edges. Backprop learns every filter. Part II takes these pieces and assembles complete end-to-end vision systems out of them.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../backpropagation/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 10: Backpropagation</div>
+  </a>
+  <a href="../cnn-part-2/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 12: CNNs in Practice</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 11 &middot; Convolutional Neural Networks</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

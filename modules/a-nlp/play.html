@@ -1,0 +1,41 @@
+<!-- ML Bible interactive lessons for this module -->
+<style>
+  .mlb-card {
+    border: 1px solid var(--line); border-radius: var(--radius-card);
+    padding: 22px 24px; margin-top: 18px; background: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  }
+  .mlb-card-title { font-weight: 700; font-size: 15px; color: var(--text); margin-bottom: 4px; }
+  .mlb-card-sub { font-size: 13px; color: var(--muted); margin-bottom: 12px; line-height: 1.55; }
+  .mlb-row {
+    display: grid; grid-template-columns: 82px 1fr; grid-template-rows: auto auto;
+    column-gap: 14px; padding: 11px 4px; text-decoration: none;
+    border-top: 1px solid var(--line); align-items: baseline;
+  }
+  .mlb-row:hover .mlb-title { color: var(--accent-dark); text-decoration: underline; }
+  .mlb-kicker { grid-row: 1 / 3; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .mlb-title { font-weight: 600; font-size: 14px; color: var(--text); }
+  .mlb-sub { font-size: 12.5px; color: var(--muted); }
+  .mlb-all { display: inline-block; margin-top: 12px; font-size: 13px; font-weight: 600; color: var(--accent-dark); text-decoration: none; }
+  .mlb-all:hover { text-decoration: underline; }
+</style>
+<div class="mlb-card">
+  <div class="mlb-card-title">📖 Interactive lessons &middot; The ML Bible</div>
+  <div class="mlb-card-sub">Full interactive chapters built from this module's ECE 657 lectures: dense prose, live figures you can drag, quizzes, and runnable code.</div>
+    <a class="mlb-row" href="modules/c-ml/language-models/index.html">
+      <span class="mlb-kicker">Lecture 13</span>
+      <span class="mlb-title">Language Models</span>
+      <span class="mlb-sub">n-grams, embeddings, decoding, perplexity</span>
+    </a>
+    <a class="mlb-row" href="modules/c-ml/sequence-models/index.html">
+      <span class="mlb-kicker">Lecture 14</span>
+      <span class="mlb-title">Sequence Models</span>
+      <span class="mlb-sub">RNNs, vanishing gradients, LSTM gates, seq2seq</span>
+    </a>
+    <a class="mlb-row" href="modules/c-ml/attention-transformers/index.html">
+      <span class="mlb-kicker">Lecture 15</span>
+      <span class="mlb-title">Attention and Transformers</span>
+      <span class="mlb-sub">QKV, multi-head attention, masks, LLM economics</span>
+    </a>
+  <a class="mlb-all" href="modules/c-ml/index.html">Browse the full course (Lectures 2&ndash;21) &rarr;</a>
+</div>

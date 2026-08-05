@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Networks — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on neural networks: the XOR wall, feature maps, representation learning, MLPs, expressivity, and a hand-built network that solves XOR.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 9 &middot; The ML Bible</div>
+  <h1>Neural Networks</h1>
+  <p class="lede">
+    Every classifier so far decides with one additive score, and the SVM lecture
+    showed the escape hatch: map the inputs into a better feature space first.
+    But someone had to design that map. This lesson removes the last human from
+    the loop. A neural network learns its own features by stacking many copies
+    of a unit you already know, the logistic neuron, and the whole story fits in
+    one tiny example: a single line cannot compute XOR, and a two-unit hidden
+    layer can. We build that network by hand, watch it work, and stop exactly
+    one step before learning the weights automatically, which is next lecture.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: one line cannot solve XOR</a></li>
+    <li><a href="#sec-xorwall">The XOR wall</a></li>
+    <li><a href="#sec-featuremaps">Feature maps, and their limit</a></li>
+    <li><a href="#sec-replearn">Representation learning</a></li>
+    <li><a href="#sec-mlp">The MLP</a></li>
+    <li><a href="#sec-expressivity">Expressivity: why nonlinearity and depth</a></li>
+    <li><a href="#sec-xornet">A network that solves XOR</a></li>
+    <li><a href="#sec-learning">Learning, previewed</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> One line cannot solve XOR</h2>
+
+<p>
+Here are two logic gates, written as tiny classification datasets. Inputs are
+two bits, the target is one bit:
+</p>
+
+<div class="dual-pane" style="max-width:560px;margin:0 auto 22px">
+  <div>
+    <div class="pane-label">AND: fire when both are on</div>
+    <table class="ttable"><thead><tr><th>x&#8321;</th><th>x&#8322;</th><th>t</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>0</td><td class="t-neg">0</td></tr>
+      <tr><td>0</td><td>1</td><td class="t-neg">0</td></tr>
+      <tr><td>1</td><td>0</td><td class="t-neg">0</td></tr>
+      <tr><td>1</td><td>1</td><td class="t-pos">1</td></tr>
+    </tbody></table>
+  </div>
+  <div>
+    <div class="pane-label">XOR: fire when they differ</div>
+    <table class="ttable"><thead><tr><th>x&#8321;</th><th>x&#8322;</th><th>t</th></tr></thead>
+    <tbody>
+      <tr><td>0</td><td>0</td><td class="t-neg">0</td></tr>
+      <tr><td>0</td><td>1</td><td class="t-pos">1</td></tr>
+      <tr><td>1</td><td>0</td><td class="t-pos">1</td></tr>
+      <tr><td>1</td><td>1</td><td class="t-neg">0</td></tr>
+    </tbody></table>
+  </div>
+</div>
+
+<p>
+Plot the four points on a plane and try to separate the 1s from the 0s with a
+single straight line. For AND you will find one in seconds. For XOR you will
+not, ever, and the failure is not about effort. It is a theorem, and it stopped
+neural network research for years. The escape has two steps. The SVM lecture
+taught the first: transform the inputs so a line works again. This lecture
+takes the second, bigger step: what if the model could <em>learn</em> that
+transformation itself, instead of waiting for us to hand-design it? That single
+idea is the strategic shift from classical machine learning to deep learning,
+and everything in this lesson builds toward it.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. THE XOR WALL ═══════════════════ -->
+<section id="sec-xorwall">
+<h2><span class="secnum">1.</span> The XOR wall</h2>
+
+<p>
+Start with the vocabulary. A dataset is <strong>linearly separable</strong>
+when the classes can be split by a line, a plane, or in higher dimensions a
+hyperplane. Every linear classifier you have met makes exactly that bet:
+</p>
+
+$$ y = \operatorname{sign}(w_0 + w^\top x) $$
+
+<p>
+Read the formula as a worldview. The score is a weighted <em>sum</em> of
+features, so the model assumes good decisions are an <strong>additive</strong>
+combination of the inputs, with no interactions between them. Each feature
+pushes the verdict up or down on its own, independent of what the others are
+doing. That worldview is often fine, and when it fails, it fails for
+identifiable reasons: noise in the inputs, noise in the labels, missing or
+latent variables the model never sees, or plain model mismatch: the true rule
+just is not additive. One honest caution before we fight for separability:
+perfectly separating a noisy training set may only mean you overfit the noise.
+The XOR wall is not that. XOR fails for the cleanest reason on the list, model
+mismatch, and it fails with only four points.
+</p>
+
+<h3>AND is separable, and you can prove it with inequalities</h3>
+
+<p>
+For the AND gate, <span class="m">$t = x_1 \wedge x_2$</span>, each row of the
+truth table is a constraint on the weights. Demand the score is positive only
+on the (1,1) row:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the feasible weight region for AND</div>
+  <p>Row by row, with the convention that the classifier outputs 1 when <span class="m">$w_0 + w_1 x_1 + w_2 x_2 > 0$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14.5px">
+    (0,0) &rarr; 0:&nbsp;&nbsp;w&#8320; &le; 0. &nbsp;Fix w&#8320; = &minus;1.5.<br>
+    (1,0) &rarr; 0:&nbsp;&nbsp;&minus;1.5 + w&#8321; &le; 0&nbsp;&nbsp;&rArr;&nbsp;&nbsp;w&#8321; &le; 1.5<br>
+    (0,1) &rarr; 0:&nbsp;&nbsp;&minus;1.5 + w&#8322; &le; 0&nbsp;&nbsp;&rArr;&nbsp;&nbsp;w&#8322; &le; 1.5<br>
+    (1,1) &rarr; 1:&nbsp;&nbsp;&minus;1.5 + w&#8321; + w&#8322; &gt; 0&nbsp;&nbsp;&rArr;&nbsp;&nbsp;w&#8321; + w&#8322; &gt; 1.5
+  </p>
+  <!-- FLAGGED: lecture-09-source-content.md states the constraints as
+       w1 >= 1.5, w2 >= 1.5 with w0 = -1.5; those directions contradict the
+       (1,0)->0 and (0,1)->0 rows under the stated convention, so the
+       inequality directions are corrected here. The conclusion (nonempty
+       feasible region, so a separating line exists) is unchanged. -->
+  <p>
+    The constraints are simultaneously satisfiable, for example
+    <span class="m">$w_1 = w_2 = 1$</span>: check <span class="m">$1 + 1 = 2 > 1.5$</span>
+    while each alone is <span class="m">$\le 1.5$</span>. A nonempty feasible
+    region means a separating line exists, and this choice draws it at
+    <span class="m">$x_1 + x_2 = 1.5$</span>. Remember those numbers; the exact
+    unit <span class="m">$\mathbb{I}[x_1 + x_2 - 1.5 > 0]$</span> returns in
+    section 6 as the AND detector inside our XOR network.
+  </p>
+</div>
+
+<h3>XOR is not, and convexity is the airtight reason</h3>
+
+<p>
+Try the same game with XOR and the constraints contradict each other. But
+"I could not find weights" is not a proof, so here is the real argument. A
+set <span class="m">$S$</span> is <strong>convex</strong> when the straight
+segment between any two of its points stays inside it:
+</p>
+
+$$ x_a, x_b \in S \;\Longrightarrow\; \lambda x_a + (1-\lambda)\, x_b \in S
+   \quad \text{for all } 0 \le \lambda \le 1, $$
+
+<p>
+and by induction any convex combination of points of <span class="m">$S$</span>
+stays in <span class="m">$S$</span>. A linear classifier assigns each class a
+half-space, everything on one side of the line, and a half-space is convex. Now
+look at XOR. The two positive points are <span class="m">$(0,1)$</span> and
+<span class="m">$(1,0)$</span>; the segment joining them passes through
+<span class="m">$(0.5, 0.5)$</span>. The two negative points are
+<span class="m">$(0,0)$</span> and <span class="m">$(1,1)$</span>; their
+segment passes through <span class="m">$(0.5, 0.5)$</span> as well. If a
+separating line existed, the point <span class="m">$(0.5, 0.5)$</span> would
+have to sit strictly inside the positive half-space <em>and</em> strictly
+inside the negative one. Contradiction. No line, no matter how clever, ever.
+Feel the wall yourself before you believe it:
+</p>
+
+<div class="figure" id="fig-andxor">
+  <div class="fig-mount" data-fig="andxor"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the wall, made draggable. Grab either handle and steer the line. On AND you can reach 4/4. On XOR the counter never passes 3/4, and the convexity overlay shows why: the two class segments cross at (0.5,&thinsp;0.5), so no half-space split exists.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A friend says "XOR is not linearly separable because four points are too many for a line with only three parameters." Fix the argument.</p>
+  <div class="quiz-opts">
+    <button data-k="a">The friend is right: a line has parameters w&#8320;, w&#8321;, w&#8322;, so it can only handle three points</button>
+    <button data-k="b">Parameter counting is the wrong tool: AND also has four points and separates fine. The real reason is convexity: each linear decision region is a half-space, and XOR's two class segments cross at (0.5, 0.5), which would have to belong to both convex regions at once</button>
+    <button data-k="c">XOR is separable, you just need a line with a very steep slope</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Counting fails immediately: AND, OR, and NAND are all four-point datasets and all separable. The obstruction is geometric, not a parameter budget.</div>
+  <div class="quiz-fb" data-k="b">Exactly. Separability is about the geometry of the class regions. Half-spaces are convex, convex sets contain the segments between their points, and XOR forces the two segments to share the midpoint (0.5, 0.5). One point cannot be strictly on both sides of a line.</div>
+  <div class="quiz-fb" data-k="c">Try it in Fig 1.1. Any slope, any offset, the best you will ever do on XOR is 3 of 4. The convexity argument says this is not bad luck.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. FEATURE MAPS ═══════════════════ -->
+<section id="sec-featuremaps">
+<h2><span class="secnum">2.</span> Feature maps, and their limit</h2>
+
+<p>
+You already know the classical escape from the SVM lecture. A
+<strong>feature map</strong> <span class="m">$\phi$</span> is a fixed
+transformation of the input, and running the same linear classifier on the
+transformed data changes what it can do:
+</p>
+
+$$ y = \operatorname{sign}\!\big(w_0 + w^\top \phi(x)\big) $$
+
+<p>
+A boundary that is linear in <em>feature space</em> can be curved in
+<em>input space</em>. For XOR the missing ingredient is the interaction between
+the inputs, so hand it over as a third coordinate:
+</p>
+
+$$ \phi(x) = (x_1,\; x_2,\; x_1 x_2) $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: XOR becomes separable in feature space</div>
+  <p>Take weights <span class="m">$w = (1, 1, -2)$</span> and <span class="m">$w_0 = -0.5$</span>, so the score is <span class="m">$x_1 + x_2 - 2\,x_1 x_2 - 0.5$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14.5px">
+    (0,0):&nbsp;&phi; = (0, 0, 0)&nbsp;&nbsp;&rarr;&nbsp;0 + 0 &minus; 0 &minus; 0.5 = &minus;0.5&nbsp;&nbsp;&rarr;&nbsp;negative&nbsp;&#10003;<br>
+    (0,1):&nbsp;&phi; = (0, 1, 0)&nbsp;&nbsp;&rarr;&nbsp;0 + 1 &minus; 0 &minus; 0.5 = +0.5&nbsp;&nbsp;&rarr;&nbsp;positive&nbsp;&#10003;<br>
+    (1,0):&nbsp;&phi; = (1, 0, 0)&nbsp;&nbsp;&rarr;&nbsp;1 + 0 &minus; 0 &minus; 0.5 = +0.5&nbsp;&nbsp;&rarr;&nbsp;positive&nbsp;&#10003;<br>
+    (1,1):&nbsp;&phi; = (1, 1, 1)&nbsp;&nbsp;&rarr;&nbsp;1 + 1 &minus; 2 &minus; 0.5 = &minus;0.5&nbsp;&nbsp;&rarr;&nbsp;negative&nbsp;&#10003;
+  </p>
+  <p>
+    Four for four, with margin 0.5 on every point. The same trick works with
+    <span class="m">$|x_1 - x_2|$</span> as the extra feature: it evaluates to
+    0, 1, 1, 0 on the four rows, so thresholding it at 0.5 solves XOR with one
+    weight. Either way, a <em>plane</em> in the lifted space does what no
+    <em>line</em> in the original plane could.
+  </p>
+</div>
+
+<p>
+Watch the lift happen. The interaction feature raises exactly one point,
+<span class="m">$(1,1)$</span>, out of the plane, and that is enough:
+</p>
+
+<div class="figure" id="fig-lift">
+  <div class="fig-mount" data-fig="lift"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the feature-map lift. Slide the lift to raise each point to height <span class="m">$x_1 x_2$</span>, and toggle the separating plane on to watch (1,&thinsp;1) climb across it; the readout counts how many points the rule classifies correctly at each moment. The right pane shows the same rule dropped back into the input plane, where the boundary is a curve, exactly the SVM lecture's kernel picture.</p>
+</div>
+
+<p>
+So why is this lesson not over? Because of who chose
+<span class="m">$\phi$</span>. We stared at XOR, realized the interaction
+<span class="m">$x_1 x_2$</span> was the missing signal, and typed it in. On
+four points that is easy. On images, audio, or text, knowing which
+transformations matter <em>is the entire problem</em>. Hand-designed feature
+maps rescue linear models only when a human already understands the structure
+of the data, and that is the limit we now cross.
+</p>
+
+<details class="check">
+  <summary>Check: connect this to the SVM lecture's kernels</summary>
+  <div>
+    <p>Kernels also computed feature maps. What did they buy us, and what did they still not solve?</p>
+    <p><b>Answer.</b> A kernel evaluates inner products <span class="m">$\langle \phi(x), \phi(x') \rangle$</span> without ever materializing <span class="m">$\phi(x)$</span>, so it made very high-dimensional, even infinite-dimensional, feature spaces computationally free. What it did not change is authorship: the kernel, and therefore the feature space, is still chosen by a person before learning starts. A polynomial kernel bakes in "interactions matter", an RBF kernel bakes in "local similarity matters". The choice of transformation stays hand-designed; only its evaluation got cheap. The next section changes the author.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. REPRESENTATION LEARNING ═══════════════════ -->
+<section id="sec-replearn">
+<h2><span class="secnum">3.</span> Representation learning</h2>
+
+<p>
+Here is the strategic shift in one line each. Classical machine learning, the
+pipeline of every lecture so far:
+</p>
+
+$$ \text{feature engineering: } \quad x \;\mapsto\; \phi(x) \;\mapsto\; \text{simple decision} $$
+
+<p>Deep learning replaces the fixed, hand-built <span class="m">$\phi$</span> with a <em>learned</em> one:</p>
+
+$$ \text{representation learning: } \quad x \;\mapsto\; \phi_\theta(x) \;\mapsto\; \text{simple decision} $$
+
+<p>
+The subscript <span class="m">$\theta$</span> is the whole announcement: the
+transformation has parameters, and the parameters are learned from data.
+<strong>Representation learning</strong> means letting the model discover the
+useful intermediate representation instead of hand-designing it. A neural
+network builds <span class="m">$\phi_\theta$</span> by composing many simple
+layers:
+</p>
+
+$$ x \;\mapsto\; h^{(1)} \;\mapsto\; h^{(2)} \;\mapsto\; \cdots \;\mapsto\; h^{(L)} \;\mapsto\; y,
+   \qquad \phi_\theta(x) = f^{(L)} \circ f^{(L-1)} \circ \cdots \circ f^{(1)}(x) $$
+
+<p>
+Each layer linearly combines its inputs, applies a nonlinearity, and hands the
+result on. Stacked, the layers build increasingly abstract descriptions:
+pixels become edges, edges become shapes, shapes become objects; tokens become
+phrases, phrases become intent. None of those intermediate concepts were
+specified by anyone. They emerge because they help the final decision.
+</p>
+
+<h3>The unit: one neuron, and you have already trained one</h3>
+
+<p>
+The building block borrows its shape, loosely, from the brain: about
+<span class="m">$10^{11}$</span> neurons, each wired to roughly
+<span class="m">$10^{4}$</span> others, each accumulating incoming signal and
+firing once it crosses a threshold. Warren McCulloch and Walter Pitts wrote
+down the first mathematical neuron in 1943, and the Parallel Distributed
+Processing school of James McClelland and David Rumelhart revived the
+connectionist program in the 1980s. Take the inspiration and none of the
+biology. The <strong>artificial neuron</strong>, or <strong>unit</strong>,
+computes
+</p>
+
+$$ y = \sigma(w_0 + w^\top x), $$
+
+<p>
+a weighted sum pushed through a nonlinearity <span class="m">$\sigma$</span>,
+called the <strong>activation function</strong>. (The offset
+<span class="m">$w_0$</span> and the name <em>bias</em> <span class="m">$b$</span>
+are used interchangeably all term.) Look hard at that formula: it is logistic
+regression, exactly. You have already trained a single neuron; this lecture
+just refuses to stop at one. Play with the one below and watch what a lone
+unit can and cannot draw:
+</p>
+
+<div class="figure" id="fig-neuron">
+  <div class="fig-mount" data-fig="neuron"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the single-neuron playground. Slide <span class="m">$w_1, w_2, b$</span> and switch the activation; the plane is shaded by the neuron's real output and the probe point prints the actual arithmetic. However you set it, one unit draws exactly one straight boundary.</p>
+</div>
+
+<h3>The layer: several units in parallel</h3>
+
+<p>
+A <strong>layer</strong> is many units running side by side on the same input.
+Stack their weight vectors into a matrix <span class="m">$W$</span> and their
+biases into a vector <span class="m">$b$</span>, and the whole layer is one
+line of math:
+</p>
+
+$$ h = \sigma(Wx + b) $$
+
+<p>
+with <span class="m">$\sigma$</span> applied element-wise. One unit draws one
+boundary; a layer of <span class="m">$k$</span> units draws
+<span class="m">$k$</span> of them at once, and together the boundaries carve
+the input space into regions. Each region has its own on/off signature across
+the units, which is the raw material later layers will combine:
+</p>
+
+<div class="figure" id="fig-layer">
+  <div class="fig-mount" data-fig="layer"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> a layer of three units. Steer two of the boundaries with the sliders; the shading counts how many units are active at each point and the readout counts the distinct regions the three lines carve, computed by sampling the real activation patterns.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A single unit computes <span class="m">$\sigma(w^\top x + b)$</span> with a sigmoid activation. Which model from earlier in the course is that, exactly?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Linear regression: it is a weighted sum of the inputs</button>
+    <button data-k="b">Logistic regression: affine score, then sigmoid, output read as a class probability</button>
+    <button data-k="c">k-nearest neighbours with k = 1: it fires for the most similar stored input</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Close but missing the crucial part: linear regression outputs the raw score <span class="m">$w^\top x + b$</span> with no nonlinearity. The sigmoid squashing is what makes it a classifier.</div>
+  <div class="quiz-fb" data-k="b">Right. The unit is logistic regression verbatim, which is why the framing of this lecture works: a neural network is logistic regressions all the way down, wired into each other. What is new is not the unit but the composition.</div>
+  <div class="quiz-fb" data-k="c">KNN stores data and measures distance at query time; it has no weights at all. The unit is a parametric scorer.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. THE MLP ═══════════════════ -->
+<section id="sec-mlp">
+<h2><span class="secnum">4.</span> The MLP</h2>
+
+<p>
+Now compose. A <strong>feed-forward neural network</strong> connects units into
+a directed acyclic graph: an <strong>input layer</strong> that just holds
+<span class="m">$x$</span>, one or more <strong>hidden layers</strong>, layers
+sitting between input and output whose values are never given in the data, and
+an <strong>output layer</strong> that produces the prediction. The
+<strong>MLP</strong>, the multi-layer perceptron, is the fully connected
+version: every unit in one layer feeds every unit in the next. (Despite the
+name, the MLP has little to do with the perceptron algorithm; the name stuck,
+the algorithm did not.)
+</p>
+
+<p>
+Full connectivity has a price you should be able to count. A layer mapping
+<span class="m">$N_{i-1}$</span> inputs to <span class="m">$N_i$</span> units
+needs a weight for every pair, so its weight matrix holds
+<span class="m">$N_i \times N_{i-1}$</span> numbers, plus
+<span class="m">$N_i$</span> biases.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: counting parameters</div>
+  <p>
+    A layer from <span class="m">$N_{i-1} = 3$</span> inputs to
+    <span class="m">$N_i = 4$</span> units:
+    <span class="m">$4 \times 3 = 12$</span> weights, plus 4 biases, 16
+    parameters for one small layer.
+  </p>
+  <p>
+    A full MLP with layout <span class="m">$2 \to 3 \to 1$</span>:
+    layer 1 has <span class="m">$3 \times 2 = 6$</span> weights and 3 biases;
+    layer 2 has <span class="m">$1 \times 3 = 3$</span> weights and 1 bias.
+    Total <span class="m">$6 + 3 + 3 + 1 = 13$</span> parameters. A plain
+    linear model on the same two inputs has 3. Scale the picture up, a layer
+    from 100 inputs to 50 units already carries
+    <span class="m">$50 \times 100 = 5{,}000$</span> weights, and you see why
+    "far more parameters than a linear model" is the understatement of the
+    course.
+  </p>
+</div>
+
+<p>
+Hold the hierarchy in your head as three sentences. A single unit makes one
+boundary, <span class="m">$\sigma(w^\top x + b)$</span>. A layer makes several,
+<span class="m">$\sigma(Wx + b)$</span>. Depth composes them,
+<span class="m">$x \mapsto h^{(1)} \mapsto \cdots \mapsto y$</span>, and the
+composition is what produces <strong>hierarchical representations</strong>:
+early layers detect simple patterns, later layers combine them into bigger
+ones, and the final layer makes a simple decision in a space where the decision
+has become easy. Build one and push numbers through it:
+</p>
+
+<div class="figure" id="fig-builder">
+  <div class="fig-mount" data-fig="builder"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the network builder. Set the hidden width, pick a weight preset (two random nets and a sharp-sigmoid XOR), choose an input, and run the forward pass; activations light up layer by layer and every number is genuinely computed. The parameter counter updates live as <span class="m">$N_i \times N_{i-1}$</span> changes with the width.</p>
+</div>
+
+<p>
+The forward pass you just watched is short enough to write honestly in Python.
+A unit is one line, and a whole network is a loop over layers:
+</p>
+
+<pre class="code" data-lang="python"><code>def neuron(x, w, b, act):
+    return act(np.dot(w, x) + b)        # one unit: affine, then nonlinearity
+
+def forward(x, layers):                 # layers: list of (W, b, act) triples
+    h = x
+    for W, b, act in layers:
+        h = act(W @ h + b)              # W has N_i x N_(i-1) weights
+    return h</code></pre>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A hidden layer maps <span class="m">$N_{i-1} = 100$</span> inputs to <span class="m">$N_i = 50$</span> units. How many weights does it have (ignoring biases), and what does that say next to a linear model on the same 100 inputs?</p>
+  <div class="quiz-opts">
+    <button data-k="a">150 weights: 100 in plus 50 out</button>
+    <button data-k="b">5,000 weights: every one of the 50 units gets its own set of 100, so N&#7522; &times; N&#7522;&#8331;&#8321; = 50 &times; 100. A linear model on the same inputs has just 100 (+1), so one hidden layer is already 50 linear models' worth of parameters feeding a second stage</button>
+    <button data-k="c">2&#185;&#8304;&#8304; weights: each unit can switch each input on or off</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That adds when it should multiply. Full connectivity means each of the 50 units has all 100 inputs: 50 &times; 100 pairs, each with its own weight.</div>
+  <div class="quiz-fb" data-k="b">Right. The multiplication N&#7522; &times; N&#7522;&#8331;&#8321; is the cost of "everyone connects to everyone", and it is exactly the count the live readout in Fig 4.1 shows. The parameter explosion is the price of learning features instead of hand-designing them.</div>
+  <div class="quiz-fb" data-k="c">Weights are continuous values, not switches, and there is one per connection: 50 &times; 100 = 5,000 of them.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. EXPRESSIVITY ═══════════════════ -->
+<section id="sec-expressivity">
+<h2><span class="secnum">5.</span> Expressivity: why nonlinearity and depth</h2>
+
+<p>
+More parameters is not automatically more power. Here is the trap that makes
+the activation function non-negotiable. Set
+<span class="m">$\sigma$</span> to the identity, so a layer is just the affine
+map <span class="m">$y = W x + b$</span>, and stack two of them:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: two linear layers collapse into one</div>
+  <p>
+    Layer 1: <span class="m">$h = W^{(1)} x + b^{(1)}$</span> with
+    <span class="m">$W^{(1)} = \begin{pmatrix} 1 &amp; 2 \\ 0 &amp; 1 \end{pmatrix}$</span>,
+    <span class="m">$b^{(1)} = (1, 0)^\top$</span>.
+    Layer 2: <span class="m">$y = w^{(2)\top} h + b^{(2)}$</span> with
+    <span class="m">$w^{(2)} = (3, 1)^\top$</span>, <span class="m">$b^{(2)} = -2$</span>.
+    Substitute and multiply out:
+  </p>
+  $$ y = w^{(2)\top}\big(W^{(1)} x + b^{(1)}\big) + b^{(2)}
+       = \underbrace{w^{(2)\top} W^{(1)}}_{\tilde{w}^\top}\, x
+       + \underbrace{w^{(2)\top} b^{(1)} + b^{(2)}}_{\tilde{b}} $$
+  <p style="font-family:var(--mono);font-size:14.5px">
+    w&#771;&#8321; = 3&middot;1 + 1&middot;0 = 3&nbsp;&nbsp;&nbsp;
+    w&#771;&#8322; = 3&middot;2 + 1&middot;1 = 7&nbsp;&nbsp;&nbsp;
+    b&#771; = 3&middot;1 + 1&middot;0 &minus; 2 = 1
+  </p>
+  <p>
+    So the two-layer network is exactly <span class="m">$y = 3x_1 + 7x_2 + 1$</span>,
+    a single affine map. Nothing about this used the specific numbers: a
+    product of matrices is a matrix, so <em>any</em> stack of identity-activation
+    layers, however deep and wide, collapses to one affine layer. Zero
+    expressive power gained. Nonlinear activations are not decoration; they are
+    the reason depth does anything at all.
+  </p>
+</div>
+
+<div class="figure" id="fig-collapse">
+  <div class="fig-mount" data-fig="collapse"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the collapse demonstrator. With the identity activation, the two-layer network's boundary sits exactly on the dashed single-layer equivalent, and the computed difference between the two maps is 0 everywhere. Switch on tanh and the boundary genuinely curves away from any line.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You stack ten linear layers (identity activation), each 1,000 units wide. What can this network represent?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Any function: ten layers is deep and a thousand units is wide</button>
+    <button data-k="b">Exactly the affine maps a single layer can represent: the ten weight matrices multiply into one matrix, so all the extra depth buys nothing</button>
+    <button data-k="c">Polynomials up to degree ten, one degree per layer</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Width and depth only pay off through the nonlinearity between layers. With identity activations the whole tower is one matrix product.</div>
+  <div class="quiz-fb" data-k="b">Right, and the worked example above is the two-layer case of the proof: <span class="m">$W^{(2)}(W^{(1)}x + b^{(1)}) + b^{(2)} = \tilde{W}x + \tilde{b}$</span>. Apply it nine times and ten layers become one. Millions of parameters, the expressive power of three.</div>
+  <div class="quiz-fb" data-k="c">Matrix-vector products never create powers of x. Composition of affine maps is affine, degree one forever.</div>
+</div>
+
+<h3>Activation functions: the three you must know</h3>
+
+$$ \text{Sigmoid: } \sigma(z) = \frac{1}{1 + e^{-z}}, \qquad
+   \text{Tanh: } \tanh(z) = \frac{e^{z} - e^{-z}}{e^{z} + e^{-z}}, \qquad
+   \text{ReLU: } \operatorname{ReLU}(z) = \max(0, z) $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: evaluate all three at a few points</div>
+  <p style="font-family:var(--mono);font-size:14.5px">
+    &sigma;(0) = 1/(1+e&#8304;) = 1/2 = 0.5<br>
+    &sigma;(2) = 1/(1+e&#8315;&sup2;) = 1/(1+0.135) &asymp; 0.881&nbsp;&nbsp;&nbsp;&sigma;(&minus;2) = 1 &minus; 0.881 = 0.119<br>
+    tanh(0) = 0&nbsp;&nbsp;&nbsp;tanh(1) = (2.718&minus;0.368)/(2.718+0.368) = 2.350/3.086 &asymp; 0.762&nbsp;&nbsp;&nbsp;tanh(&minus;1) &asymp; &minus;0.762<br>
+    ReLU(&minus;3) = max(0,&minus;3) = 0&nbsp;&nbsp;&nbsp;ReLU(0) = 0&nbsp;&nbsp;&nbsp;ReLU(3) = 3
+  </p>
+  <p>
+    Ranges to memorize: sigmoid squashes into <span class="m">$(0, 1)$</span>,
+    tanh into <span class="m">$(-1, 1)$</span> centred at zero, ReLU into
+    <span class="m">$[0, \infty)$</span>. Sigmoid and tanh go flat, they
+    <em>saturate</em>, once <span class="m">$|z|$</span> is a few units from
+    zero. ReLU never saturates on its positive side, one of the reasons it
+    became the modern default; its price is the hard flat zero on the negative
+    side.
+  </p>
+</div>
+
+<div class="figure" id="fig-activations">
+  <div class="fig-mount" data-fig="activations"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the activation explorer. Slide the probe along <span class="m">$z$</span> and read the three real outputs. The shaded bands mark where sigmoid and tanh have gone flat; ReLU keeps climbing forever on the right, which is exactly its appeal.</p>
+</div>
+
+<h3>Universal approximation, and the honest fine print</h3>
+
+<p>
+So how expressive is a network once the activations are genuinely nonlinear?
+The classical answer: a network with at least one hidden layer, two weight
+layers, is a <strong>universal function approximator</strong>: it can
+approximate any function arbitrarily well. In fact a single hidden layer can
+already perfectly discriminate any training set. The fine print is the width:
+that one layer may need to be extremely wide, in the worst case behaving like
+a decision tree with one leaf per training point, a giant lookup table wearing
+a network costume. Capacity grows with more hidden units and with more layers,
+and the practical experience of the field is that one hidden layer is
+<em>sufficient but not efficient</em>: depth often buys with composition what
+width can only buy with brute force. Feel capacity move:
+</p>
+
+<div class="figure" id="fig-capacity">
+  <div class="fig-mount" data-fig="capacity"></div>
+  <p class="fig-caption"><b>Fig 5.3,</b> the capacity demo. A genuinely trained network (gradient descent runs in your browser, deterministic) fits a curvy two-class boundary. At width 1 it underfits to a near-line; more units and a second layer bend the boundary; at full capacity it starts carving pockets around the four deliberately mislabeled points, memorizing noise. Universal approximation is a capability, not a recommendation.</p>
+</div>
+
+<details class="check">
+  <summary>Check: "one hidden layer is universal" versus "just go wide"</summary>
+  <div>
+    <p>If a single hidden layer can approximate anything, why does anyone build deep networks?</p>
+    <p><b>Answer.</b> Universality is an existence statement, not a cost estimate. The guarantee says a wide-enough single hidden layer exists, and "wide enough" can be astronomically wide, in the spirit of one unit, or one decision-tree leaf, per training case, which memorizes rather than generalizes. Depth attacks the same expressivity budget by composition: early layers build small reusable pieces and later layers combine them, so a function with hierarchical structure can be represented with far fewer total units. Sufficient but not efficient is the whole slogan. Fig 5.3 shows the small-scale version: a second layer buys flexibility that pure width spends parameters to match.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. A NETWORK THAT SOLVES XOR ═══════════════════ -->
+<section id="sec-xornet">
+<h2><span class="secnum">6.</span> A network that solves XOR</h2>
+
+<p>
+Time to collect the payoff. We build the smallest interesting network by hand:
+two inputs, one hidden layer of two units, one output unit, using the
+hard-threshold activation <span class="m">$\sigma(\cdot) = \mathbb{I}[\,\cdot > 0\,]$</span>,
+which outputs 1 when its argument is positive and 0 otherwise. The design idea
+is the punchline of the whole lecture: make each hidden unit detect a simple
+concept, then let the output combine the concepts.
+</p>
+
+$$ h_1 = \mathbb{I}[\,x_1 + x_2 - 0.5 > 0\,] \qquad\quad
+   h_2 = \mathbb{I}[\,x_1 + x_2 - 1.5 > 0\,] \qquad\quad
+   y = \mathbb{I}[\,h_1 - h_2 - 0.5 > 0\,] $$
+
+<p>
+Read each unit. <span class="m">$h_1$</span> fires when the sum of the inputs
+exceeds 0.5, that is, when at least one input is on:
+<span class="m">$h_1 = x_1 \text{ OR } x_2$</span>. <span class="m">$h_2$</span>
+fires when the sum exceeds 1.5, when both are on:
+<span class="m">$h_2 = x_1 \text{ AND } x_2$</span>, the very unit whose
+feasible weights we derived in section 1. The output fires when
+<span class="m">$h_1$</span> is on and <span class="m">$h_2$</span> is off,
+<span class="m">$y = h_1 \text{ AND } \neg h_2$</span>, so the network computes
+"at least one, but not both":
+</p>
+
+$$ (x_1 \text{ OR } x_2) \;\text{AND}\; \neg(x_1 \text{ AND } x_2) \;=\; x_1 \text{ XOR } x_2 $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: verify the whole truth table</div>
+  <p style="font-family:var(--mono);font-size:14px">
+    (0,0):&nbsp;h&#8321; = &#120128;[0+0&minus;0.5&gt;0] = &#120128;[&minus;0.5&gt;0] = 0&nbsp;&nbsp;h&#8322; = &#120128;[&minus;1.5&gt;0] = 0&nbsp;&nbsp;y = &#120128;[0&minus;0&minus;0.5&gt;0] = 0&nbsp;&nbsp;&#10003;<br>
+    (0,1):&nbsp;h&#8321; = &#120128;[1&minus;0.5&gt;0] = 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;h&#8322; = &#120128;[&minus;0.5&gt;0] = 0&nbsp;&nbsp;y = &#120128;[1&minus;0&minus;0.5&gt;0] = 1&nbsp;&nbsp;&#10003;<br>
+    (1,0):&nbsp;h&#8321; = &#120128;[1&minus;0.5&gt;0] = 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;h&#8322; = &#120128;[&minus;0.5&gt;0] = 0&nbsp;&nbsp;y = &#120128;[1&minus;0&minus;0.5&gt;0] = 1&nbsp;&nbsp;&#10003;<br>
+    (1,1):&nbsp;h&#8321; = &#120128;[2&minus;0.5&gt;0] = 1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;h&#8322; = &#120128;[0.5&gt;0] = 1&nbsp;&nbsp;&nbsp;y = &#120128;[1&minus;1&minus;0.5&gt;0] = 0&nbsp;&nbsp;&#10003;
+  </p>
+  <p>
+    Four for four. Notice what happened in the hidden layer: the network
+    re-represented each input as the pair
+    <span class="m">$(h_1, h_2) = (\text{OR}, \text{AND})$</span>. In that
+    learned coordinate system the positives sit at <span class="m">$(1,0)$</span>
+    and the negatives at <span class="m">$(0,0)$</span> and
+    <span class="m">$(1,1)$</span>, which a single line separates easily. The
+    hidden layer performed exactly the lift of section 2, except the lift is
+    made of the same kind of unit as everything else, so it is learnable.
+  </p>
+</div>
+
+<div class="figure" id="fig-xornet">
+  <div class="fig-mount" data-fig="xornet"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the XOR network, stepped. Feed it any of the four inputs, or step through all of them; the units light up as the real threshold arithmetic runs, and the truth table fills in live. OR and AND compose into XOR, which no single line could draw.</p>
+</div>
+
+<p>
+A single linear classifier gives one boundary in input space and cannot
+separate XOR. This network combines simple units that detect intermediate
+concepts, OR and AND, into a nonlinear rule. That sentence is the whole point
+of hidden layers, and it is why we bothered with every section before this
+one. Now run the same network as code, and then break it:
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 6.2,</b> the forward pass as a live code exercise. The <code>forward</code> function really executes. The hidden layer is fixed to the OR and AND detectors; the output weights are yours. Start at the correct (1, &minus;1, &minus;0.5), break it, and find other settings that still pass all four rows.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In the XOR network, what do <span class="m">$h_1$</span> and <span class="m">$h_2$</span> compute, and how does the output combine them?</p>
+  <div class="quiz-opts">
+    <button data-k="a">h&#8321; computes AND, h&#8322; computes OR, and the output averages them</button>
+    <button data-k="b">Both hidden units compute partial XORs on half the inputs each, and the output sums them</button>
+    <button data-k="c">h&#8321; computes OR (threshold 0.5), h&#8322; computes AND (threshold 1.5), and the output fires when h&#8321; is on and h&#8322; is off: (x&#8321; OR x&#8322;) AND NOT (x&#8321; AND x&#8322;) = XOR</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Check the thresholds: 0.5 trips when either input is on (OR), 1.5 only when both are (AND). And the output thresholds, it never averages.</div>
+  <div class="quiz-fb" data-k="b">Neither hidden unit computes anything XOR-like; each is a plain linear threshold, which is the point. XOR only appears when the output combines them.</div>
+  <div class="quiz-fb" data-k="c">Exactly. The hidden layer learns two simple, linearly-computable concepts and re-represents the input as (OR, AND); in those coordinates XOR is the linearly separable pattern (1, 0). Intermediate concepts are what hidden layers are for.</div>
+</div>
+
+<details class="check">
+  <summary>Check (coding): complete the forward pass</summary>
+  <div>
+    <p>One line of <code>forward</code> is blanked out. What goes in it, and does the order of operations matter?</p>
+<pre class="code" data-lang="python"><code>def forward(x, layers):
+    h = x
+    for W, b, act in layers:
+        h = ____________________
+    return h</code></pre>
+    <p><b>Answer.</b> <code>h = act(W @ h + b)</code>. The order is the definition of a layer: affine map first (<code>W @ h + b</code>, the <span class="m">$N_i \times N_{i-1}$</span> weights and the biases), nonlinearity second. Writing <code>act(W @ h) + b</code> instead would leave the bias outside the nonlinearity, and the very next layer's affine map would absorb it differently; more importantly, forgetting <code>act</code> entirely turns the loop into a product of affine maps, and section 5 proved that collapses the whole network into a single linear layer. The nonlinearity inside the loop is the network.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. LEARNING, PREVIEWED ═══════════════════ -->
+<section id="sec-learning">
+<h2><span class="secnum">7.</span> Learning, previewed</h2>
+
+<p>
+Everything above was <em>representation</em>: what networks can express. We
+set the XOR weights by staring at a truth table, and that does not scale past
+four points. Real networks have thousands to billions of weights, and nobody
+sets any of them by hand. The missing piece is
+<strong>backpropagation</strong>: an algorithm that learns all the weights
+from data by propagating loss information backward through the layers,
+efficiently, so that every weight learns how it should change to reduce the
+error. You already own the ingredients, a differentiable model and gradient
+descent from the regression lectures. What backpropagation adds is the
+bookkeeping that makes the gradient of a deep composition cheap to compute.
+That is the entire next lecture. This one only needed to convince you the
+weights are worth learning.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">8.</span> Summary and method card</h2>
+
+<p>
+The story in one paragraph. Linear models decide with one additive score, so
+they fail on interactions, and XOR is the minimal counterexample, provably
+unfixable by any line because linear decision regions are convex. Feature maps
+expose hidden structure, <span class="m">$x_1 x_2$</span> makes XOR separable,
+but a person must design them, which requires already knowing which
+transformations matter. Neural networks learn the transformation instead:
+stack affine maps and nonlinear activations, and depth composes simple learned
+concepts into expressive representations, with the nonlinearity mandatory
+because stacked linear layers collapse into one. A hand-built two-unit hidden
+layer solves XOR by detecting OR and AND and combining them. And
+backpropagation, next lecture, is what makes networks with more than four data
+points trainable.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Neural Networks (MLP)</div>
+  <table>
+    <tr><th>Assumption</th><td>Complex functions can be built by composing many simple functions, provided the network includes nonlinearities.</td></tr>
+    <tr><th>Model class</th><td>Layered compositions of affine transformations and nonlinear activations: <span class="m">$h^{(i)} = \sigma(W^{(i)} h^{(i-1)} + b^{(i)})$</span>.</td></tr>
+    <tr><th>Learning / selection</th><td>Choose the architecture (depth, widths) and activations; then learn all weights and biases by minimizing a task loss with gradient-based optimization.</td></tr>
+    <tr><th>Prediction</th><td>One forward pass: alternate affine map and activation, layer by layer, read the output unit.</td></tr>
+    <tr><th>Strengths</th><td>Learns intermediate features itself; represents complex nonlinear boundaries; a single hidden layer is already a universal approximator.</td></tr>
+    <tr><th>Limitations</th><td>Harder to optimize and interpret than linear models; needs choices of architecture, activations, data, and regularization; capacity can memorize noise.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Depth, layer widths (<span class="m">$N_i \times N_{i-1}$</span> weights per layer), activation function.</td></tr>
+    <tr><th>Next step</th><td>Train these composed functions efficiently with backpropagation.</td></tr>
+  </table>
+</div>
+</section>
+
+<!-- ═══════════════════ 9. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">9.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+argue, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A network with one hidden layer is a universal function approximator. Which conclusion actually follows?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Any trained one-hidden-layer network will generalize to new data</button>
+    <button data-k="b">Depth is pointless, since one hidden layer can represent anything</button>
+    <button data-k="c">For any target function there exists a wide-enough single hidden layer that approximates it; the theorem says nothing about how wide, how to find the weights, or how well it generalizes</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Universality is about representational capacity, not generalization. The extreme case, one unit per training point, is a memorizer, like a decision tree with one leaf per example.</div>
+  <div class="quiz-fb" data-k="b">Sufficient is not efficient. The guaranteed width can be astronomical, while depth can often represent the same function by composing reusable pieces with far fewer units.</div>
+  <div class="quiz-fb" data-k="c">Right. It is an existence theorem with three silences: width (possibly enormous), trainability (finding weights is a separate problem, see next lecture), and generalization (representing the training data perfectly can be pure memorization).</div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">Count every parameter in an MLP with layout <span class="m">$2 \to 4 \to 4 \to 1$</span> (weights and biases).</p>
+  <div class="quiz-opts">
+    <button data-k="a">28: the three weight matrices hold 8, 16, and 4 weights</button>
+    <button data-k="b">37: (4&times;2 + 4) + (4&times;4 + 4) + (1&times;4 + 1) = 12 + 20 + 5</button>
+    <button data-k="c">11: 2 + 4 + 4 + 1 units</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Those are the weights, correctly multiplied, but each of the 4 + 4 + 1 = 9 units also carries a bias: 28 + 9 = 37.</div>
+  <div class="quiz-fb" data-k="b">Right. Per layer it is N&#7522; &times; N&#7522;&#8331;&#8321; weights plus N&#7522; biases: 12, then 20, then 5. Compare 37 parameters against 3 for a linear model on the same two inputs.</div>
+  <div class="quiz-fb" data-k="c">That counts units. Parameters live on the connections and the biases: N&#7522; &times; N&#7522;&#8331;&#8321; + N&#7522; per layer.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a network for x&#8321; AND NOT x&#8322;, and give its weights</summary>
+  <div>
+    <p>Using hard-threshold units <span class="m">$\mathbb{I}[\cdot > 0]$</span>, build the smallest network computing <span class="m">$x_1 \wedge \neg x_2$</span> (fires only on input (1,&thinsp;0)). How many units do you need?</p>
+    <p><b>Answer.</b> One. The function is linearly separable, only (1,&thinsp;0) is positive, and its convex hull (a single point) is disjoint from the hull of the other three, so a single unit suffices:</p>
+    $$ y = \mathbb{I}[\,x_1 - x_2 - 0.5 > 0\,] $$
+    <p>Verify: (0,0) gives <span class="m">$-0.5$</span>, off; (0,1) gives <span class="m">$-1.5$</span>, off; (1,0) gives <span class="m">$+0.5$</span>, on; (1,1) gives <span class="m">$-0.5$</span>, off. Four for four with weights <span class="m">$w = (1, -1)$</span>, <span class="m">$b = -0.5$</span>. Two things worth noticing. First, this is exactly the output unit of the XOR network, which computed <span class="m">$h_1 \wedge \neg h_2$</span> on the hidden activations; good sub-circuits get reused. Second, the design lesson: reach for a hidden layer only when the convexity test fails, as it did for XOR. Do not pay for depth that the geometry does not demand.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): argue when depth should beat width</summary>
+  <div>
+    <p>You have a fixed budget of units. When should you spend it on depth rather than width, and why?</p>
+    <p><b>Answer</b> (one good version). Spend on depth when the target function has <em>compositional structure</em>: it is naturally described as simple parts combined into bigger parts, edges into shapes into objects, gates into adders into arithmetic, OR and AND into XOR. A deep network computes each reusable part once and lets later layers reference it, so the unit count tracks the description length of the function. A single wide layer must instead enumerate: in the worst case something like one unit per distinguishable input region, the decision-tree-with-one-leaf-per-point regime, which is exponential brute force. The XOR network is the miniature proof: two hidden concepts and one combiner, versus a lookup over input patterns. Prefer width when the function is shallow-structured (one layer of localized bumps suffices) or when depth's costs bite, harder optimization being the classic one, which is part of why backpropagation, next lecture, matters so much. And remember capacity cuts both ways: Fig 5.3's deepest, widest setting was also the one that memorized the mislabeled points.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): connect the neuron back to logistic regression, and a layer to softmax</summary>
+  <div>
+    <p>Make the two correspondences precise.</p>
+    <p><b>Answer.</b> A single sigmoid unit <em>is</em> logistic regression: the same affine score <span class="m">$w^\top x + b$</span>, the same sigmoid squashing to <span class="m">$(0,1)$</span>, the same reading of the output as <span class="m">$P(t = 1 \mid x)$</span>. Nothing changes but the diagram around it. A layer of <span class="m">$C$</span> units computes <span class="m">$C$</span> affine scores at once, <span class="m">$z = Wx + b$</span>, and if you normalize those scores with softmax instead of squashing each independently, you have multiclass logistic regression, one score per class, exponentiated and normalized into a distribution. This is why the framing "a network is logistic regressions wired together" is not a metaphor. The output layer of a classification MLP literally is a (multiclass) logistic regression; everything before it is the learned feature map <span class="m">$\phi_\theta$</span> that replaced the hand-designed <span class="m">$\phi$</span>. Deep learning did not discard the linear-model lectures; it stacked them.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the representational half of neural networks: one line cannot compute an interaction, a hand-built feature exposes it, and a hidden layer of ordinary logistic units learns to build such features itself, provided the activations are nonlinear so the stack does not collapse. We built the XOR network by hand and verified every number. What we refused to do is set weights by hand ever again. Next lecture: backpropagation, the algorithm that learns them all.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../svm/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 8: Support Vector Machines</div>
+  </a>
+  <a href="../backpropagation/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 10: Backpropagation</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 9 &middot; Neural Networks</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

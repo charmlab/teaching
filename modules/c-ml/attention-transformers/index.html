@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attention and Transformers — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive capstone lesson on attention and transformers: queries, keys, and values, multi-head attention, the transformer block, architecture families, the LLM training pipeline, token economics, context windows, and scaling laws.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 15 &middot; The ML Bible</div>
+  <h1>Attention and Transformers</h1>
+  <p class="lede">
+    The sequence-models lecture ended on a cliffhanger: seq2seq squeezes an
+    entire input sentence into one vector, and one vector forgets. The fix is
+    not a better memory, it is a different question. Instead of asking "how do
+    I preserve everything I have read?", attention asks "which tokens are
+    relevant right now?", and lets every word look directly at every other
+    word, in parallel. That one idea is the transformer, and the transformer
+    is every modern LLM. This capstone builds attention from a single dot
+    product up to the full block, then switches hats and treats the result as
+    an engineering artifact: what it costs to train and to call, how a raw
+    text predictor becomes a helpful assistant, and how to choose a model
+    without burning the budget.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: one vector is not enough</a></li>
+    <li><a href="#sec-attention">Attention: retrieval, not memory</a></li>
+    <li><a href="#sec-multihead">Multi-head attention: several lenses at once</a></li>
+    <li><a href="#sec-block">The transformer block</a></li>
+    <li><a href="#sec-families">Architecture families: same block, different masks</a></li>
+    <li><a href="#sec-pipeline">Building useful LLMs: the training pipeline</a></li>
+    <li><a href="#sec-foundation">Foundation models and multimodality</a></li>
+    <li><a href="#sec-choosing">Choosing a model: cost, context, scaling laws</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: one vector is not enough</h2>
+
+<p>
+Recall exactly where the last lecture left us. A basic seq2seq model reads
+the whole input, one token at a time, and hands the decoder a single final
+hidden state: one fixed-size vector that is supposed to summarize everything.
+The decoder leans on that summary, and the summary favours whatever arrived
+last. Forget one early word and the meaning flips: drop the "Don't" from
+"Don't eat the pizza" and you have changed the instruction into its opposite.
+Or take "The animal did not cross the street because it was exhausted";
+resolving what "it" refers to requires holding "animal" in mind across the
+whole clause, which is precisely the kind of early information a running
+summary overwrites.
+</p>
+
+<p>
+Two problems, and they share one root cause. <strong>Memory</strong>: early
+information gets overwritten, and gradients vanish across long ranges, so the
+model cannot even learn to keep what matters. <strong>Speed</strong>:
+computation is sequential, token <span class="m">$t$</span> waits for token
+<span class="m">$t-1$</span>, so no amount of parallel hardware helps. The
+shared cause is that information must travel through every step in between.
+Gates made the memory more selective, bidirectional and stacked cells helped
+at the margins, but nothing removed the relay race itself.
+</p>
+
+<p>
+So ask the different question. What if a word did not need information to be
+<em>carried</em> to it, step by step, because it could simply <em>look</em>
+at any other word directly, all pairs at once, in parallel? That mechanism
+exists, it is called <strong>attention</strong>: a learned mechanism that
+lets each position retrieve information from other positions by relevance.
+Here is what it feels like before any math. Pick a word and watch which other
+words it lights up:
+</p>
+
+<div class="figure" id="fig-highlighter">
+  <div class="fig-mount" data-fig="highlighter"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> attention as a learned highlighter. Click any word to make it the query; every other word is shaded by its attention weight, computed live by a softmax over dot-product similarities. "he" lights up "Amir" from four words away with no relay through the words in between, which is exactly what the seq2seq bottleneck could not do. <!-- flagged addition: the token feature vectors behind this figure are hand-crafted by me for pedagogy (the source specifies the mechanism, not this sentence's numbers); the weights shown are genuinely computed from them. --></p>
+</div>
+
+<p>
+That reframing is the big idea of the whole lecture: attention takes sequence
+modeling from a <em>memory-preservation</em> problem to a
+<em>retrieval</em> problem. The rest of the technical half makes the
+highlighter precise, and the second half of the lecture deals with what
+happened when the world scaled it up.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. ATTENTION ═══════════════════ -->
+<section id="sec-attention">
+<h2><span class="secnum">1.</span> Attention: retrieval, not memory</h2>
+
+<h3>Seq2seq attention: retrieve from every encoder state</h3>
+
+<p>
+The first version of the idea patches seq2seq directly. The encoder already
+produces a hidden state for every input position,
+<span class="m">$h_1, \dots, h_T$</span>; the bottleneck was that we threw
+away all but the last. Attention keeps them all, and at each decoder step
+<span class="m">$i$</span> it lets the decoder state
+<span class="m">$s_i$</span> ask every encoder state how relevant it is. A
+dot product scores the match, a softmax turns scores into weights, and a
+weighted sum builds a custom context vector for this step:
+</p>
+
+$$ \operatorname{score}(s_i, h_j) = s_i^\top h_j, \qquad
+   \alpha_{ij} = \frac{\exp(\operatorname{score}(s_i, h_j))}{\sum_{j'=1}^{T}\exp(\operatorname{score}(s_i, h_{j'}))},
+   \qquad c_i = \sum_{j=1}^{T} \alpha_{ij} h_j. $$
+
+<p>
+Read the three pieces left to right: score everything, normalize the scores
+into a probability distribution over positions (the same softmax we built in
+the logistic-regression lecture, doing the same job), then blend the states
+with those probabilities. No single vector ever has to summarize the whole
+input again, because each decoder step retrieves exactly what it needs, from
+wherever it sits.
+</p>
+
+<h3>Self-attention: queries, keys, and values</h3>
+
+<p>
+Now drop the encoder-decoder scaffolding and turn the mechanism inward.
+<strong>Self-attention</strong> is attention within one sequence, token to
+token, so "he" can retrieve from "Amir" directly and every token's
+representation becomes aware of its relationships to the rest of the
+sentence. To do that cleanly, each token emits three different vectors,
+because it plays three different roles:
+</p>
+
+<div class="hook-grid">
+  <div class="hook-card">
+    <div class="hook-emoji">🔎</div>
+    <div class="hook-q">Query <span class="m">$q_i$</span></div>
+    <div class="hook-a">What am I looking for? The probe this token sends out when it scans the sentence.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🏷️</div>
+    <div class="hook-q">Key <span class="m">$k_i$</span></div>
+    <div class="hook-a">What do I offer? The label other tokens' queries are matched against.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">📦</div>
+    <div class="hook-q">Value <span class="m">$v_i$</span></div>
+    <div class="hook-a">What do I pass on? The content that actually flows to whoever attends here.</div>
+  </div>
+</div>
+
+<p>
+The mechanics are the same score, softmax, weighted-sum pipeline, with one
+new ingredient:
+</p>
+
+$$ \operatorname{score}(q_i, k_j) = \frac{q_i^\top k_j}{\sqrt{d_k}}, \qquad
+   \alpha_{ij} = \frac{\exp(\operatorname{score}(q_i, k_j))}{\sum_{\ell=1}^{T}\exp(\operatorname{score}(q_i, k_\ell))},
+   \qquad z_i = \sum_{j=1}^{T} \alpha_{ij} v_j. $$
+
+<p>
+The new ingredient is the <span class="m">$1/\sqrt{d_k}$</span>. It is a
+temperature scaling: in high dimensions, dot products between random-ish
+vectors grow with the dimension, and a softmax fed huge scores saturates into
+a one-hot spike with vanishing gradients everywhere else. Dividing by
+<span class="m">$\sqrt{d_k}$</span> keeps the scores numerically moderate
+before the softmax, so the weights stay soft and trainable. You will see the
+effect directly in Fig 1.2's toggle.
+</p>
+
+<h3>The matrix form</h3>
+
+<p>
+Stack the token embeddings as the rows of
+<span class="m">$X \in \mathbb{R}^{T \times d_{\text{model}}}$</span>. Three
+learned projection matrices turn every token's embedding into its query, key,
+and value in one shot, and the whole mechanism collapses to one line:
+</p>
+
+$$ Q = X W_Q, \quad K = X W_K, \quad V = X W_V, \qquad
+   \operatorname{Attention}(Q, K, V) = \operatorname{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V. $$
+
+<p>
+The object in the middle, <span class="m">$\operatorname{softmax}(QK^\top/\sqrt{d_k})$</span>,
+is a <span class="m">$T \times T$</span> matrix worth staring at: entry
+<span class="m">$(i, j)$</span> is how much token <span class="m">$i$</span>
+attends to token <span class="m">$j$</span>, and every row sums to 1. Notice
+what self-attention does and does not change. The shape is preserved,
+<span class="m">$T \times d_{\text{model}}$</span> in and
+<span class="m">$T \times d_{\text{model}}$</span> out, but the meaning is
+transformed: each input row was an independent token embedding, and each
+output row is a context-aware blend of the whole sentence.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one attention row on "Amir went to class"</div>
+  <!-- flagged addition: the source says the slides work a full toy example on
+       "Amir went to class" with N=4, d_model=5, d_k=2 but does not reproduce the
+       matrix entries; the specific X, W_Q, W_K, W_V values here (and in Fig 1.1)
+       are chosen by me to keep the arithmetic clean. The pipeline itself is verbatim. -->
+  <p>Four tokens, <span class="m">$d_{\text{model}} = 5$</span>, <span class="m">$d_k = 2$</span>. Fig 1.1 holds the full <span class="m">$X$</span> and weight matrices; after the projections, the query for "class" and the four keys come out as</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    q<sub>class</sub> = [2, 0]&nbsp;&nbsp;&nbsp;&nbsp;k<sub>Amir</sub> = [2, 0]&nbsp;&nbsp;k<sub>went</sub> = [1, 2]&nbsp;&nbsp;k<sub>to</sub> = [0, 1]&nbsp;&nbsp;k<sub>class</sub> = [2, 2]
+  </p>
+  <p>Dot products, then the <span class="m">$1/\sqrt{2}$</span> scaling:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    raw scores&nbsp;&nbsp;= [4, 2, 0, 4]<br>
+    scaled&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= [4, 2, 0, 4] / &radic;2 = [2.83, 1.41, 0, 2.83]
+  </p>
+  <p>Softmax the scaled scores to get the attention weights, then blend the values <span class="m">$v_{\text{Amir}} = [1,1]$</span>, <span class="m">$v_{\text{went}} = [2,2]$</span>, <span class="m">$v_{\text{to}} = [0,1]$</span>, <span class="m">$v_{\text{class}} = [3,1]$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &alpha; = [0.434, 0.106, 0.026, 0.434]&nbsp;&nbsp;&nbsp;(sums to 1)<br>
+    z<sub>class</sub> = 0.434&middot;[1,1] + 0.106&middot;[2,2] + 0.026&middot;[0,1] + 0.434&middot;[3,1] = [1.949, 1.106]
+  </p>
+  <p>"class" splits its attention almost evenly between "Amir" and itself, nearly ignores "to", and its new representation is a blend dominated by those two value vectors. Step through the exact same numbers, and edit them, in the figure below.</p>
+</div>
+
+<div class="figure" id="fig-qkv">
+  <div class="fig-mount" data-fig="qkv"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the query/key/value builder, this lesson's technical centrepiece. Step through the full pipeline on "Amir went to class": <span class="m">$X$</span>, the projections <span class="m">$Q = XW_Q$</span>, <span class="m">$K = XW_K$</span>, <span class="m">$V = XW_V$</span>, the raw and scaled scores, the softmax attention matrix <span class="m">$A$</span> (rows sum to 1), and the output <span class="m">$O = AV$</span>. Every matrix is computed live; click any cell of <span class="m">$X$</span> to edit it and watch the attention pattern and output re-derive themselves.</p>
+</div>
+
+<div class="figure" id="fig-heatmap">
+  <div class="fig-mount" data-fig="heatmap"></div>
+  <p class="fig-caption"><b>Fig 1.2,</b> the <span class="m">$T \times T$</span> attention matrix as a heatmap for a longer sentence. Hover or focus any cell to read "token <span class="m">$i$</span> attends to token <span class="m">$j$</span>" with its weight; each row is a probability distribution summing to 1. Toggle the <span class="m">$1/\sqrt{d_k}$</span> scaling off and watch the raw scores grow and every row collapse toward a one-hot spike; toggle it back on and the weights stay moderate and soft.</p>
+</div>
+
+<h3>The code</h3>
+
+<p>
+The whole mechanism is four lines of NumPy. Note where the mask argument
+enters; section 4 will use it to change the model family without touching
+anything else:
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def softmax(z):
+    e = np.exp(z - z.max(axis=-1, keepdims=True))
+    return e / e.sum(axis=-1, keepdims=True)
+
+def self_attention(X, Wq, Wk, Wv, M=None):
+    Q, K, V = X @ Wq, X @ Wk, X @ Wv
+    S = Q @ K.T                        # T x T raw scores
+    if M is not None:                  # mask: 0 (allowed) or -inf (forbidden)
+        S = S + M
+    A = softmax(S / np.sqrt(K.shape[1]))   # rows sum to 1
+    return A, A @ V                    # attention matrix, output</code></pre>
+
+<p>
+Do not just read it, run it. The version below executes the same computation
+on the toy sentence:
+</p>
+
+<div class="figure" id="fig-attncode">
+  <div class="fig-mount" data-fig="attncode"></div>
+  <p class="fig-caption"><b>Fig 1.3,</b> a live <code>self_attention</code>. Press Run and the function above executes for real on the "Amir went to class" matrices: the printed <span class="m">$A$</span> and <span class="m">$O$</span> come from the computation, and the "class" row matches the worked example digit for digit. The mask checkbox previews section 4 by passing a causal <span class="m">$M$</span>.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A query is <span class="m">$q = [2, 0]$</span> and the keys are <span class="m">$k_1 = [2, 0]$</span>, <span class="m">$k_2 = [0, 2]$</span>, with <span class="m">$d_k = 2$</span> and values <span class="m">$v_1 = [1, 0]$</span>, <span class="m">$v_2 = [0, 1]$</span>. After the <span class="m">$1/\sqrt{2}$</span> scaling and softmax, what is the attention output <span class="m">$z$</span>, roughly?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$z = [1, 0]$</span>: the softmax picks the best key outright</button>
+    <button data-k="b"><span class="m">$z \approx [0.94, 0.06]$</span>: heavily tilted to <span class="m">$v_1$</span> but still a blend</button>
+    <button data-k="c"><span class="m">$z = [0.5, 0.5]$</span>: softmax always splits evenly</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The scores are <span class="m">$4/\sqrt{2} \approx 2.83$</span> and <span class="m">$0$</span>, so the winner dominates, but a softmax never gives a hard 1 and 0 for finite scores. Attention is a soft retrieval, which is exactly what keeps it differentiable and trainable.</div>
+  <div class="quiz-fb" data-k="b">Right. Scaled scores are <span class="m">$[2.83, 0]$</span>, softmax gives <span class="m">$[0.944, 0.056]$</span>, and the blend is <span class="m">$0.944 \cdot v_1 + 0.056 \cdot v_2 \approx [0.94, 0.06]$</span>. Soft, weighted retrieval: mostly the relevant token, a little of everything else.</div>
+  <div class="quiz-fb" data-k="c">Only identical scores split evenly. Here <span class="m">$q$</span> matches <span class="m">$k_1$</span> and is orthogonal to <span class="m">$k_2$</span>, so the weights tilt hard toward token 1.</div>
+</div>
+
+<details class="check">
+  <summary>Check: what exactly does the 1/&radic;d<sub>k</sub> buy us?</summary>
+  <div>
+    <p>Suppose we deleted the <span class="m">$1/\sqrt{d_k}$</span> from the score. Nothing in the formula becomes ill-defined, so why is it there?</p>
+    <p><b>Answer.</b> It is a temperature control on the softmax. Dot products grow with the dimension of the vectors: at <span class="m">$d_k = 512$</span>, typical scores are an order of magnitude larger than at <span class="m">$d_k = 2$</span>, purely from summing more terms. Feed a softmax scores like 40 and 20 and it returns weights like 0.9999999 and 0.0000001: effectively one-hot. That has two costs. The retrieval loses its softness (no partial credit for second-best matches), and the gradient of the softmax at saturation is nearly zero, so the projections stop learning. Dividing by <span class="m">$\sqrt{d_k}$</span> cancels the dimension-driven growth and keeps the scores numerically moderate, so the weights stay soft and the gradients stay alive. Flip the toggle in Fig 1.2 and read the max score and the row entropy with and without it.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 2. MULTI-HEAD ═══════════════════ -->
+<section id="sec-multihead">
+<h2><span class="secnum">2.</span> Multi-head attention: several lenses at once</h2>
+
+<p>
+One attention head learns one <span class="m">$W_Q, W_K, W_V$</span> triple,
+so it highlights one kind of relationship. But a sentence has several things
+going on at once: who refers to whom, who does what, what follows what, where
+things happen. Asking one head to encode all of those in a single
+<span class="m">$T \times T$</span> pattern is asking one highlighter to mark
+grammar, plot, and geography in the same colour. So run several attention
+operations in parallel, each with its own projections, each a different
+relational <em>lens</em>:
+</p>
+
+$$ Q^{(h)} = X W_Q^{(h)}, \quad
+   A^{(h)} = \operatorname{softmax}\!\left(\frac{Q^{(h)}K^{(h)\top}}{\sqrt{d_k}}\right),
+   \quad O^{(h)} = A^{(h)} V^{(h)}, $$
+$$ \operatorname{MHA}(X) = \operatorname{Concat}(O^{(1)}, \dots, O^{(H)})\, W_O. $$
+
+<p>
+Each head produces its own attention matrix and its own output; the outputs
+are concatenated side by side and a final learned projection
+<span class="m">$W_O$</span> mixes them back down to
+<span class="m">$d_{\text{model}}$</span> columns. Nothing about any single
+head changed; multi-head attention is just <span class="m">$H$</span> copies
+of section 1 plus one linear layer. What you gain is coverage: different
+heads catch different patterns.
+</p>
+
+<div class="figure" id="fig-multihead">
+  <div class="fig-mount" data-fig="multihead"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> four heads, four lenses, one sentence. Switch heads and the attention matrix reorganizes: one head tracks reference (pronoun to name), one tracks actions, one tracks local sequence, one tracks location. The Combine view concatenates the four head outputs and applies <span class="m">$W_O$</span>, all computed live. <!-- flagged addition: the per-head projections here are hand-designed (each head reads a different feature pair) so the four lenses are visible on a toy sentence; the source names the four pattern types but gives no numeric example. --></p>
+</div>
+
+<details class="check">
+  <summary>Check: why several small heads instead of one big one?</summary>
+  <div>
+    <p>Multi-head attention with <span class="m">$H = 4$</span> heads of dimension <span class="m">$d_k$</span> costs about the same as one head of dimension <span class="m">$4 d_k$</span>. What does splitting buy?</p>
+    <p><b>Answer.</b> A single head produces a single <span class="m">$T \times T$</span> weight pattern, so at each position it commits to one blend of the sentence. Four heads produce four independent patterns, so the same token can simultaneously attend to its antecedent through one lens, the verb through another, and its neighbours through a third, as in Fig 2.1. One wide head has more capacity per score but still only one softmax per row; it must average competing relationships into a compromise pattern. Several lenses at once beats one thick lens, which is the source of the name: each head is a different relational view, and <span class="m">$W_O$</span> learns how to combine the views.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. TRANSFORMER BLOCK ═══════════════════ -->
+<section id="sec-block">
+<h2><span class="secnum">3.</span> The transformer block</h2>
+
+<p>
+"Attention Is All You Need" (Vaswani et al., 2017) did something more radical
+than adding attention to an RNN: it removed the recurrence entirely and kept
+only attention. No hidden state carried step to step means no waiting for
+token <span class="m">$t-1$</span>, which makes training massively parallel,
+and that parallelism is what unlocked the scale behind modern LLMs. Worth
+pausing on: the architecture you license when you "buy an LLM" today is
+nearly a decade old. What changed since 2017 is scale, data, and the system
+around the model, a point the second half of this lecture takes seriously.
+</p>
+
+<p>
+But attention alone is not a full layer. Three gaps need filling, and each
+addition earns its seat.
+</p>
+
+<h3>Positional encoding: attention is order-blind</h3>
+
+<p>
+Look back at <span class="m">$\operatorname{softmax}(QK^\top/\sqrt{d_k})V$</span>
+and notice what it never uses: the positions. Shuffle the rows of
+<span class="m">$X$</span> and each token's output is the same blend of the
+same values. That is fatal for language, because order changes meaning:
+"good, not bad" and "bad, not good" contain identical tokens and opposite
+judgements. The fix is to add a position-dependent vector to each embedding,
+<span class="m">$z_i = x_i + p_i$</span>, so the same word at a different
+position presents a different vector to the attention. The original
+transformer uses sinusoids at geometrically spaced frequencies:
+</p>
+
+$$ P_{i, 2j} = \sin\!\left(\frac{i}{10000^{2j/d_{\text{model}}}}\right), \qquad
+   P_{i, 2j+1} = \cos\!\left(\frac{i}{10000^{2j/d_{\text{model}}}}\right). $$
+
+<p>
+Modern LLMs use other schemes, but the role is always the same: inject order.
+See both halves of the claim below, the failure without it and the striped
+structure of the fix:
+</p>
+
+<div class="figure" id="fig-posenc">
+  <div class="fig-mount" data-fig="posenc"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> positional encoding, off and on. Left: with the encoding off, attention computes the identical output vector for "not" in "good, not bad" and "bad, not good", the two sentences are literally indistinguishable to it; switch the encoding on and the outputs separate, all values computed live. Right: the sinusoidal <span class="m">$P$</span> matrix as a heatmap (positions down, dimensions across), fast stripes in early dimensions and slow stripes in later ones, giving every position a unique fingerprint.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why does self-attention need positional encoding when an RNN never did?</p>
+  <div class="quiz-opts">
+    <button data-k="a">RNNs store positions in their gates; attention has no gates</button>
+    <button data-k="b">It is an optional trick that slightly improves accuracy</button>
+    <button data-k="c">An RNN gets order for free by reading tokens one at a time; attention processes all pairs simultaneously and its formula never touches position, so without <span class="m">$P$</span> "good, not bad" and "bad, not good" produce identical representations</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Gates control how much information flows, not where it came from. The RNN's order-awareness comes from its sequential reading, not its gating.</div>
+  <div class="quiz-fb" data-k="b">It is not optional: without it the model cannot represent word order at all, and Fig 3.1 shows two opposite sentences becoming identical. That is a broken model of language, not a small accuracy dip.</div>
+  <div class="quiz-fb" data-k="c">Right. Order was implicit in the RNN's processing sequence. Attention traded that away for parallelism, so order has to be injected back into the data itself, <span class="m">$z_i = x_i + p_i$</span>.</div>
+</div>
+
+<h3>The full block: mix, then process, with safety rails</h3>
+
+<p>
+The second gap: attention only ever computes weighted <em>averages</em> of
+value vectors, so we add a position-wise <strong>feed-forward network</strong>,
+the same two-layer MLP applied to every token independently, to actually
+transform each blended representation. The third gap: deep stacks of anything
+are hard to train, which is backpropagation-lecture territory, so each
+sub-layer is wrapped in a <strong>residual connection</strong> and a
+<strong>normalization</strong>. One transformer block, updating the whole
+sequence in parallel:
+</p>
+
+$$ \tilde{X} = X + P \quad\text{(inject order)} $$
+$$ U = \operatorname{Norm}\!\big(\tilde{X} + \operatorname{MHA}(\tilde{X})\big) \quad\text{(mix across tokens)} $$
+$$ X' = \operatorname{Norm}\!\big(U + \operatorname{FFN}(U)\big), \qquad
+   \operatorname{FFN}(u_i) = W_2\, \sigma(W_1 u_i + b_1) + b_2 \quad\text{(process each token)} $$
+
+<p>
+The division of labour is clean: attention is the only place tokens talk to
+each other, and the FFN is where each token digests what it heard. Walk
+through it, shape by shape:
+</p>
+
+<div class="figure" id="fig-block">
+  <div class="fig-mount" data-fig="block"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> one transformer block, executed step by step on the toy sentence. Each press advances one sub-step, <span class="m">$X \to X + P \to \operatorname{MHA} \to \operatorname{Norm} \to \operatorname{FFN} \to \operatorname{Norm} \to X'$</span>, lighting up the active stage and showing the actual <span class="m">$T \times d_{\text{model}}$</span> matrix at that point, with shapes annotated. Then stack blocks and watch the same sequence get reread, pass after pass. <!-- flagged addition: the MHA output projection, FFN weights, and layer-norm choice inside this demo are fixed values chosen by me so the block computes real numbers end to end; the source specifies the block structure, not toy weights. --></p>
+</div>
+
+<p>
+The stack control at the end of that figure is the right mental model for
+depth. <strong>Stacking blocks is rereading.</strong> Each pass builds on the
+last: early passes resolve tokens, middle passes assemble syntax, later
+passes work at the level of meaning. It is the same spirit as the CNN
+hierarchy from Lecture 11, edges to parts to objects, transplanted to
+language. Depth is how many times the model effectively rereads, and more
+layers buy abstraction at more compute per token.
+</p>
+</section>
+
+<!-- ═══════════════════ 4. FAMILIES ═══════════════════ -->
+<section id="sec-families">
+<h2><span class="secnum">4.</span> Architecture families: same block, different masks</h2>
+
+<p>
+Every headline model you have heard of stacks the block from section 3. The
+differences between the families are wiring, training objective, and above
+all <em>who is allowed to look at whom</em>:
+</p>
+
+<ul>
+  <li><strong>Encoder-only</strong> (BERT, RoBERTa): full bidirectional attention, every token sees the whole sentence. Great for understanding tasks: search, classification, ranking.</li>
+  <li><strong>Decoder-only</strong> (GPT, Llama, Claude): causal left-to-right attention, each token sees only its past. The dominant chat and LLM design: prompt in, text out.</li>
+  <li><strong>Encoder-decoder</strong> (T5, the original translation transformer): read the input with an encoder, generate with a decoder. Natural for "transform A into B": translation, summarization.</li>
+</ul>
+
+<p>
+Here is the elegant part: the core formula is shared, and one extra matrix
+decides the family. A <strong>mask</strong> <span class="m">$M$</span> is
+added to the scores before the softmax, with
+<span class="m">$M_{ij} = 0$</span> where token <span class="m">$i$</span>
+may attend to token <span class="m">$j$</span> and
+<span class="m">$M_{ij} = -\infty$</span> where it may not:
+</p>
+
+$$ A = \operatorname{softmax}\!\left(\frac{QK^\top + M}{\sqrt{d_k}}\right), \qquad
+   M_{ij} = \begin{cases} 0 & i \text{ may attend to } j \\ -\infty & \text{otherwise.}\end{cases} $$
+
+<p>
+A score of <span class="m">$-\infty$</span> exponentiates to exactly zero, so
+forbidden cells vanish from the softmax and the remaining weights renormalize
+over the allowed ones. Encoder-only uses the all-zeros mask; decoder-only
+uses the causal, lower-triangular mask; encoder-decoder combines encoder
+self-attention, masked decoder self-attention, and cross-attention where
+decoder queries meet encoder keys and values. In code:
+</p>
+
+<pre class="code" data-lang="python"><code>def causal_mask(T):
+    M = np.zeros((T, T))
+    M[np.triu_indices(T, k=1)] = -np.inf   # j > i: the future is forbidden
+    return M
+
+A, O = self_attention(X, Wq, Wk, Wv, M=causal_mask(4))</code></pre>
+
+<div class="figure" id="fig-mask">
+  <div class="fig-mount" data-fig="mask"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> one attention computation, two model families. Toggle the mask: full (bidirectional, the encoder-only family, BERT) versus causal (lower-triangular, the decoder-only family, GPT). The mask matrix shows its 0 and <span class="m">$-\infty$</span> entries, the forbidden score cells grey out, and the softmax rows renormalize live over what remains; every row still sums to 1.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the causal mask hits the "went" row</div>
+  <p>Take the toy sentence's second row. Unmasked, "went" scored all four tokens: scaled scores <span class="m">$[0, 1.41, 0.71, 1.41]$</span>, weights <span class="m">$[0.089, 0.365, 0.180, 0.365]$</span>. Apply the causal mask and the "to" and "class" cells get <span class="m">$-\infty$</span>: they exponentiate to zero and disappear. The two surviving scores <span class="m">$[0, 1.41]$</span> renormalize:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &alpha;<sub>went</sub> = [e&#8304;, e&sup1;&#8901;&#8308;&sup1;] / (e&#8304; + e&sup1;&#8901;&#8308;&sup1;) = [1, 4.11] / 5.11 = [0.196, 0.804, 0, 0]<br>
+    z<sub>went</sub> = 0.196&middot;[1,1] + 0.804&middot;[2,2] = [1.804, 1.804]
+  </p>
+  <p>Same formula, same weights matrices, and "went" now writes its representation using only "Amir" and itself. That single change of mask is the entire difference in attention pattern between a BERT-style layer and a GPT-style layer.</p>
+</div>
+
+<p>
+And what is GPT, exactly? A decoder-only transformer trained on next-token
+prediction, the very objective from the language-modeling lecture:
+</p>
+
+$$ L = -\sum_{t=1}^{T} \log p(w_t \mid w_1, \dots, w_{t-1}). $$
+
+<p>
+Not a different attention mechanism, not a new theory of language: the causal
+mask makes every position a training example for "predict the next token",
+and the cross-entropy loss you already know does the rest.
+</p>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">How does the same attention formula produce both BERT-style and GPT-style behaviour?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Only the mask differs: all-zeros <span class="m">$M$</span> gives bidirectional attention (encoder-only), the lower-triangular causal <span class="m">$M$</span> hides the future (decoder-only), and the training objective matches the wiring</button>
+    <button data-k="b">GPT uses a fundamentally different score function suited to generation</button>
+    <button data-k="c">BERT runs attention twice per layer, once in each direction</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. Same <span class="m">$\operatorname{softmax}((QK^\top + M)/\sqrt{d_k})V$</span>, different <span class="m">$M$</span>. The <span class="m">$-\infty$</span> entries exponentiate to zero, so the softmax renormalizes over the allowed tokens, exactly as in Fig 4.1.</div>
+  <div class="quiz-fb" data-k="b">It does not: the score is the same scaled dot product. GPT's generative behaviour comes from the causal mask plus the next-token objective, not from new attention math.</div>
+  <div class="quiz-fb" data-k="c">Bidirectionality is not two passes; it is the absence of a restriction. With <span class="m">$M = 0$</span> everywhere, one attention pass already lets every token see both sides.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. PIPELINE ═══════════════════ -->
+<section id="sec-pipeline">
+<h2><span class="secnum">5.</span> Building useful LLMs: the training pipeline</h2>
+
+<p>
+Now put the architect's hat down and pick up the builder's. A short history
+locates us. 2017: the transformer. 2018: the field splits, BERT takes
+understanding and GPT-1 takes generation. 2019 to 2020: GPT-2 and GPT-3 show
+that scale alone yields few-shot ability and emergent properties nobody
+explicitly trained for. 2022: InstructGPT and ChatGPT make models usable via
+alignment, and the world notices. 2023 onward: open-weight families (Llama,
+Mistral, Qwen), multimodal models, long context, and steadily falling prices.
+The 2022 inflection deserves emphasis because it was <em>not</em> a smarter
+architecture: it was alignment plus product. Capability and usability are
+different investments, and the pipeline below is where usability comes from.
+</p>
+
+<p>
+From raw text to helpful assistant takes three stages, and they are wildly
+unequal in cost:
+</p>
+
+<ol>
+  <li><strong>Pretraining</strong>: predict the next token on internet-scale text. Buys broad knowledge and fluency. This is the expensive step: months on thousands of GPUs, tens of millions of dollars, and it is what you are really paying for in a frontier model.</li>
+  <li><strong>Supervised fine-tuning (SFT)</strong>: imitate curated instruction-answer pairs. Buys instruction following: the difference between a text continuer and something that answers you.</li>
+  <li><strong>Preference tuning (RLHF or DPO)</strong>: learn from human "which answer is better?" comparisons. Buys a helpful, harmless tone and safer refusals.</li>
+</ol>
+
+<div class="figure" id="fig-pipeline">
+  <div class="fig-mount" data-fig="pipeline"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the training-pipeline map. Click each stage for what it buys, what it costs, and its characteristic failure mode: pretraining bakes in stale facts and biases, SFT teaches the style of good answers rather than guaranteed correctness, and preference tuning can induce sycophancy and over-refusal. The bracket marks what "fine-tuning" actually touches: stages 2 and 3, on top of someone else's pretraining.</p>
+</div>
+
+<p>
+Two consequences matter for anyone building on these models. First, SFT and
+preference tuning are comparatively cheap but decide usability and safety, so
+when you "fine-tune" a model you are almost always adjusting behaviour and
+style in stages 2 and 3, not adding knowledge to stage 1. Second, a fluent,
+confident answer is a <em>trained behaviour</em>, not evidence of truth. The
+preference stage rewarded answers people liked, and people like confidence.
+Alignment improves manners and safety; it does not improve factual grounding.
+Grounding is what retrieval (RAG) and evaluation are for, which is precisely
+where section 7 goes.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Your team fine-tunes an open-weight model on your product documentation, and it still confidently misstates last month's pricing change. Which stage failed, and why was this predictable?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The preference-tuning stage: RLHF should have taught it your prices</button>
+    <button data-k="b">Nothing failed: more epochs of fine-tuning will fix it</button>
+    <button data-k="c">No stage failed at its own job: fine-tuning adjusts behaviour and style (stages 2 and 3), while facts live mostly in pretraining, so fresh knowledge needs retrieval at query time, not more tuning</button>
+  </div>
+  <div class="quiz-fb" data-k="a">RLHF teaches tone and preference between answers; it is the wrong tool for injecting facts, and it can even make the confident wrong answer sound more convincing.</div>
+  <div class="quiz-fb" data-k="b">More epochs teach the style of your docs more strongly. SFT learns what good answers look like, not a database of current facts, and next month's pricing change would break it again anyway.</div>
+  <div class="quiz-fb" data-k="c">Right. The pipeline's division of labour makes this failure predictable: pretraining is frozen and stale, tuning shapes behaviour, so current facts must be retrieved and stuffed into the context at query time (RAG). Section 7 prices exactly that pattern out.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. FOUNDATION MODELS ═══════════════════ -->
+<section id="sec-foundation">
+<h2><span class="secnum">6.</span> Foundation models and multimodality</h2>
+
+<p>
+Why did the transformer, of all architectures, take over? Three properties
+compound into <strong>trainability at scale</strong>. <em>Parallelism</em>:
+all positions compute at once, a perfect fit for GPUs, where an RNN's
+step-by-step loop leaves the hardware idle. <em>Direct connections</em>: any
+token reaches any other in one attention step, so no gradient has to survive
+a long relay. <em>Generality</em>: nothing in the block knows what a "token"
+is. It can be a word, an image patch, an audio slice, or a line of code, and
+the same architecture processes all of them.
+</p>
+
+<p>
+That last property is where multimodality comes from. A Vision Transformer
+(ViT) cuts an image into patches and treats the patches like words: embed
+each one, add positions, feed the same block. CLIP trains a text encoder and
+an image encoder to place matching text and images near each other in one
+shared embedding space, which is what makes cross-modal search and
+text-to-image generation possible. Try the tokenizer move yourself:
+</p>
+
+<div class="figure" id="fig-patches">
+  <div class="fig-mount" data-fig="patches"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> an image becomes a sentence. Slide the patch size: the image is cut into patches, each patch is flattened into a token vector, and the resulting sequence (length computed live) feeds the identical transformer block from section 3. Smaller patches mean a longer sequence, a trade-off section 7 will price via the <span class="m">$n^2$</span> attention cost.</p>
+</div>
+
+<p>
+Scale plus generality produced a new kind of artifact. A
+<strong>foundation model</strong> is a model pretrained once at huge cost and
+reused across many tasks, off the shelf, via prompting, fine-tuning, or
+retrieval. Most organizations consume foundation models rather than train
+their own, and that sentence has teeth: it means a core capability of your
+product may come from an external vendor, with their pricing, their
+availability, their deprecation schedule, and their policies. Building on a
+foundation model is a supply-chain decision, the same category of decision as
+choosing a cloud provider or a critical component supplier, and the sane
+response is the same: plan for portability.
+</p>
+
+<details class="check">
+  <summary>Check: why did transformers scale where RNNs could not?</summary>
+  <div>
+    <p>LSTMs were state of the art for a decade and had plenty of parameters available. What specifically stopped "just make the LSTM bigger" from producing GPT-3, and what did the transformer change?</p>
+    <p><b>Answer.</b> Two of the three scaling properties were missing. First, parallelism: an RNN must compute step <span class="m">$t-1$</span> before step <span class="m">$t$</span>, so training time grows with sequence length no matter how many GPUs you buy, while a transformer computes every position of every sequence simultaneously and soaks up all the hardware you give it. Second, direct connections: in an RNN, a gradient linking word 1 to word 500 crosses 499 multiplications, the vanishing-gradient relay from last lecture, while attention connects the two words in one step, so long-range structure is learnable at scale. Add generality (the same block for any token type) and you get an architecture where more compute and more data reliably buy more capability, which is what the scaling laws in section 7 quantify.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. CHOOSING A MODEL ═══════════════════ -->
+<section id="sec-choosing">
+<h2><span class="secnum">7.</span> Choosing a model: cost, context, scaling laws</h2>
+
+<h3>Build, buy, or adapt</h3>
+
+<p>
+Every "we need an LLM" conversation lands on one of three options.
+<strong>Buy</strong> a closed API (GPT, Claude, Gemini): the fastest and
+strongest option, least control, and your data leaves your boundary.
+<strong>Adapt</strong> open weights (Llama, Mistral, Qwen): control, on-prem
+privacy, no per-token vendor fee, but you own the ops burden, the GPUs, the
+serving stack, the upgrades. <strong>Build</strong>, as in pretrain your own:
+almost never justified outside a handful of labs, for reasons the scaling
+numbers below make brutal. And within adapt, keep the two tools straight:
+<strong>fine-tuning changes behaviour and format, not knowledge; RAG injects
+knowledge without retraining.</strong> Most "we need a custom model" requests
+dissolve, on inspection, into prompting plus RAG plus light fine-tuning on a
+strong base.
+</p>
+
+<h3>Tokenization and the cost of a call</h3>
+
+<p>
+The model does not see words; it sees <strong>tokens</strong>, sub-word
+chunks from the same tokenization story as the language-modeling lecture. The
+English rule of thumb is about 1 token per 4 characters, so a 20-page
+document is roughly 12,000 to 15,000 tokens. You pay per token, in and out,
+at different rates:
+</p>
+
+$$ \text{cost} = (\text{tokens in} \times p_{\text{in}}) + (\text{tokens out} \times p_{\text{out}}). $$
+
+<pre class="code" data-lang="python"><code>def cost_per_call(tokens_in, tokens_out, p_in, p_out):
+    # p_in, p_out are dollars per 1M tokens
+    return tokens_in * p_in / 1e6 + tokens_out * p_out / 1e6
+
+cost_per_call(12000, 500, 3.00, 15.00)   # 0.036 + 0.0075 = 0.0435, about $0.044</code></pre>
+
+<p>
+Run the worked example: a support bot that stuffs a 12,000-token product
+manual into every prompt and gets 500 tokens back, at <span class="usd">$</span>3 per million input
+tokens and <span class="usd">$</span>15 per million output tokens, costs
+<span class="m">$12000 \times 3/10^6 + 500 \times 15/10^6 = \$0.036 + \$0.0075 \approx \$0.044$</span>
+per query. Harmless, until you multiply: at 100,000 queries a month that is
+about <span class="usd">$</span>4,400 a month, and the bill is utterly dominated by the stuffed input.
+Now notice what RAG does to it. Retrieve the two relevant paragraphs instead
+of shipping the manual, roughly a 20x cut in input tokens, and the same
+traffic costs about <span class="usd">$</span>930 a month. Feel the arithmetic move:
+</p>
+
+<div class="figure" id="fig-cost">
+  <div class="fig-mount" data-fig="cost"></div>
+  <p class="fig-caption"><b>Fig 7.1,</b> the token and cost calculator. Type or paste text to see the 1-token-per-4-characters estimate; set input and output sizes, prices, and monthly volume, and the cost per call and monthly bill are computed live from the formula above. The preset reproduces the lecture's <span class="usd">$</span>0.044-per-query manual-stuffing example, and the RAG toggle cuts input tokens 20x and reprices the month.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A call sends 8,000 tokens in and receives 1,000 tokens out, at <span class="usd">$</span>2.50 per 1M input and <span class="usd">$</span>10 per 1M output tokens. Cost per call?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="usd">$</span>0.30: (8000 + 1000) tokens at the average price</button>
+    <button data-k="b"><span class="usd">$</span>0.03: <span class="m">$8000 \times 2.5/10^6 + 1000 \times 10/10^6 = 0.02 + 0.01$</span></button>
+    <button data-k="c"><span class="usd">$</span>0.0025: only input tokens are billed</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Averaging the prices double-counts: input and output are billed at their own rates, and the answer is ten times smaller. Recompute each term separately.</div>
+  <div class="quiz-fb" data-k="b">Right, three cents. And note the structure: the input term is twice the output term here, so if this call is stuffing context, retrieval is where the savings live. At a million calls a month this is <span class="usd">$</span>30,000, which is why the formula deserves respect.</div>
+  <div class="quiz-fb" data-k="c">Output tokens are billed too, and typically at a several-times-higher rate, because generating them is the slow sequential part. Both terms count.</div>
+</div>
+
+<h3>The n&sup2; tax on context</h3>
+
+<p>
+Why does everyone obsess over input length? Because self-attention compares
+every token to every other token: the score matrix is
+<span class="m">$T \times T$</span>, so compute and memory grow like
+<span class="m">$n^2$</span> in the sequence length. Double the context, pay
+roughly four times the attention cost. Engineering like FlashAttention cuts
+the memory traffic and makes the constant factors far friendlier, but the
+fundamental <span class="m">$n^2$</span> scaling remains, which is why
+retrieving the right few chunks so often beats brute-forcing a longer
+context:
+</p>
+
+<div class="figure" id="fig-quadratic">
+  <div class="fig-mount" data-fig="quadratic"></div>
+  <p class="fig-caption"><b>Fig 7.2,</b> the <span class="m">$n^2$</span> attention-cost curve against an ideal linear line, both normalized to an 8k-token baseline and computed live. Slide the context length or press Double: doubling <span class="m">$n$</span> multiplies attention compute by 4, and the gap between the curves is the price of every token attending to every other token.</p>
+</div>
+
+<h3>Latency: the decoder is the slow part</h3>
+
+<p>
+One asymmetry to internalize. The encoder side of a call reads all input
+tokens at once, in parallel; the decoder emits output one token at a time,
+each conditioned on the last. So output length drives latency more than input
+length does. Two numbers to watch: <strong>time-to-first-token</strong>, the
+responsiveness a user feels, and <strong>tokens-per-second</strong>, the
+sustained throughput. The standard playbook follows directly: stream tokens
+so users see progress immediately, cap output length, and put smaller, faster
+models on latency-sensitive paths.
+</p>
+
+<h3>Context windows: working memory, not a database</h3>
+
+<p>
+The <strong>context window</strong> is the maximum number of tokens the model
+can consider at once, and everything competes for it: the system prompt, the
+retrieved documents, the conversation so far, and the answer being generated.
+Everything outside the window is invisible, and there is no memory between
+calls unless you re-send it yourself. Bigger windows exist, but they raise
+cost and latency (that <span class="m">$n^2$</span> again), and models often
+attend poorly to the middle of very long inputs, the "lost in the middle"
+effect: material near the start and end gets used, material buried in the
+centre gets skimmed.
+</p>
+
+<div class="figure" id="fig-window">
+  <div class="fig-mount" data-fig="window"></div>
+  <p class="fig-caption"><b>Fig 7.3,</b> the context window as working memory. Grow the conversation and watch the oldest turns fall off the fixed window and become invisible to the model; slide the key fact along the input and its retrieval strength follows the "lost in the middle" curve, strong near the edges and weak in the centre. <!-- flagged addition: the U-shaped retrieval curve drawn here is a stylized illustration of the source's "models often attend poorly to the middle of long inputs", not a measurement. --> A window is working memory, not a database: the durable fix is retrieving the right few chunks per call.</p>
+</div>
+
+<h3>Training compute and scaling laws</h3>
+
+<p>
+Finally, the numbers that explain why pretraining concentrates in a few labs.
+Training cost is roughly (model size) times (tokens seen), and both factors
+are limited by GPUs, memory, and time; frontier runs use thousands of GPUs
+for weeks to months and cost tens of millions of dollars. The surprising
+part is how <em>predictable</em> the returns are: <strong>scaling
+laws</strong> show loss falling smoothly as parameters, data, and compute
+grow, smoothly enough that performance can be budgeted in advance like any
+other engineering quantity.
+</p>
+
+<p>
+The refinement with teeth is <strong>Chinchilla (2022)</strong>: many
+headline models were undertrained, all parameters and not enough data. For a
+fixed compute budget, a smaller model trained on more tokens can beat a
+bigger one trained on fewer. That is why today's strong models are often
+smaller but trained longer, and, as a bonus, cheaper to serve. The buyer's
+version of the lesson: the cheapest model that clears your quality bar is
+often a mid-size, well-trained one, not the biggest name on the price list.
+</p>
+
+<div class="figure" id="fig-chinchilla">
+  <div class="fig-mount" data-fig="chinchilla"></div>
+  <p class="fig-caption"><b>Fig 7.4,</b> the Chinchilla trade-off, qualitatively. Fix a compute budget, then slide the split between parameters and training tokens: the stylized loss curve is computed live and its minimum sits away from the "biggest possible model" end, so an oversized, undertrained model loses to a smaller, longer-trained one. Raise the budget and the whole curve drops, predictably. <!-- flagged addition: the loss surface uses the parametric form L = E + A/N^alpha + B/D^beta from the Chinchilla paper's fit as a stylized illustration; the source states the qualitative law without a formula. --></p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Your assistant's answers degrade once conversations get long, and a colleague proposes upgrading to a model with a 4x larger context window. What does the <span class="m">$n^2$</span> cost say, and what is the alternative?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Attention cost grows 4x, a fair price for 4x the memory</button>
+    <button data-k="b">Nothing changes: context length only affects quality, not cost</button>
+    <button data-k="c">Attention compute grows roughly 16x, latency and price follow, and the middle of the huge window is poorly attended anyway; retrieving the few relevant turns per call is usually better and cheaper</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The cost is quadratic, not linear: 4x the tokens means roughly <span class="m">$4^2 = 16$</span>x the attention compute, before counting the lost-in-the-middle quality problem.</div>
+  <div class="quiz-fb" data-k="b">Every input token is billed and attends to every other, so context length is a first-order driver of both price and latency. Fig 7.2 is the picture.</div>
+  <div class="quiz-fb" data-k="c">Right. Quadratic cost plus weak mid-window attention makes brute-force context an expensive way to get worse recall. A window is working memory; storage and search belong to retrieval.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 8. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">8.</span> Summary and method card</h2>
+
+<p>
+One idea carried the technical half: replace memory with retrieval. A query
+asks, keys answer, a softmax turns match quality into weights, and a weighted
+sum of values builds each token a context-aware representation, all pairs at
+once, in parallel. Multi-head attention runs several relational lenses
+simultaneously; positional encoding puts order back; the feed-forward network
+processes what attention gathered; residuals and normalization make the stack
+trainable; and a single mask matrix decides whether the result behaves like
+BERT, GPT, or a translator. One idea carried the systems half: the model is
+the easy part now. The hard parts of enterprise AI are the data, the cost,
+and the system around the model: the pipeline that makes it usable, the
+tokens that make it expensive, the window that bounds its working memory, and
+the scaling laws that say what a budget can buy.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Attention, Transformers &amp; Foundation Models</div>
+  <table>
+    <tr><th>Assumption</th><td>Useful context can appear anywhere in a sequence, and one pretrained architecture can be reused across many tasks and modalities.</td></tr>
+    <tr><th>Model class</th><td>Stacked transformer blocks: multi-head self-attention, position-wise feed-forward, residuals and normalization, positional information; encoder, decoder, and encoder-decoder variants selected by masking.</td></tr>
+    <tr><th>Learning / selection</th><td>Pretrain at scale with self-supervised objectives (next-token prediction); adapt via prompting, RAG, fine-tuning, and preference tuning; select on quality, cost, latency, data privacy, and portability.</td></tr>
+    <tr><th>Prediction</th><td><span class="m">$\operatorname{Attention}(Q,K,V) = \operatorname{softmax}\!\big((QK^\top + M)/\sqrt{d_k}\big)V$</span> inside each block; decoder-only models generate by sampling the next token repeatedly.</td></tr>
+    <tr><th>Strengths</th><td>Parallel, scalable, modality-flexible, reusable; direct connections between any two positions; strong general-purpose models available without training from scratch.</td></tr>
+    <tr><th>Limitations</th><td>Attention cost grows as <span class="m">$n^2$</span> in context length; data- and compute-hungry; finite context window; may hallucinate fluently; creates vendor and supply-chain dependence.</td></tr>
+    <tr><th>Next step</th><td>From capable models to reliable systems: grounding with RAG, evaluation, monitoring, and LLMOps.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: this is the destination the whole neural
+arc was walking toward. Backpropagation gave us training, CNNs showed that
+architecture should mirror the structure of the data, language modeling
+turned text into prediction, sequence models hit the memory wall, and
+attention dissolved the wall by turning memory into retrieval. What remains,
+beyond this course's finish line, is the systems discipline of making these
+models reliable.
+</p>
+</section>
+
+<!-- ═══════════════════ 9. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">9.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then four transfer questions that ask you to decide and
+justify, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">In self-attention, what are the roles of the query, key, and value vectors that each token emits?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Query is the token's meaning, key is its position, value is its part of speech</button>
+    <button data-k="b">Query is what the token is looking for, key is what it offers for matching, value is the content it passes on to whoever attends to it</button>
+    <button data-k="c">They are three copies of the embedding kept for numerical stability</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Position enters through the positional encoding added to the embedding, not through the key; and none of the three is a part-of-speech tag. Think retrieval: probe, label, content.</div>
+  <div class="quiz-fb" data-k="b">Right. Queries score against keys to decide the weights, and the weights blend values. Three roles, three learned projections of the same embedding.</div>
+  <div class="quiz-fb" data-k="c">They come from three different learned matrices <span class="m">$W_Q, W_K, W_V$</span> precisely so the three roles can differ; identical copies would force a token to offer exactly what it seeks.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">What did each stage of the LLM pipeline buy, and what is each one's characteristic failure mode?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Pretraining buys safety, SFT buys knowledge, RLHF buys speed</button>
+    <button data-k="b">All three stages add knowledge; the later ones add newer knowledge</button>
+    <button data-k="c">Pretraining buys knowledge and fluency but bakes in stale facts and biases; SFT buys instruction-following but learns style, not guaranteed correctness; preference tuning buys helpful, harmless tone but can induce sycophancy and over-refusal</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Backwards on all three: safety work happens in preference tuning, knowledge comes from pretraining, and no stage buys speed (that is serving engineering).</div>
+  <div class="quiz-fb" data-k="b">The later stages are small and cheap compared to pretraining and adjust behaviour, not knowledge. That is exactly why fine-tuning on your docs does not keep a model current.</div>
+  <div class="quiz-fb" data-k="c">Right, and the one-line consequence: a fluent, confident answer is a trained behaviour, not evidence of truth, so grounding needs retrieval and evaluation, not more alignment.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): build, buy, or adapt, and defend it</summary>
+  <div>
+    <p>A hospital network wants an assistant that answers clinicians' questions from its internal care protocols. Requirements: patient data must never leave the hospital's infrastructure, protocols change monthly, the team has solid engineers but no ML research group, and the budget is real but not frontier-lab real. Build, buy, or adapt, and what is the knowledge strategy?</p>
+    <p><b>Answer.</b> Adapt open weights, with RAG carrying the knowledge. The privacy constraint rules out closed APIs in their default form: prompts containing patient context would cross the vendor boundary. Pretraining their own model is out on cost and staffing; it is almost never justified outside a few labs. So: an open-weight model (Llama, Mistral, Qwen class) served on-prem, which trades a per-token vendor fee for an ops burden their engineers can carry. Monthly-changing protocols are the giveaway for the knowledge strategy: fine-tuning changes behaviour and format, not knowledge, and re-tuning every month would still leave facts baked in and stale. Retrieval injects the current protocol text into the context at query time, so an update is a document refresh, not a training run. Light fine-tuning is still sensible for tone and format (clinical style, citation habits), which is exactly what it is good at. This is the standard dissolution: prompting plus RAG plus light fine-tuning on a strong base, and plan for portability so the base model can be swapped when a better one ships.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): when a bigger context window is the wrong fix</summary>
+  <div>
+    <p>A legal-tech team's contract analyzer misses clauses buried deep in long agreements. The proposed fix is upgrading to a model with a 10x larger context window and stuffing entire contracts into every call. Argue the case against, and propose the alternative.</p>
+    <p><b>Answer.</b> Three arguments, in increasing order of severity. Cost: every input token is billed on every call, so 10x the context is roughly 10x the input bill for the same answer, and the attention compute underneath grows like <span class="m">$n^2$</span>, roughly 100x, which shows up as latency and price. Quality: long inputs suffer the lost-in-the-middle effect, and a clause buried at page 40 of 80 is sitting exactly where attention is weakest, so the fix targets the symptom with a mechanism that is weak at the very position causing the symptom. Architecture: a context window is working memory with no persistence between calls; the contract corpus would be re-shipped on every query forever. The alternative is retrieval: index the contracts, embed and search for the clauses relevant to the question, and place those few chunks near the start or end of a modest prompt. That converts an <span class="m">$n^2$</span> brute-force scan into a targeted lookup, cuts input tokens by an order of magnitude (the same 20x arithmetic as Fig 7.1), and puts the critical text where the model attends well. A bigger window is the right tool when the task genuinely needs simultaneous reasoning over the whole document; it is the wrong tool for finding needles.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): the Chinchilla lesson as a buying guide</summary>
+  <div>
+    <p>Two API models clear your quality bar in evaluation: a famous very large model and a mid-size model at a fifth of the per-token price. A stakeholder insists on the large one "because more parameters means more capability". Use the scaling-law story to respond.</p>
+    <p><b>Answer.</b> The premise is the exact error Chinchilla exposed. Loss scales predictably with parameters, data, and compute together, and for a fixed compute budget many large models turn out undertrained: a smaller model trained on more tokens beats a bigger one trained on fewer. Parameter count alone is therefore not a capability ranking, and the market reflects this: today's strong models are often smaller but trained longer, and cheaper to serve precisely because serving cost scales with size. The decision procedure is already in the question: both models clear the quality bar, and the bar is the requirement. Paying 5x per token buys headroom you have measured no need for, on every call, forever. Pick the cheapest model that clears the bar, keep the evaluation harness so the decision can be revisited when either model or the bar changes, and spend the saved budget where this lecture says the real problems live: retrieval, evaluation, and the system around the model.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 6 (transfer): self-attention as a soft k-NN</summary>
+  <div>
+    <p>Way back in Lecture 2, k-nearest-neighbours answered queries by finding similar stored points and combining their labels. Make the analogy to self-attention precise: what plays the role of the query, the stored points, the similarity, and the vote, and what is the crucial difference?</p>
+    <p><b>Answer.</b> The mapping is nearly one-to-one. The query vector <span class="m">$q_i$</span> is the k-NN query point; the keys are the stored points it is compared against; the scaled dot product <span class="m">$q^\top k / \sqrt{d_k}$</span> is the similarity function standing in for negative distance; and the output <span class="m">$z_i = \sum_j \alpha_{ij} v_j$</span> is the vote, a similarity-weighted combination of stored content, with values as the "labels". Two differences matter. First, softness: k-NN makes a hard cut at k neighbours, while the softmax gives every token a nonzero, differentiable weight, a soft k-NN over the sequence, which is what lets gradients flow and the whole thing train end to end. Second, and deeper: k-NN's stored points are fixed training data with a fixed metric, while attention <em>learns</em> its representations. <span class="m">$W_Q$</span> and <span class="m">$W_K$</span> learn what "similar" should mean and <span class="m">$W_V$</span> learns what to return, and the database being queried is the sentence itself, rebuilt at every layer. Retrieval as the organizing idea, from the second lecture of the course to the last.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the capstone. Attention turned "remember everything" into "look it up", the transformer block made that idea stackable and trainable, masks turned one block into three model families, and scale turned the result into foundation models that most of the world consumes rather than builds. The engineering that follows, tokens and prices, context budgets, retrieval, scaling laws, is where ML meets the systems around it, and it is where your work as a practitioner will actually happen. The course started with a dot product deciding which neighbour to trust; it ends with a dot product deciding which word to read. It was retrieval all along.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../sequence-models/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 14: Sequence Models</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../mle-map-bayesian/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 16: MLE, MAP &amp; Bayesian Prediction</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 15 &middot; Attention and Transformers</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

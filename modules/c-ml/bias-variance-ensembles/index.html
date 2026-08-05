@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bias, Variance &amp; Ensembles — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on the bias-variance trade-off and ensemble methods: the decomposition, majority voting, bagging, random forests, AdaBoost, and gradient boosting.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 7 &middot; The ML Bible</div>
+  <h1>Bias, Variance &amp; Ensembles</h1>
+  <p class="lede">
+    Every lecture so far trained one model and hoped for the best. This one asks
+    a sharper question first: when a model misses, is it missing because it is
+    systematically wrong, or because it is unstable? That split, bias versus
+    variance, is the most useful diagnostic in machine learning, and it comes
+    with an exact equation. Then the payoff: if one model is imperfect, train
+    many imperfect models whose mistakes disagree and let them vote. Bagging,
+    random forests, and boosting are three ways of engineering that
+    disagreement, and every claim about them below is computed live, with real
+    resamples, real trees, and real boosting rounds.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: four dart players</a></li>
+    <li><a href="#sec-world">The world behind the dataset</a></li>
+    <li><a href="#sec-bv">Bias, variance, and Bayes error</a></li>
+    <li><a href="#sec-vote">Why combine models</a></li>
+    <li><a href="#sec-bagging">Bagging and random forests</a></li>
+    <li><a href="#sec-boosting">Boosting: AdaBoost and beyond</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> Four dart players</h2>
+
+<p>
+Picture four people at a dartboard. The first lands every dart in a tight
+cluster on the bullseye. The second sprays darts everywhere, but centred on
+the bullseye: shaky hands, honest aim. The third throws a tight, repeatable
+cluster that sits stubbornly up and to the right of the bullseye: steady
+hands, crooked aim. The fourth sprays darts around the wrong spot and has
+both problems at once.
+</p>
+
+<p>
+Here is the translation that powers this whole lecture. The bullseye is the
+true answer. Each dart is a prediction made by a model, and, crucially, each
+dart comes from a model trained on a <em>different dataset</em> drawn from
+the same world. Crooked aim, a cluster centred off target, is
+<strong>bias</strong>. Shaky hands, a cluster that spreads wide, is
+<strong>variance</strong>. They are different failures, they have different
+causes, and they need different cures. Throw a few rounds and check the
+numbers, which are computed from the actual darts:
+</p>
+
+<div class="figure" id="fig-dartboard">
+  <div class="fig-mount" data-fig="dartboard"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the two axes of error. Each throw scatters twelve darts per board from that board's aim and shake settings. The purple dot is the dart centroid, the average prediction: its distance from the bullseye is the bias, and the spread around it is the variance. Note that you cannot tell the two apart from a single dart.</p>
+</div>
+
+<p>
+The last sentence of that caption is the deep one. One dart tells you almost
+nothing about a player. The character of a model, biased or unstable or both,
+only shows up across <em>repeated</em> throws. So before any equation, we
+need to say precisely what "repeated throws" means for a learning algorithm.
+That is section 1. Then section 2 turns the dartboard into an exact equation,
+and sections 3 to 5 build the machinery that fixes each kind of error.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. THE WORLD BEHIND THE DATASET ═══════════════════ -->
+<section id="sec-world">
+<h2><span class="secnum">1.</span> The world behind the dataset</h2>
+
+<p>
+Your dataset feels like a fixed, solid thing. It is not. It is one draw from
+a <strong>population distribution</strong>
+<span class="m">$p_{\text{population}}$</span>, the unknown world your data
+came from. The 80 patients in your study are not "the data"; they are one
+sample of the endless stream of patients the hospital could have seen. Run
+the collection again and you would get a different dataset,
+<span class="m">$D_2$</span> instead of <span class="m">$D_1$</span>, from
+the same world:
+</p>
+
+$$ D_1, D_2, D_3, \dots \sim p_{\text{population}} $$
+
+<p>
+Now train the same algorithm, same hyperparameters, same everything, on each
+of those datasets. You get different models
+<span class="m">$f_1, f_2, f_3, \dots$</span>, because each one fit the
+quirks of its own sample. And here is the idea that unlocks the whole
+lecture: fix a single test input <span class="m">$\hat{x}$</span> and ask
+each model for its prediction. You get a different answer each time. The
+prediction <span class="m">$\hat{y}$</span> at a fixed input is a
+<strong>random variable</strong>, with the randomness coming from which
+dataset the model happened to be trained on. The same logic covers other
+sources of training randomness too, like a random initialization or the
+order of minibatches: rerun the learning process and the prediction moves.
+</p>
+
+<p>
+Once <span class="m">$\hat{y}$</span> is a random variable, we can interrogate
+it like one. What is its average? How much does it spread? That is exactly
+the dartboard, and you can now generate it for real. Below, one press of
+Resample draws a fresh 20-point dataset from a fixed generator and refits a
+polynomial. Old fits linger as ghosts, and at the marked query point you can
+watch the cloud of predictions form:
+</p>
+
+<div class="figure" id="fig-resample">
+  <div class="fig-mount" data-fig="resample"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the prediction as a random variable. Resample a dozen times at degree 1: the fits barely move (low variance) but all miss the curve the same way (high bias). Now sweep to degree 9 and resample again: each fit chases its own sample's noise, and the prediction cloud at <span class="m">$\hat{x}$</span> stretches wide (high variance, low bias). The readouts are the mean, bias, and spread of the actual recorded predictions.</p>
+</div>
+
+<p>
+Play with that figure until the trade shows up in your hands: simple models
+give answers that are stable but stubbornly wrong, and flexible models give
+answers that are right on average but wildly unreliable one dataset at a
+time. Section 2 makes "on average" and "unreliable" into named, additive
+pieces of test error.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. BIAS, VARIANCE, BAYES ═══════════════════ -->
+<section id="sec-bv">
+<h2><span class="secnum">2.</span> Bias, variance, and Bayes error</h2>
+
+<p>
+Three questions fully describe how a learning procedure behaves at one test
+input <span class="m">$x$</span>:
+</p>
+
+<ul>
+  <li><b>Is the average prediction on target?</b> If the mean of <span class="m">$\hat{y}$</span> across retrainings sits away from the best possible answer, the procedure is systematically off. That gap is <strong>bias</strong>.</li>
+  <li><b>How much does the prediction move when I rerun learning?</b> New sample, new initialization, new minibatch order. The wobble across reruns is <strong>variance</strong>.</li>
+  <li><b>How noisy is the target itself?</b> Two identical patients can have different outcomes. No model, however good, can predict noise that is not a function of <span class="m">$x$</span>. That floor is <strong>Bayes error</strong>.</li>
+</ul>
+
+<p>
+For squared-error loss these three are not just a taxonomy, they are an exact
+accounting. Write <span class="m">$y^\star(x) = \mathbb{E}[t \mid x]$</span>
+for the best possible prediction under squared loss, the true average target
+at <span class="m">$x$</span>. Then the expected squared error of the learned
+prediction decomposes exactly:
+</p>
+
+$$ \mathbb{E}\big[(\hat{y} - t)^2 \mid x\big]
+   = \underbrace{\big(\mathbb{E}[\hat{y}\mid x] - y^\star(x)\big)^2}_{\text{Bias}^2}
+   + \underbrace{\operatorname{Var}(\hat{y}\mid x)}_{\text{Variance}}
+   + \underbrace{\operatorname{Var}(t\mid x)}_{\text{Bayes error}} $$
+
+<p>
+Read each term against the dartboard. The expectation and variance of
+<span class="m">$\hat{y}$</span> are taken over reruns of the learning
+procedure, our repeated throws. Bias² asks how far the centroid of the darts
+sits from the bullseye. Variance asks how widely the darts scatter around
+their own centroid. And <span class="m">$\operatorname{Var}(t \mid x)$</span>
+belongs to the target, not to the algorithm: it is the bullseye itself
+jittering between throws, and no player can beat it.
+</p>
+
+<p>
+The diagnostic value comes from what drives each term. High bias means the
+model class is too restrictive or just misspecified for the problem; it
+cannot represent the truth no matter which dataset it sees. That is the
+formal face of <strong>underfitting</strong>. High variance means the model
+is too sensitive to the particular training sample; it can represent the
+truth, but it also represents every accident of the draw. That is
+<strong>overfitting</strong>. Bayes error is unavoidable label noise, and the
+only "fix" is better features or a better measurement process, not a better
+learner. Model selection, meaning choices like complexity, regularization
+strength, and depth limits, is the art of balancing the first two terms for
+low test error and a small generalization gap.
+</p>
+
+<p>
+One honesty note before the picture. This clean additive decomposition is a
+theorem <em>for squared loss only</em>. For 0-1 loss or cross-entropy the
+mathematics comes out differently, and the terms interact. But the diagnostic
+language survives: "too simple", "too sensitive to the sample", and
+"irreducible" are the right categories for every loss we will meet.
+</p>
+
+<p>
+Now watch the accounting happen. The figure below reran the Fig 1.1
+experiment 60 times at each polynomial degree from 0 to 6 and measured each
+term of the decomposition for real. Before it shows you the total, commit to a guess:
+</p>
+
+<div class="figure" id="fig-decomp">
+  <div class="fig-mount" data-fig="decomp"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the decomposition, measured. Bias² (green) falls as the model gains capacity; variance (purple) rises as it gains sensitivity; the Bayes floor <span class="m">$\sigma^2 = 0.0625$</span> never moves. Click the degree you would ship. Only then does the orange total appear, with the computed sweet spot where the falling and rising curves trade places.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A degree-0 polynomial (a constant) and a degree-9 polynomial are both trained on many resampled datasets. Which decomposition term is large for each, and which term would stay even with a perfect model?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Degree 0 suffers high variance, degree 9 high bias; Bayes error can be removed with enough data</button>
+    <button data-k="b">Degree 0 suffers high bias² (too restrictive, underfits), degree 9 high variance (too sensitive, overfits); Bayes error remains for any model</button>
+    <button data-k="c">Both suffer equally from bias and variance; only the Bayes error differs between them</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Backwards on the first two. A constant cannot bend toward the truth no matter the sample, so its error is systematic (bias); a degree-9 fit bends to every accident of the sample, so its error is instability (variance).</div>
+  <div class="quiz-fb" data-k="b">Right. Too-simple means restrictive, which is bias² and underfitting; too-flexible means sample-sensitive, which is variance and overfitting; and <span class="m">$\operatorname{Var}(t\mid x)$</span> comes from the target itself, so no model, and no amount of data, removes it.</div>
+  <div class="quiz-fb" data-k="c">Check Fig 2.1: the green and purple curves are dramatically different at the two ends. Bayes error is the one term that is identical for every model, not the one that differs.</div>
+</div>
+
+<details class="check">
+  <summary>Check: depth limits, minimum leaf sizes, and pruning in bias-variance language</summary>
+  <div>
+    <p>Decision trees come with knobs: a maximum depth, a minimum number of samples per leaf, and post-training pruning. Restate what each knob does using bias and variance.</p>
+    <p><b>Answer.</b> All three knobs push the same direction: they restrict the tree, trading variance down for bias up. A depth limit caps how many rules the tree can stack, so it cannot carve a region around every noisy point (variance falls), but it also cannot express fine real structure (bias rises). A minimum leaf size forces every prediction to average over several training points, which is exactly variance reduction by averaging, at the cost of blurring real distinctions near boundaries. Pruning removes branches whose splits do not validate, deleting the parts of the tree most likely to be fitted noise. An unrestricted tree sits at the far right of Fig 2.1: tiny bias, huge variance. That location is exactly why trees are the favourite base model for the averaging trick of section 4.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. WHY COMBINE MODELS ═══════════════════ -->
+<section id="sec-vote">
+<h2><span class="secnum">3.</span> Why combine models</h2>
+
+<p>
+Here is the big idea of the second half of this lecture. Instead of asking
+one model to get everything right, combine many imperfect models whose
+mistakes are not identical. An <strong>ensemble</strong> is a set of base
+models combined by voting, averaging, or weighted voting. The simplest
+combiner is <strong>majority vote</strong>: every model predicts, and the
+class with the most votes wins,
+</p>
+
+$$ \hat{y} = \operatorname*{arg\,max}_{c \in C}
+   \sum_{j=1}^{M} \mathbb{I}\big(f_j(\hat{x}) = c\big) $$
+
+<p>
+where <span class="m">$\mathbb{I}(\cdot)$</span> is the indicator function
+that counts each model's vote for class <span class="m">$c$</span>. Why
+should a committee of mediocre models beat its members? Because for the
+majority to be wrong, <em>more than half the models must be wrong on the
+same input at the same time</em>. If each model errs with probability
+<span class="m">$\epsilon &lt; 0.5$</span> and the errors are
+<strong>independent</strong>, that simultaneous failure is a coincidence, and
+its probability is a binomial tail that collapses as the committee grows.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the binomial tail</div>
+  <p><b>Warm-up, <span class="m">$N = 3$</span> voters, <span class="m">$\epsilon = 0.3$</span>.</b> The majority errs when 2 or 3 models err together:</p>
+  $$ P(\text{majority wrong})
+     = \binom{3}{2}(0.3)^2(0.7) + (0.3)^3
+     = 3(0.09)(0.7) + 0.027 = 0.189 + 0.027 = 0.216 $$
+  <p>Three mediocre models voting already beat one mediocre model: 0.216 versus 0.3.</p>
+  <p><b>The lecture's example, <span class="m">$N = 21$</span>, <span class="m">$\epsilon = 0.3$</span>.</b> Now the majority errs only when 11 or more err at once:</p>
+  $$ P(\text{majority wrong}) = \sum_{k=11}^{21} \binom{21}{k} (0.3)^k (0.7)^{21-k} \approx 0.026 $$
+  <p>The largest term, <span class="m">$k = 11$</span>, is <span class="m">$\binom{21}{11}(0.3)^{11}(0.7)^{10} = 352716 \times (1.77 \times 10^{-6}) \times 0.0282 \approx 0.018$</span>, and the rest of the tail adds about 0.009. Twenty-one classifiers that are each wrong 30% of the time make a committee that is wrong 2.6% of the time. That is not a small improvement; it is an order of magnitude, bought purely with arithmetic.</p>
+</div>
+
+<p>
+The catch is the word <em>independent</em>, and it deserves suspicion. If all
+21 models were trained the same way on the same data, their errors are nearly
+identical, they all fail on the same hard inputs together, and the vote
+recounts one opinion 21 times. The binomial argument needs models whose
+datasets still come from the same
+<span class="m">$p_{\text{population}}$</span>, answering the same question,
+but whose failures are genuinely different coincidences. Feel both effects:
+</p>
+
+<div class="figure" id="fig-vote">
+  <div class="fig-mount" data-fig="vote"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the majority-vote calculator. Set <span class="m">$\epsilon = 0.30$</span>, <span class="m">$N = 21$</span> and read 0.026 off the real binomial tail. Then raise the correlation slider: as errors become shared rather than independent, a floor of <span class="m">$\rho\,\epsilon$</span> appears that no committee size can break through. Independence is not a footnote; it is the whole mechanism.</p>
+</div>
+
+<p>
+This is not just theory with good manners. The team that won the Netflix
+Prize progress award, BellKor, did it with an ensemble of 107 models. The
+rest of this lecture is about the two great strategies for manufacturing
+useful disagreement between models trained on one dataset: train them in
+parallel on perturbed data (bagging, section 4), or train them in sequence,
+each one targeting the mistakes of the last (boosting, section 5).
+</p>
+</section>
+
+<!-- ═══════════════════ 4. BAGGING AND RANDOM FORESTS ═══════════════════ -->
+<section id="sec-bagging">
+<h2><span class="secnum">4.</span> Bagging and random forests</h2>
+
+<p>
+Section 3's argument wants many models trained on many datasets from
+<span class="m">$p_{\text{population}}$</span>. In real life we get exactly
+one dataset <span class="m">$D$</span> and no way to sample the world again.
+<strong>Bagging</strong>, short for bootstrap aggregating, fakes it. A
+<strong>bootstrap</strong> dataset is built by sampling
+<span class="m">$N$</span> points from <span class="m">$D$</span> <em>with
+replacement</em>: same size as the original, but some points appear twice or
+three times and others not at all. Make <span class="m">$m$</span> bootstrap
+datasets, train a base model on each, and combine by averaging (regression)
+or voting (classification). Each model sees a slightly different world, so
+each develops slightly different quirks.
+</p>
+
+<h3>The variance-reduction theorem</h3>
+
+<p>
+Why average? Because averaging is a variance-killing machine, and we can
+prove it with two identities from probability:
+<span class="m">$\operatorname{Var}(aX) = a^2 \operatorname{Var}(X)$</span>
+and
+<span class="m">$\operatorname{Var}(X + Y) = \operatorname{Var}(X) + \operatorname{Var}(Y) + 2\operatorname{Cov}(X, Y)$</span>,
+where the covariance term vanishes when <span class="m">$X$</span> and
+<span class="m">$Y$</span> are independent.
+<!-- Note: the lecture slide writes the second identity with a bare Cov(X,Y)
+     term; the standard identity has 2·Cov(X,Y), used here. -->
+Let <span class="m">$y_1, \dots, y_m$</span> be the predictions of
+<span class="m">$m$</span> models at a fixed input, each with the same mean
+and variance, and let
+<span class="m">$\bar{y} = \frac{1}{m}\sum_i y_i$</span> be the ensemble
+average. Then:
+</p>
+
+$$ \mathbb{E}[\bar{y}] = \mathbb{E}[y_i] \quad (\text{bias unchanged}), \qquad
+   \operatorname{Var}[\bar{y}]
+   = \frac{1}{m^2}\sum_{i=1}^{m}\operatorname{Var}[y_i]
+   = \frac{1}{m}\operatorname{Var}[y_i] \quad (\text{if independent}) $$
+
+<p>
+Read the two halves separately, because they are the headline of this whole
+section. The mean of the average is the mean of any one model:
+<em>bagging does not touch bias</em>. If every tree is crooked the same way,
+their average is exactly that crooked. But the variance of the average is the
+single-model variance cut by a factor of <span class="m">$m$</span>,
+<em>when the models are independent</em>. In practice they are not, they all
+resample the same <span class="m">$D$</span>, so the covariance terms do not
+vanish and the real reduction is smaller than <span class="m">$1/m$</span>.
+Smaller, but still large, which is why bagging is a strong black-box recipe
+that works with no tuning of the base model at all.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: variance of an average</div>
+  <p>Say one deep tree's prediction at some input has variance <span class="m">$\operatorname{Var}[y_i] = 0.40$</span> across retrainings. Average <span class="m">$m = 10$</span> independent such trees:</p>
+  $$ \operatorname{Var}[\bar{y}]
+     = \operatorname{Var}\!\Big[\tfrac{1}{10}\textstyle\sum_i y_i\Big]
+     = \tfrac{1}{100}\sum_{i=1}^{10}\operatorname{Var}[y_i]
+     = \tfrac{1}{100}(10 \times 0.40) = 0.04 $$
+  <p>The <span class="m">$\tfrac{1}{m^2}$</span> comes from pulling the <span class="m">$\tfrac{1}{10}$</span> out of the variance (it squares), and the sum contributes only <span class="m">$m$</span> variance terms because independence kills every covariance term. Ten times less variance, identical bias. If the trees are correlated, the killed covariance terms come back and the 0.04 creeps upward, which Fig 3.1's correlation slider already showed you from the voting side.</p>
+</div>
+
+<p>
+Now watch the theorem run on real trees. Every tree below is genuinely
+trained on a real bootstrap resample, and the variance readout is measured by
+building many independent bags and watching their answers disagree:
+</p>
+
+<div class="figure" id="fig-bagging">
+  <div class="fig-mount" data-fig="bagging"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> bagging, live. At <span class="m">$m = 1$</span> the boundary is one tree's jagged guess, and the variance at the &times; probe is large. Slide <span class="m">$m$</span> up: the faint single-tree boundaries still disagree with each other, the orange averaged boundary settles, and the measured variance falls, tracking (but not quite reaching) the <span class="m">$\operatorname{Var}/m$</span> benchmark because bootstrap trees are correlated. The mean prediction readout barely moves: bias stays put.</p>
+</div>
+
+<p>
+The base model matters, and the decomposition says exactly how. Bagging cuts
+variance and leaves bias alone, so it helps most when the base model's error
+<em>is</em> variance. A deep, unpruned decision tree is the perfect victim:
+almost no bias, enormous variance, sitting at the far right of Fig 2.1. A
+logistic regression model is the opposite: a stable, low-variance,
+possibly-biased linear boundary. Bag it and you average nearly identical
+lines into the same line. The code is almost insulting in its simplicity:
+</p>
+
+<pre class="code" data-lang="python"><code>def bag(models, X):
+    # each model votes ±1; the bag averages the votes and takes the sign
+    preds = np.stack([m.predict(X) for m in models])   # shape (m, N)
+    return np.sign(preds.mean(axis=0))                 # equal-vote average</code></pre>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Bagging 100 deep decision trees improves accuracy a lot, but bagging 100 logistic regression models barely helps. Why, in bias-variance terms?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Logistic regression is already the best possible model, so nothing can improve it</button>
+    <button data-k="b">Trees are nonlinear, and bagging only works on nonlinear models</button>
+    <button data-k="c">Averaging reduces variance and leaves bias alone; deep trees are low-bias high-variance (much to reduce), logistic regression is low-variance (almost nothing to reduce, and its bias survives the average)</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Logistic regression has real bias whenever the true boundary is not linear. The point is that bagging cannot remove that bias, not that there is nothing to remove.</div>
+  <div class="quiz-fb" data-k="b">Bagging's math never mentions linearity. The averaging identity applies to any predictions; what differs is how much variance there is to cut.</div>
+  <div class="quiz-fb" data-k="c">Exactly. <span class="m">$\mathbb{E}[\bar{y}] = \mathbb{E}[y_i]$</span> says the bias survives untouched, and <span class="m">$\operatorname{Var}[\bar{y}] \approx \operatorname{Var}[y_i]/m$</span> says variance is what shrinks. Bagging is a variance treatment, so it needs a high-variance patient. Retrained logistic regressions land on nearly the same line every time, so their average is that same line.</div>
+</div>
+
+<h3>Random forests: bagging plus a second dice roll</h3>
+
+<p>
+Bagging's weak spot is that correlation. Bootstrap resamples overlap heavily,
+so bagged trees tend to pick the same strong features for their top splits
+and end up making correlated mistakes, and correlated mistakes, as Fig 3.1
+showed, are the ones voting cannot fix. A <strong>random forest</strong> is
+bagged decision trees with a second randomness source aimed squarely at this
+problem: <strong>feature subsampling</strong>. At every split of every tree,
+the tree may only consider a random subset of the features. A tree that is
+sometimes forbidden from using the dominant feature is forced to find other
+structure, so different trees make different mistakes, their errors cancel
+better, and the ensemble variance falls further. Aggregate by majority vote
+for classification or averaging for regression, exactly as before.
+</p>
+
+<div class="figure" id="fig-forest">
+  <div class="fig-mount" data-fig="forest"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> one deep tree against a forty-tree forest on the same data. The single tree carves axis-aligned boxes around individual noisy points; the forest's averaged vote is smooth. Toggle feature subsampling and watch the measured average tree-to-tree correlation drop, and the held-out test accuracy respond. Decorrelation is the entire job of the second dice roll.</p>
+</div>
+
+<details class="check">
+  <summary>Check (coding): finish the bagging pipeline</summary>
+  <div>
+    <p>Complete the missing line so the function trains <span class="m">$m$</span> trees on bootstrap resamples. <code>resample(X, t)</code> should return a dataset of the same size, sampled with replacement.</p>
+    <pre class="code" data-lang="python"><code>def train_bag(X, t, m):
+    models = []
+    for i in range(m):
+        Xb, tb = resample(X, t)      # &lt;-- write this function
+        models.append(DeepTree().fit(Xb, tb))
+    return models</code></pre>
+    <p><b>Answer.</b></p>
+    <pre class="code" data-lang="python"><code>def resample(X, t):
+    N = len(t)
+    idx = np.random.randint(0, N, size=N)   # N draws WITH replacement
+    return X[idx], t[idx]</code></pre>
+    <p>The one-line heart of it is <code>with replacement</code>: sampling without replacement at full size would return the original dataset every time, giving <span class="m">$m$</span> identical trees and an ensemble that is pure ceremony. Each bootstrap draw leaves out roughly 37% of the points (each point is missed with probability <span class="m">$(1 - 1/N)^N \approx e^{-1}$</span>), and that missing third is what makes the trees disagree.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 5. BOOSTING ═══════════════════ -->
+<section id="sec-boosting">
+<h2><span class="secnum">5.</span> Boosting: AdaBoost and beyond</h2>
+
+<p>
+Bagging attacks variance with parallel, independent averaging. Boosting is
+the other strategy, and it is almost philosophically opposite. First, two
+definitions. A <strong>weak learner</strong> is a model that is only slightly
+better than chance, say 55% accuracy on a two-class problem; a decision stump
+(a one-split tree) is the classic example. A <strong>strong learner</strong>
+is a highly accurate model. Boosting's promise sounds like alchemy: combine
+enough weak learners, correctly, and you get a strong one.
+</p>
+
+<p>
+The "correctly" is <em>sequential training with reweighting</em>. Where
+bagging trains its models simultaneously and independently, boosting trains
+them one at a time, and each new learner is pointed at the examples the
+ensemble so far gets wrong. Points carry weights; mistakes make weights grow;
+the next learner, trained on the weighted data, has no choice but to attend
+to the hard cases.
+</p>
+
+<h3>AdaBoost, precisely</h3>
+
+<p>
+At round <span class="m">$m$</span>, every training point
+<span class="m">$n$</span> carries a weight
+<span class="m">$w_m^{(n)} &gt; 0$</span>, initially equal. Train a weak
+learner <span class="m">$y_m$</span> on the weighted data, then measure how
+badly it did <em>in weighted terms</em>:
+</p>
+
+$$ \epsilon_m = \frac{\sum_{n=1}^{N} w_m^{(n)}\,
+   \mathbb{I}\big[y_m(x^{(n)}) \neq t^{(n)}\big]}{\sum_{n=1}^{N} w_m^{(n)}} $$
+
+<p>
+This is an error rate where heavy points count more: fail a point of weight
+0.5 and you eat half the maximum error at once. From it, compute the
+learner's quality, which will be its voting weight, requiring
+<span class="m">$0 \le \epsilon_m &lt; 0.5$</span>:
+</p>
+
+$$ \alpha_m = \ln\!\left(\frac{1 - \epsilon_m}{\epsilon_m}\right) $$
+
+<p>
+Study this function's two ends, because they are the design. As
+<span class="m">$\epsilon_m \to 0.5$</span>, the learner is barely better
+than a coin flip and <span class="m">$\alpha_m \to 0$</span>: a near-useless
+learner gets a near-zero vote. As <span class="m">$\epsilon_m \to 0$</span>,
+<span class="m">$\alpha_m \to \infty$</span>: a learner that aces the
+weighted data earns an enormous vote. (Some texts define
+<span class="m">$\alpha_m$</span> with an extra factor of
+<span class="m">$\tfrac{1}{2}$</span>; the convention pairs with the form of
+the weight update, and the algorithm is the same.) Then raise the stakes on
+whatever this learner got wrong:
+</p>
+
+$$ w_{m+1}^{(n)} = w_m^{(n)}
+   \exp\!\big(\alpha_m\, \mathbb{I}\big[y_m(x^{(n)}) \neq t^{(n)}\big]\big)
+   = \begin{cases} w_m^{(n)} & y_m(x^{(n)}) = t^{(n)} \\[2pt]
+     w_m^{(n)}\, e^{\alpha_m} & y_m(x^{(n)}) \neq t^{(n)} \end{cases} $$
+
+<p>
+Correct points keep their weight; misclassified points get multiplied by
+<span class="m">$e^{\alpha_m}$</span>, and the multiplier is largest exactly
+when the learner was good, because a good learner's mistakes are the truly
+hard examples. After <span class="m">$M$</span> rounds, predict with a
+<strong>weighted vote</strong>, with labels coded as
+<span class="m">$\pm 1$</span>:
+</p>
+
+$$ Y_M(x) = \operatorname{sign}\!\left( \sum_{m=1}^{M} \alpha_m\, y_m(x) \right) $$
+
+<p>
+Put that next to bagging's combiner,
+<span class="m">$Y_M(x) = \operatorname{sign}\big(\sum_m y_m(x)\big)$</span>,
+and the contrast is one symbol: bagging gives every model an equal vote,
+boosting pays each model by quality. The full algorithm is four lines.
+Initialize <span class="m">$w_1^{(n)} &gt; 0$</span>; for
+<span class="m">$m = 1, \dots, M$</span> train <span class="m">$y_m$</span>
+on the weighted data, compute <span class="m">$\epsilon_m$</span>, set
+<span class="m">$\alpha_m = \ln\frac{1-\epsilon_m}{\epsilon_m}$</span>,
+update the weights; predict with the weighted vote. Stop after
+<span class="m">$M$</span> rounds, or when validation stops improving, or
+when no weak learner with <span class="m">$\epsilon_m &lt; 0.5$</span> can be
+found.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one full AdaBoost round</div>
+  <p>Five points on a line, <span class="m">$x = 1, 2, 3, 4, 5$</span>, labels <span class="m">$t = +1, +1, -1, +1, -1$</span>, all weights starting at <span class="m">$w_1^{(n)} = 0.2$</span>. Take the stump "predict <span class="m">$+1$</span> if <span class="m">$x &lt; 2.5$</span>, else <span class="m">$-1$</span>". It gets points 1, 2, 3, 5 right and misses only point 4.</p>
+  <p><b>Weighted error:</b> only point 4's weight is in the numerator,</p>
+  $$ \epsilon_1 = \frac{0.2}{0.2+0.2+0.2+0.2+0.2} = \frac{0.2}{1.0} = 0.2 $$
+  <p><b>Learner quality:</b></p>
+  $$ \alpha_1 = \ln\!\left(\frac{1 - 0.2}{0.2}\right) = \ln 4 \approx 1.386 $$
+  <p><b>Weight update:</b> the four correct points keep <span class="m">$w = 0.2$</span>; point 4 becomes</p>
+  $$ w_2^{(4)} = 0.2 \times e^{1.386} = 0.2 \times 4 = 0.8 $$
+  <p>Renormalizing the new total <span class="m">$0.2 \times 4 + 0.8 = 1.6$</span> to sum to one gives <span class="m">$0.125$</span> for each correct point and <span class="m">$0.8 / 1.6 = 0.5$</span> for point 4. One round ago, point 4 held 20% of the ensemble's attention; now it holds 50%, and the round-2 stump will be chosen to fix it. That is the entire mechanism of boosting in one number.</p>
+</div>
+
+<p>
+Now watch the mechanism run on 2-D data, where each round really trains the
+best available stump on the current weights:
+</p>
+
+<div class="figure" id="fig-adaboost">
+  <div class="fig-mount" data-fig="adaboost"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> AdaBoost round by round. Dot area is the current weight. Step: the round's best stump appears dashed, its <span class="m">$\epsilon_m$</span> and <span class="m">$\alpha_m$</span> are computed in the log, its mistakes get red rings and swell by <span class="m">$e^{\alpha_m}$</span>, and the shaded weighted-vote boundary bends. Single stumps can only draw one straight line each, yet the ensemble carves a staircase around a diagonal problem.</p>
+</div>
+
+<p>
+Run the same arithmetic yourself. The exercise below is the weight update
+from the worked example, live: pick a stump, run the round, apply the update,
+and then find the stump the new weights force you toward.
+</p>
+
+<div class="figure" id="fig-adacode">
+  <div class="fig-mount" data-fig="adacode"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the weight update as a runnable exercise. With the default <span class="m">$\theta = 2.5$</span> rule the output reproduces the worked example exactly: <span class="m">$\epsilon = 0.2$</span>, <span class="m">$\alpha = \ln 4 \approx 1.386$</span>, and point 4 jumping to half the total weight. Apply the update, then try to beat <span class="m">$\epsilon = 0.5$</span> on the reweighted data.</p>
+</div>
+
+<p>The loop in full, faithful to the equations above:</p>
+
+<pre class="code" data-lang="python"><code>def adaboost(X, t, M):
+    N = len(t)
+    w = np.ones(N) / N                       # 1. equal initial weights
+    learners, alphas = [], []
+    for m in range(M):
+        h = train_weak(X, t, w)              # 2. fit to the weighted data
+        wrong = h.predict(X) != t
+        eps = (w * wrong).sum() / w.sum()    # weighted error rate
+        if eps >= 0.5: break                 # no weak learner left
+        alpha = np.log((1 - eps) / eps)      # learner quality
+        w = w * np.exp(alpha * wrong)        # grow the mistakes
+        learners.append(h); alphas.append(alpha)
+    return learners, alphas   # predict: sign(sum(a * h.predict(x)))</code></pre>
+
+<p>
+Boosting earned its reputation in production long ago. Viola and Jones
+(2004) built real-time face detection out of AdaBoost with two twists: the
+weak classifiers were nothing more than comparisons of total pixel intensity
+between two rectangular image regions, and the loss was asymmetric, because
+missing a face costs more than a false alarm on background. Thousands of
+laughably weak learners, boosted, gave the face detector that shipped in
+cameras for a decade.
+</p>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">How does boosting differ from bagging in mechanism, and which error component does boosting primarily attack?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Boosting trains sequentially, reweighting hard examples, and combines by quality-weighted vote; it primarily reduces bias, which is why deliberately weak, high-bias base models suit it</button>
+    <button data-k="b">Boosting is bagging with more models; both mainly reduce variance, so both want deep trees as base models</button>
+    <button data-k="c">Boosting trains in parallel on bootstrap resamples and votes equally; it reduces Bayes error</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right on both. The sequential reweighting lets the ensemble represent structure no single stump can (watch Fig 5.1 carve a diagonal out of straight lines): that is capacity being added, bias being removed. Hand boosting an already-flexible model and you mostly feed its appetite for overfitting.</div>
+  <div class="quiz-fb" data-k="b">Every clause differs. Bagging: parallel, independent resamples, equal votes, variance reduction, wants low-bias high-variance bases. Boosting: sequential, reweighted data, α-weighted votes, bias reduction, wants weak high-bias bases.</div>
+  <div class="quiz-fb" data-k="c">That is bagging's training scheme, not boosting's. And Bayes error is the one component no ensemble of any kind can reduce; it lives in the target.</div>
+</div>
+
+<details class="check">
+  <summary>Check (math): one α and two weight updates, by hand</summary>
+  <div>
+    <p>At some round the weak learner's weighted error is <span class="m">$\epsilon_m = 0.25$</span>. Compute <span class="m">$\alpha_m$</span>, then update two points that both currently have weight <span class="m">$0.1$</span>: point A was classified correctly, point B was not.</p>
+    <p><b>Answer.</b> <span class="m">$\alpha_m = \ln\frac{1 - 0.25}{0.25} = \ln 3 \approx 1.099$</span>. Point A keeps its weight: <span class="m">$w_A \to 0.1$</span>, because the indicator in the exponent is 0 and <span class="m">$e^0 = 1$</span>. Point B is multiplied by <span class="m">$e^{\alpha_m} = e^{\ln 3} = 3$</span>: <span class="m">$w_B \to 0.1 \times 3 = 0.3$</span>. Sanity checks worth internalizing: the multiplier <span class="m">$e^{\alpha_m} = \frac{1-\epsilon_m}{\epsilon_m}$</span> is exactly the correct-to-wrong odds of the learner, and a smaller <span class="m">$\epsilon_m$</span> would have punished B's weight even harder.</p>
+  </div>
+</details>
+
+<h3>Gradient boosting: fit whatever is left</h3>
+
+<p>
+AdaBoost is one member of a bigger family. The general view, called
+<strong>gradient boosting</strong>, builds an additive model one term at a
+time:
+</p>
+
+$$ F_m(x) = F_{m-1}(x) + \eta\, h_m(x) $$
+
+<p>
+where <span class="m">$\eta$</span> is a learning rate and each new weak
+learner <span class="m">$h_m$</span> is trained to fix the current model's
+remaining error. For squared-error regression, "remaining error" is
+beautifully literal. The <strong>residual</strong> is what the current model
+has not yet explained,
+</p>
+
+$$ r_m^{(n)} = t^{(n)} - F_{m-1}(x^{(n)}) $$
+
+<p>
+and the new learner's training targets <em>are the residuals</em>. Start with
+a constant, fit a stump to what is left, add it, fit a stump to what is left
+now, and repeat. Each round the residuals shrink toward pure noise, and the
+sum of all the small corrections becomes an accurate model:
+</p>
+
+<div class="figure" id="fig-gradboost">
+  <div class="fig-mount" data-fig="gradboost"></div>
+  <p class="fig-caption"><b>Fig 5.3,</b> gradient boosting on 1-D regression. Top: the running model <span class="m">$F_m$</span>, which begins as the flat mean of the targets. Bottom: the current residuals <span class="m">$t - F_{m-1}$</span> in red and the real stump fitted to them in purple, added at strength <span class="m">$\eta$</span> on each Step. Lower <span class="m">$\eta$</span> takes smaller, safer steps and needs more rounds.</p>
+</div>
+
+<pre class="code" data-lang="python"><code>def gradient_boost(X, t, M, eta):
+    F = np.full(len(t), t.mean())        # F_0: a constant model
+    stumps = []
+    for m in range(M):
+        r = t - F                        # residuals: the unexplained part
+        h = fit_stump(X, r)              # weak learner fits the residuals
+        F = F + eta * h.predict(X)       # F_m = F_{m-1} + eta * h_m
+        stumps.append(h)
+    return stumps</code></pre>
+
+<p>
+This recipe, plus regularization and serious engineering, is XGBoost,
+LightGBM, and CatBoost, the gradient-boosted tree libraries that have
+dominated tabular-data competitions for a decade. When someone says "just
+throw XGBoost at it", this loop is what they are throwing.
+</p>
+
+<p>
+One final side-by-side, because the exam question "compare bagging and
+boosting" deserves a picture rather than a paragraph:
+</p>
+
+<div class="figure" id="fig-contrast">
+  <div class="fig-mount" data-fig="contrast"></div>
+  <p class="fig-caption"><b>Fig 5.4,</b> the two ensembling philosophies. Bagging: parallel training on bootstrap resamples, one equal vote each, variance reduction. Boosting: sequential training where each model inherits the last one's reweighted mistakes, votes proportional to quality (the α bars come from a real 5-round run), bias reduction. Press Train and watch the order of operations differ.</p>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">6.</span> Summary and method card</h2>
+
+<p>
+The through-line of this lecture is generalization: checking that a model
+learned real structure rather than the accidents of one sample. Bias-variance
+gives the diagnosis a precise grammar. Bias is systematic error from a model
+class too restrictive for the truth; variance is instability from a model too
+sensitive to its particular sample; Bayes error is the noise floor nothing
+can beat; and for squared loss the three add up exactly. Ensembles are the
+treatment. Bagging trains in parallel on bootstrap resamples and averages,
+cutting variance by up to <span class="m">$1/m$</span> while leaving bias
+alone; random forests add feature subsampling to decorrelate the trees and
+cut variance further. Boosting trains in sequence, reweighting hard examples
+and paying each weak learner a vote of
+<span class="m">$\alpha_m = \ln\frac{1-\epsilon_m}{\epsilon_m}$</span>,
+building capacity round by round and cutting bias, which is how weak learners
+become a strong one. And underneath all of it sits section 3's single
+mechanism: combining only helps when the combined models' mistakes are not
+the same mistakes.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Ensemble Methods</div>
+  <table>
+    <tr><th>Assumption</th><td>One model may be too unstable, too biased, or too sensitive to the exact training sample; several imperfect models can disagree usefully.</td></tr>
+    <tr><th>Model class</th><td>A set of base predictors combined by voting, averaging, or weighted voting.</td></tr>
+    <tr><th>Learning / selection</th><td>Create diversity: resample the data (bagging), randomize features (random forests), reweight examples and train sequentially (boosting).</td></tr>
+    <tr><th>Prediction</th><td>Bagging / forests: equal vote or average, <span class="m">$\operatorname{sign}(\sum_m y_m)$</span>. Boosting: quality-weighted vote, <span class="m">$\operatorname{sign}(\sum_m \alpha_m y_m)$</span>.</td></tr>
+    <tr><th>Strengths</th><td>Reduces error by combining predictors whose mistakes are not perfectly correlated; cuts variance (bagging) and can turn weak learners strong (boosting), often with no base-model tuning.</td></tr>
+    <tr><th>Limitations</th><td>Costs more computation and interpretability; helps least when the base predictors all make the same errors; cannot touch Bayes error.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Number of base models <span class="m">$m$</span>; base-model capacity; features per split (forests); rounds <span class="m">$M$</span> and learning rate <span class="m">$\eta$</span> (boosting).</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: we now have models (trees, linear and
+logistic regression), a theory of their failures (bias, variance, Bayes),
+and machinery for combining them into something better than any single one.
+Next lecture returns to a single model but asks for the best possible single
+boundary: maximum margins, support vectors, and kernels.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">7.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+connect, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A colleague bags 100 copies of a linear model whose main failure is fitting a straight line to visibly curved data. What should they expect?</p>
+  <div class="quiz-opts">
+    <button data-k="a">A large accuracy gain: 100 models always beat 1</button>
+    <button data-k="b">Almost no gain: their model's error is bias, the average of 100 nearly identical straight lines is another straight line, and <span class="m">$\mathbb{E}[\bar{y}] = \mathbb{E}[y_i]$</span> guarantees the systematic miss survives</button>
+    <button data-k="c">A large gain, but only if they also increase the learning rate</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The majority-vote argument needs the models' errors to differ. A hundred retrained linear fits on bootstrap resamples land on nearly the same wrong line, so the committee recounts one opinion.</div>
+  <div class="quiz-fb" data-k="b">Right. Bagging is a variance treatment applied here to a bias disease. The fix is more capacity (or boosting, which adds capacity round by round), not more copies.</div>
+  <div class="quiz-fb" data-k="c">Learning rate is a knob of gradient boosting's additive updates, not of bagging, which has no sequential structure at all.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">21 classifiers each have error <span class="m">$\epsilon = 0.3$</span>. With independent errors, majority voting gives ensemble error <span class="m">$\approx 0.026$</span>. What happens in the opposite extreme, where all 21 make perfectly correlated (identical) errors?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Ensemble error 0: the vote still cancels the mistakes</button>
+    <button data-k="b">Ensemble error rises above 0.5, because the errors compound</button>
+    <button data-k="c">Ensemble error stays exactly 0.3: every vote is unanimous, wrong together on the same 30% of inputs, so the ensemble is one model photocopied 21 times</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Cancellation requires disagreement. If every model errs on the same inputs, there is nothing to outvote.</div>
+  <div class="quiz-fb" data-k="b">Voting cannot make identical models worse than one of them; it reproduces them exactly.</div>
+  <div class="quiz-fb" data-k="c">Exactly, and the whole span from 0.026 to 0.3 is controlled by error correlation, which is what Fig 3.1's ρ slider walks through. Every ensemble design choice in this lecture, bootstrap resampling, feature subsampling, sequential reweighting, is a scheme for pushing correlation down.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design an ensemble when your base models are correlated</summary>
+  <div>
+    <p>You must ensemble 50 models, but they were all trained by the same team, with the same architecture, on nearly the same data, and their errors correlate heavily. What gain should you expect, and what would you change about the ensemble's construction to earn a real gain?</p>
+    <p><b>Answer</b> (one good version). Expect little. With heavy correlation the ensemble error sits near the shared error floor, not near the binomial-tail fantasy: in the extreme of identical errors, 50 models vote exactly like 1, and Fig 3.1's floor <span class="m">$\rho\,\epsilon$</span> quantifies the in-between. Averaging-wise, the covariance terms that independence deleted from <span class="m">$\operatorname{Var}[\bar{y}]$</span> come back, so variance stops falling long before <span class="m">$1/50$</span>. To earn a real gain, manufacture disagreement at the source: train on different resamples or disjoint data slices (bagging's trick), restrict different models to different feature subsets (the forest's trick), use different model families or hyperparameters so their inductive biases differ, or train sequentially against the current ensemble's mistakes (boosting's trick). The metric to watch during construction is pairwise error correlation, not individual accuracy: a slightly worse but decorrelated model can add more to the committee than another copy of the best one.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): why does a random forest need both dice rolls?</summary>
+  <div>
+    <p>A random forest randomizes twice: bootstrap resampling of the data, and feature subsampling at every split. Explain why each one alone leaves value on the table.</p>
+    <p><b>Answer.</b> Bootstrap alone (plain bagging of trees) creates diversity, but a limited kind: the resamples overlap in most of their points, and when one feature is dominant, nearly every tree still chooses it for the top splits. The trees end up structurally similar, their errors correlate, and correlated errors are the ones averaging cannot cancel; Fig 4.2's correlation readout shows exactly this. Feature subsampling alone, with every tree seeing the full dataset, has the mirror problem: the data-side variance that bagging was built to average away is untouched, and trees that all memorize the same noisy points make the same noise-driven mistakes regardless of which features they split on. Together the two randomizations attack both sources of similarity at once, different points and different split choices, which decorrelates the trees enough for the <span class="m">$\operatorname{Var}[\bar{y}]$</span> averaging math to do real work. The general principle: an ensemble is only as good as its diversity, so randomize every stage of training that you can afford to randomize.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): connect gradient boosting to gradient descent</summary>
+  <div>
+    <p>Gradient boosting fits each new learner to the residuals <span class="m">$r = t - F_{m-1}(x)$</span>. Gradient descent updates parameters against the gradient of a loss. Show that these are the same move.</p>
+    <p><b>Answer.</b> Treat the model's predictions themselves as the thing being optimized: one "parameter" <span class="m">$F(x^{(n)})$</span> per training point, with squared loss <span class="m">$L = \sum_n \tfrac{1}{2}\big(t^{(n)} - F(x^{(n)})\big)^2$</span>. The gradient with respect to the prediction at point <span class="m">$n$</span> is <span class="m">$\partial L / \partial F(x^{(n)}) = -(t^{(n)} - F(x^{(n)})) = -r^{(n)}$</span>. So the residual is exactly the negative gradient, and "fit <span class="m">$h_m$</span> to the residuals, then set <span class="m">$F_m = F_{m-1} + \eta\, h_m$</span>" is a gradient descent step of size <span class="m">$\eta$</span>, taken in the space of functions rather than the space of weights, with the weak learner acting as the step direction (it approximates the negative gradient using only moves a stump can express). That is why the method is called <em>gradient</em> boosting, and why swapping the squared loss for another differentiable loss just changes what the learners fit: the negative gradient of that loss. Lecture 5's descent on weights and this lecture's descent on functions are the same algorithm at different altitudes. <!-- The function-space framing extends the source's residual-fitting description; it is the standard reading of F_m = F_{m-1} + eta*h_m and is included to answer the transfer question. --></p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is bias, variance, and ensembles: one exact equation that names the two ways a model can fail, and two engineering strategies built directly on its terms. Average many unstable models and the variance term collapses; stack many weak models against each other's mistakes and the bias term erodes; and both tricks live or die on whether the models' errors disagree. Next lecture: support vector machines, where we stop combining models and instead demand the single best boundary there is.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../logistic-regression/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 6: Logistic Regression</div>
+  </a>
+  <a href="../svm/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 8: Support Vector Machines</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 7 &middot; Bias, Variance &amp; Ensembles</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

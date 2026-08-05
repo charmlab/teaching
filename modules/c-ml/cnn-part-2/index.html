@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNNs in Practice — ECE 657 · The ML Bible</title>
+<meta name="description" content="A fully interactive lesson on how CNNs became successful in practice: 1x1 convolutions, large curated datasets, GPUs and scaling, the LeNet-to-ResNet architecture lineage, transfer learning, interpretability, adversarial examples, and dense prediction.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 12 &middot; The ML Bible</div>
+  <h1>CNNs in Practice</h1>
+  <p class="lede">
+    Part I built the machine: convolution, ReLU, pooling, stacked feature maps.
+    This lecture asks the more uncomfortable question, why did that machine sit
+    on the shelf for twenty years and then, in 2012, suddenly beat everything?
+    The answer is not one clever idea. It is several ingredients, large curated
+    datasets, serious compute, and deeper architectures, scaled together. This
+    is Part II: less derivation, more history and systems, the story of how
+    deep vision actually got built, plus the tricks that make it usable when
+    you have almost no data of your own.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: an idea is not enough</a></li>
+    <li><a href="#sec-onebyone">The 1&times;1 convolution, riddle answered</a></li>
+    <li><a href="#sec-data">Ingredient 1: large curated datasets</a></li>
+    <li><a href="#sec-compute">Ingredient 2: compute</a></li>
+    <li><a href="#sec-arch">Ingredient 3: deeper architectures</a></li>
+    <li><a href="#sec-transfer">Transfer learning</a></li>
+    <li><a href="#sec-interp">What CNNs learn, and interpretability</a></li>
+    <li><a href="#sec-apps">Applications: from labels to pixels</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: an idea is not enough</h2>
+
+<p>
+Here is a fact that should bother you. By 1998, Yann LeCun's LeNet-5 was a
+complete, working convolutional network: convolution, pooling, fully
+connected layers, trained end to end by backpropagation, reading handwritten
+digits on real envelopes for the US Postal Service. Every architectural idea
+from Part I already existed, deployed, in production. And then, for over a
+decade, almost nothing. Computer vision kept running on hand-crafted
+features, and neural networks were a niche taste. The breakthrough did not
+come from a new equation. It came in 2012, when a CNN called AlexNet won the
+ImageNet challenge by a margin nobody could argue with, and it won because
+three things had finally scaled up at the same time:
+</p>
+
+<div class="hook-grid">
+  <div class="hook-card">
+    <div class="hook-emoji">🗂️</div>
+    <div class="hook-q">Data</div>
+    <div class="hook-a">LeNet trained on 60,000 tiny digit scans. AlexNet trained on <b>1.2 million</b> labelled photographs across 1,000 categories. No dataset, no deep model worth training.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">⚡</div>
+    <div class="hook-q">Compute</div>
+    <div class="hook-a">Training AlexNet took 5 to 6 days on two gaming GPUs. On the CPUs of the LeNet era the same run was simply out of reach. Hardware built for video games turned out to be built for convolution.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🏗️</div>
+    <div class="hook-q">Architectures</div>
+    <div class="hook-a">Depth went from 5 weight layers to 8, then 22, then past 100, and each jump needed a new structural idea to stay trainable: bottlenecks, factorized filters, skip connections.</div>
+  </div>
+</div>
+
+<p>
+The big idea of this lecture, worth writing at the top of your notes: the
+success of deep learning did not come from any single ingredient. It came
+from <strong>scaling architecture, data, compute, optimization, and
+validation together</strong>. Take any one away and the whole thing stalls,
+which is exactly what the twenty quiet years demonstrate. The plan: first we
+settle the riddle Part I left open, then we take the three ingredients in
+turn, and then we cover the practical miscellany, transfer learning, what
+the filters actually learn, where these models are brittle, and what vision
+tasks beyond classification look like.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. THE 1×1 CONVOLUTION ═══════════════════ -->
+<section id="sec-onebyone">
+<h2><span class="secnum">1.</span> The 1&times;1 convolution, riddle answered</h2>
+
+<p>
+Part I ended on a riddle: does a <span class="m">$1 \times 1$</span>
+convolution ever make sense? A kernel that sees one pixel cannot detect an
+edge, a corner, or any spatial pattern at all. It looks useless. The
+answer is the third dimension. A kernel's depth always equals its
+input's depth, so on a stack of <span class="m">$M$</span> feature maps a
+"<span class="m">$1 \times 1$</span>" kernel is really
+<span class="m">$1 \times 1 \times M$</span>: at every location it computes
+a weighted sum straight down the channel stack,
+</p>
+
+$$ z_{\text{out}}[i,j] \;=\; \sum_{m=1}^{M} w_m \, z_m[i,j] \;+\; b $$
+
+<p>
+one learned linear combination of all <span class="m">$M$</span> channels,
+applied at every pixel. That single observation buys three distinct things,
+and all three matter in practice:
+</p>
+
+<ul>
+  <li><strong>Dimensionality reduction.</strong> Use <span class="m">$I < M$</span> filters and the volume goes from <span class="m">$W \times H \times M$</span> to <span class="m">$W \times H \times I$</span>: fewer channels, same spatial size, and every convolution downstream gets cheaper because its kernels are now <span class="m">$K \times K \times I$</span> deep instead of <span class="m">$K \times K \times M$</span>.</li>
+  <li><strong>Cross-channel mixing.</strong> The output is a learned combination of existing detectors, so it can capture correlations <em>across</em> channels: "edge here AND red here" becomes one new feature.</li>
+  <li><strong>Extra capacity.</strong> Follow it with a nonlinearity and you have added a genuine layer of processing, per pixel, at almost no spatial cost. Interspersed with ReLUs, 1&times;1 convolutions deepen the network cheaply.</li>
+</ul>
+
+<p>
+And the direction is not fixed: use <em>more</em>
+<span class="m">$1 \times 1$</span> filters than input channels and the
+depth goes up instead of down. GoogLeNet, coming in section 4, leans on the
+reduction direction so hard it has a name for it, the
+<strong>bottleneck</strong>: squeeze the channels with a cheap
+<span class="m">$1 \times 1$</span>, do the expensive
+<span class="m">$3 \times 3$</span> or <span class="m">$5 \times 5$</span>
+work in the narrow space, and the layer's cost collapses. Mix some channels
+yourself:
+</p>
+
+<div class="figure" id="fig-onebyone">
+  <div class="fig-mount" data-fig="onebyone"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the 1&times;1 convolution as a channel mixer. Four real feature maps (computed live by convolving Part I's test image with four kernels) feed a bank of 1&times;1 filters. Slide the output depth <span class="m">$I$</span> to compress or expand the stack, click an output channel to see its mixing weights, and check the highlighted pixel's arithmetic: a weighted sum straight down the channel stack, spatial size untouched.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked: what a 1&times;1 layer does to the volume</div>
+  <!-- flagged addition: the source states the three benefits but gives no numeric
+       instance; this 28×28×64 → 28×28×16 example and its arithmetic are mine. -->
+  <p>Take a <span class="m">$28 \times 28 \times 64$</span> volume through <span class="m">$I = 16$</span> filters of size <span class="m">$1 \times 1$</span>. The sizing formula from Part I barely notices: <span class="m">$\hat W = (28 - 1 + 0)/1 + 1 = 28$</span>. Output volume: <span class="m">$28 \times 28 \times 16$</span>, same spatial grid, a quarter of the channels.</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    params&nbsp;= K&sup2;&middot;I&middot;J + I = 1&middot;16&middot;64 + 16 = 1,040<br>
+    a 5&times;5 conv on the full 64 channels into 16 maps: 25&middot;16&middot;64 + 16 = 25,616
+  </p>
+  <p>The 1&times;1 layer costs 4% of the 5&times;5 layer's parameters, and afterwards that 5&times;5 layer only needs kernels 16 deep instead of 64 deep. Squeeze first, then do the expensive spatial work: that is the bottleneck trick.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A <span class="m">$1 \times 1$</span> convolution with <span class="m">$I$</span> filters is applied to a <span class="m">$14 \times 14 \times 48$</span> volume. Which quantity can it NOT change?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The number of channels: the output depth is stuck at 48</button>
+    <button data-k="b">The features themselves: it copies channels through unchanged</button>
+    <button data-k="c">The spatial size: the output is 14 &times; 14 no matter what <span class="m">$I$</span> is</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Backwards: changing the channel count is the one thing it is best at. Output depth equals the number of filters, so <span class="m">$I = 8$</span> compresses to 8 channels and <span class="m">$I = 96$</span> expands to 96.</div>
+  <div class="quiz-fb" data-k="b">Each output channel is a learned weighted combination of all 48 input channels, plus a bias, usually followed by a ReLU. That is real feature-building, not copying: Fig 1.1 shows the mixture arithmetic.</div>
+  <div class="quiz-fb" data-k="c">Right. With <span class="m">$K = 1$</span>, <span class="m">$P = 0$</span>, <span class="m">$S = 1$</span> the sizing formula gives <span class="m">$\hat W = W$</span> always. A 1&times;1 convolution operates purely along the channel dimension: depth is its whole business, space is untouched.</div>
+</div>
+
+<details class="check">
+  <summary>Check: give three reasons to use a 1&times;1 convolution</summary>
+  <div>
+    <p>Say them out loud before expanding. The lecture wants three distinct benefits.</p>
+    <p><b>Answer.</b> One, <em>dimensionality reduction</em>: with fewer filters than input channels it shrinks the depth of the volume without touching the spatial dimensions, which cuts the compute of every layer that follows (and it can equally increase the depth if you use more filters). Two, <em>cross-channel combination</em>: each output is a learned linear combination of all input channels at that pixel, so it captures correlations between existing feature maps and builds new features out of them. Three, <em>added capacity</em>: interleaved with nonlinearities it acts like an extra (cheap) layer of processing, adding depth and expressive power. This is exactly the recipe GoogLeNet uses for its bottlenecks.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 2. DATASETS ═══════════════════ -->
+<section id="sec-data">
+<h2><span class="secnum">2.</span> Ingredient 1: large curated datasets</h2>
+
+<p>
+Start with the least glamorous ingredient, because it decides everything
+downstream: garbage in, garbage out. A model can only learn the structure
+its dataset contains, so <strong>curation</strong> is not clerical work, it
+is a set of design decisions, each with consequences:
+</p>
+
+<ul>
+  <li><strong>Which categories?</strong> How many classes, and how fine-grained: is "dog" one class, or is every breed its own?</li>
+  <li><strong>How many images?</strong> Sample count is the fuel for parameter count; too little and big models memorize.</li>
+  <li><strong>How much resolution?</strong> Input dimensions set the compute bill for every experiment ever run on the data.</li>
+  <li><strong>How to annotate accurately?</strong> Labels are the targets; noisy labels put a ceiling on every model, and semi-supervised tricks only stretch, not replace, human labelling.</li>
+  <li><strong>How are images sourced?</strong> Ethics, privacy, and cost all live here, and biases in sourcing become biases in the model.</li>
+  <li><strong>How to preprocess?</strong> Normalize and standardize so the optimizer sees well-conditioned inputs, the same lesson as always.</li>
+</ul>
+
+<p>
+Three landmark datasets show how these choices evolved, and how violently
+the scale jumped. <strong>MNIST</strong>: handwritten digits from scanned
+zip codes, 10 classes, 60K training and 10K test images, grayscale
+<span class="m">$28 \times 28$</span>, digits centred and size-normalized,
+about 60 MB. <strong>CIFAR-10 and CIFAR-100</strong>: labelled subsets of
+the 80-million-tiny-images collection, 10 or 100 classes, 60K training and
+6K test images, colour, about 160 MB. Then the discontinuity.
+<strong>ImageNet</strong> (2009): 1,000 classes, 1.2 million training
+images, 150K test images, about 50 GB. Its categories come from WordNet
+synsets, about 22,000 available, with the 1,000 most common chosen for the
+challenge, and they are deliberately fine-grained, many dog breeds among
+them. The images were pulled from image search and hand-labelled by
+Mechanical Turk workers, which is itself a lesson: at this scale, labelling
+is an industrial process. Feel the jumps:
+</p>
+
+<div class="figure" id="fig-datasets">
+  <div class="fig-mount" data-fig="datasets"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the dataset ladder. Cards for MNIST, CIFAR-10/100, and ImageNet with the numbers from the lecture; pick an attribute and the log-scale bars re-sort so you can feel the jump, roughly three orders of magnitude from MNIST to ImageNet in disk size. The thumbnails are synthetic sketches in each dataset's style (procedurally drawn, not real dataset photos).</p>
+</div>
+
+<p>
+ImageNet mattered because it came with a scoreboard: the <strong>ImageNet
+Large Scale Visual Recognition Challenge</strong> (ILSVRC), an annual
+competition that made progress public, measurable, and brutally
+comparable. Two of its tasks matter for this lecture.
+<strong>Classification</strong> asks <em>what</em> is in the image: one
+label out of 1,000. <strong>Object detection</strong> asks <em>what and
+where</em>: every object, each with a bounding box. Keep that distinction;
+section 7 stretches it further, all the way to labelling every pixel.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Fei-Fei Li's team chose ImageNet's 1,000 categories from WordNet synsets, including dozens of dog breeds, rather than 1,000 obviously different things. Why does the fine-grained choice matter for the models that get trained on it?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It makes the dataset smaller, since similar categories share images</button>
+    <button data-k="b">It forces models to learn subtle, hierarchical visual distinctions rather than coarse cues, so the learned features are richer and transfer better</button>
+    <button data-k="c">It is only a labelling convenience: WordNet happened to be available</button>
+  </div>
+  <div class="quiz-fb" data-k="a">No image is shared between classes, and 1.2M images is anything but small. The fine-grained choice is about what the task demands, not about storage.</div>
+  <div class="quiz-fb" data-k="b">Right. Telling a malamute from a husky needs textures, shapes, and part relationships, not just "furry thing present". A benchmark that demands fine distinctions rewards models that learn deep, reusable features, which is exactly what made ImageNet backbones so valuable for transfer learning in section 5.</div>
+  <div class="quiz-fb" data-k="c">WordNet supplied the category structure (about 22,000 synsets to choose from), but choosing fine-grained classes was deliberate: it makes the benchmark demand real visual understanding.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 3. COMPUTE ═══════════════════ -->
+<section id="sec-compute">
+<h2><span class="secnum">3.</span> Ingredient 2: compute</h2>
+
+<p>
+The second ingredient is the one that snuck up on everybody. After 2012,
+neural networks began to outperform everything else in the ILSVRC standings,
+and a pattern emerged immediately: the organizations at the top of the
+leaderboard were the ones with the most compute and the recruited academic
+talent to use it. The competitive advantage was no longer a clever feature
+descriptor. It was GPUs, data, and the budget to run big experiments.
+</p>
+
+<p>
+Which brings in the business lesson the lecture likes: <em>when there is a
+gold rush, sell shovels</em>. NVIDIA, co-founded and led by Jensen Huang
+since 1993, spent two decades building GPUs for 3D graphics, hardware whose
+whole job is doing millions of small multiply-accumulate operations in
+parallel. Convolution, as you now know from Part I, is exactly millions of
+small multiply-accumulate operations. When the 2012 boom hit, NVIDIA was
+uniquely positioned, and it became the dominant supplier of AI compute, with
+over 80% market share. The miners changed every year; the shovel seller kept
+winning.
+</p>
+
+<p>
+But here is the part that matters for how you think, not just for trivia
+night: more GPU power enabled deeper models, <strong>but only when data,
+compute, optimization, and validation scaled together</strong>. This is the
+same "scale the ingredients together" claim from the hook, and later
+scaling-laws work on neural language models made it quantitative: loss
+improves predictably as you grow model and data in balance, and stalls when
+one outruns the others. A giant model on a small dataset memorizes. A giant
+dataset under a tiny model plateaus. Plenty of both without the compute to
+finish training helps nobody. Play with the balance:
+</p>
+
+<div class="figure" id="fig-scaling">
+  <div class="fig-mount" data-fig="scaling"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the scale-together playground. Three sliders, dataset size, model size, and training compute, drive a pair of stylized error curves, validation and training, plotted against compute for the current data and model budget, and the diagnosis names the binding constraint. Push the model far beyond the data and watch the overfitting gap open. The shape is qualitative, meant to build intuition about balance, not to report measured numbers.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Your team gets a 100&times; bigger GPU cluster and immediately trains a 100&times; bigger CNN on the same 10,000-image dataset. What does the scale-together principle predict?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Roughly 100&times; better accuracy: compute is the bottleneck for deep learning</button>
+    <button data-k="b">No change at all: model size does not affect accuracy</button>
+    <button data-k="c">Little or no improvement, likely worse generalization: the model now dwarfs the data, so it memorizes the training set instead of learning</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Compute is one ingredient of several. With the dataset fixed and tiny, the extra capacity has nothing new to learn from, and the bias-variance lecture already told you where excess capacity goes: variance.</div>
+  <div class="quiz-fb" data-k="b">Model size affects accuracy in both directions: too small underfits, too large on fixed data overfits. Neither is "no change".</div>
+  <div class="quiz-fb" data-k="c">Right. Ingredients must scale together. A 100&times; model on unchanged data is exactly the imbalance Fig 3.1 punishes with an overfitting gap; you would need more data (or aggressive augmentation and transfer learning, section 5) to cash in the compute.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. ARCHITECTURES ═══════════════════ -->
+<section id="sec-arch">
+<h2><span class="secnum">4.</span> Ingredient 3: deeper and deeper architectures</h2>
+
+<p>
+Third ingredient: the models themselves. The story runs through four
+architectures, and each one is remembered for a structural idea, not for a
+parameter setting. Walk the timeline first, then we will do the arithmetic
+that explains the oddest fact in it: the 2014 network is deeper than the
+2012 network and fifteen times smaller.
+</p>
+
+<div class="figure" id="fig-timeline">
+  <div class="fig-mount" data-fig="timeline"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the architecture timeline, LeNet-1 (1988) to ResNet (2015). Click a node for its year, depth, parameter count, error, and signature idea; the linked chart below plots parameters on a log scale across the generations, with the top-5 / test errors marked where the lecture reports them. Every number is from the lecture's comparison table.</p>
+</div>
+
+<h3>LeNet: the proof it could work at all</h3>
+
+<p>
+<strong>LeNet</strong> (LeCun and colleagues, developed from 1988 to 1998,
+LeNet-1 through LeNet-5) recognized handwritten digits and characters so the
+US Postal Service could sort envelopes by zip code automatically. The recipe
+is the one Part I built: convolution for feature extraction, average pooling
+(they called it subsampling) for downsampling, fully connected layers for
+the decision, originally with tanh activations where a modern network would
+use ReLU. It worked, it shipped, and it was the existence proof that
+end-to-end learned vision was possible. Now put Part I's sizing formula to
+work and fill in LeNet-5's whole layer table by hand:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked: the LeNet-5 layer table, from the sizing formula</div>
+  <p>Input is a <span class="m">$32 \times 32 \times 1$</span> grayscale image. Apply <span class="m">$\hat W = (W - K + 2P)/S + 1$</span> at every step (all convolutions here use <span class="m">$P = 0$</span>, <span class="m">$S = 1$</span>; pooling is <span class="m">$2 \times 2$</span> with stride 2), and count weights as <span class="m">$(K^2 J + 1)\,M$</span> per conv layer:</p>
+  <div class="wtable-wrap">
+    <table class="wtable lenet-table">
+      <tr><th>layer</th><th>operation</th><th>output size</th><th>sizing arithmetic</th><th>weights</th></tr>
+      <tr><td>C1</td><td>6 filters, 5&times;5</td><td>28 &times; 28 &times; 6</td><td>(32 &minus; 5)/1 + 1 = 28</td><td>(25&middot;1 + 1)&middot;6 = 156</td></tr>
+      <tr><td>AP1</td><td>avg pool 2&times;2, s2</td><td>14 &times; 14 &times; 6</td><td>28 / 2 = 14</td><td>0</td></tr>
+      <tr><td>C2</td><td>16 filters, 5&times;5</td><td>10 &times; 10 &times; 16</td><td>(14 &minus; 5)/1 + 1 = 10</td><td>(25&middot;6 + 1)&middot;16 = 2,416</td></tr>
+      <tr><td>AP2</td><td>avg pool 2&times;2, s2</td><td>5 &times; 5 &times; 16</td><td>10 / 2 = 5</td><td>0</td></tr>
+      <tr><td>C3</td><td>120 filters, 5&times;5</td><td>1 &times; 1 &times; 120</td><td>(5 &minus; 5)/1 + 1 = 1</td><td>(25&middot;16 + 1)&middot;120 = 48,120</td></tr>
+      <tr><td>FC1</td><td>dense to 84</td><td>84</td><td>&mdash;</td><td>(120 + 1)&middot;84 = 10,164</td></tr>
+      <tr><td>FC2</td><td>dense to 10, softmax</td><td>10</td><td>&mdash;</td><td>(84 + 1)&middot;10 = 850</td></tr>
+    </table>
+  </div>
+  <p>Total: <span class="m">$156 + 2{,}416 + 48{,}120 + 10{,}164 + 850 = 61{,}706$</span> weights, which is the lecture's "about 60,000 parameters" for LeNet-5. Notice C3: a 5&times;5 convolution on a 5&times;5 input is a convolution that only fits once, so its output is <span class="m">$1 \times 1 \times 120$</span>, effectively a fully connected layer wearing a convolution costume. Hold that thought for GoogLeNet.</p>
+</div>
+
+<h3>AlexNet: the 2012 detonation</h3>
+
+<p>
+<strong>AlexNet</strong> (2012) is architecturally a scaled-up LeNet, 8
+weight layers, ReLU instead of tanh, about 60 million parameters, but its
+ILSVRC result changed the field: <strong>16.4% top-5 error</strong>, where
+top-5 means the model gets five guesses and is scored correct if the true
+label is among them. The gap to every non-neural competitor was so large
+that the argument ended more or less overnight; this single win set off the
+modern deep-learning boom. The engineering detail worth remembering: 60M
+parameters did not fit on one GPU of the day, so the network was literally
+split into <em>two parallel branches</em> running on two GTX 580 3GB gaming
+cards, communicating only at certain layers, and training still took 5 to 6
+days. The architecture was bent around the hardware, which tells you how
+close to the edge of feasible this was.
+</p>
+
+<h3>GoogLeNet: deeper and 15&times; smaller</h3>
+
+<p>
+<strong>GoogLeNet</strong> (2014) made the point that depth and size are
+different axes: 22 weight layers, nearly three times AlexNet's depth, with
+about <strong>4 million parameters against AlexNet's 60 million</strong>,
+and 6.6% test error. Where did 93% of the parameters go? Three deliberate
+moves. First, it removed the giant fully connected layers at the end and
+went <em>fully convolutional</em>; in AlexNet-style designs those dense
+layers held the bulk of all weights, exactly like the FC-versus-conv
+arithmetic from Part I predicts. Second, it factorized big convolutions into
+stacks of smaller ones, several small kernels reaching the same receptive
+field for fewer weights. Third, the star of section 1: <span
+class="m">$1 \times 1$</span> bottlenecks squeezing channel counts before
+every expensive convolution. Depth up, parameters down, accuracy up. The
+lesson generalizes: parameters are a design choice, not a tax you must pay
+for depth.
+</p>
+
+<h3>ResNet: past 100 layers, past the benchmark</h3>
+
+<p>
+<strong>ResNet</strong> (He and colleagues, 2015) broke the depth barrier
+outright: over 100 layers, made trainable by <strong>skip
+connections</strong>, which we will demystify in a moment. It was so strong
+that the community's measuring stick had to change, from top-5 accuracy to
+top-1, and error analysis found that many of the remaining "mistakes" traced
+to wrong ground-truth labels rather than wrong predictions. CNNs had
+surpassed human performance on ImageNet, and the community largely retired
+the benchmark and moved on to harder problems. Here is the whole lineage in
+one table, the lecture's comparison across generations:
+</p>
+
+<div class="wtable-wrap">
+  <table class="wtable arch-table">
+    <tr><th></th><th>LeNet-1 (1988)</th><th>LeNet-5 (1998)</th><th>AlexNet (2012)</th><th>GoogLeNet (2014)</th></tr>
+    <tr><td>categories</td><td>10</td><td>10</td><td>1,000</td><td>1,000</td></tr>
+    <tr><td>image size</td><td>~16 &times; 16</td><td>32 &times; 32</td><td>256 &times; 256 &times; 3</td><td>256 &times; 256 &times; 3</td></tr>
+    <tr><td>training examples</td><td>7,291</td><td>60,000</td><td>1.2M</td><td>1.2M</td></tr>
+    <tr><td>parameters</td><td>~9,760</td><td>~60,000</td><td>60M</td><td>4M</td></tr>
+  </table>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">GoogLeNet (22 layers) has about 4M parameters; AlexNet (8 layers) has about 60M. How can the much deeper network be 15&times; smaller?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Its layers are so narrow that each one detects only a couple of patterns</button>
+    <button data-k="b">It dropped the huge fully connected layers (going fully convolutional), factorized large kernels into small ones, and used 1&times;1 bottlenecks to shrink channel counts before expensive convolutions</button>
+    <button data-k="c">It was trained on far less data, so it needed fewer parameters</button>
+  </div>
+  <div class="quiz-fb" data-k="a">GoogLeNet's layers are genuinely wide in places; narrowness is not the mechanism. The savings are structural: where AlexNet spends parameters (dense layers) GoogLeNet simply does not have them.</div>
+  <div class="quiz-fb" data-k="b">Right, all three moves at once. Recall Part I: fully connected layers scale with input size times output size, convolutions only with kernel size, so deleting the dense block removes most of the budget; factorizing and bottlenecking shave the conv layers too. Depth and parameter count are independent dials.</div>
+  <div class="quiz-fb" data-k="c">Both trained on the same ILSVRC data, 1.2M images. The difference is architecture, not data.</div>
+</div>
+
+<h3>Parameters, connections, FLOPS: memory versus speed</h3>
+
+<p>
+The comparison table counts parameters, but parameters answer only one
+question: how much <em>memory</em> does the model need? The question a
+deployment engineer asks is different: how <em>fast</em> is it? The quantity
+that answers that is the number of <strong>connections</strong>, every
+multiply, add, nonlinearity, and pooling operation the forward pass
+executes, measured in <strong>FLOPS</strong> (floating-point operations).
+For a conv layer the two quantities split cleanly because of weight sharing:
+</p>
+
+$$ \text{params} = (K^2 J + 1)\,M, \qquad
+   \text{connections} = \hat W \hat H \, M \,(K^2 J + 1) $$
+
+<p>
+Same bracket, but connections multiply it by the whole output grid, because
+the shared kernel is <em>re-executed</em> at every one of the
+<span class="m">$\hat W \hat H$</span> positions. Parameters do not grow
+with image size; work does. So FLOPS set the computational complexity and
+therefore the achievable frames per second, while parameters set the memory
+footprint, and a network can be small-but-slow or big-but-fast depending on
+where its weights sit. Check it live:
+</p>
+
+<div class="figure" id="fig-flops">
+  <div class="fig-mount" data-fig="flops"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> parameters versus connections for one conv layer. Sliders for input size, kernel, filters, input depth, and stride; both counts are computed from the formulas above and drawn as log-scale bars. Grow the input and watch connections climb while parameters sit still; then compare a conv layer against a dense layer, where the two counts are the same thing.</p>
+</div>
+
+<p>
+The same arithmetic, as code you can rerun. This <code>layer_report</code>
+is Part I's sizing formula plus the two counting formulas, and the version
+below actually executes:
+</p>
+
+<pre class="code" data-lang="python"><code>def layer_report(W, H, J, K, M, P, S):
+    Wo = (W - K + 2*P) // S + 1        # output width  (Part I formula)
+    Ho = (H - K + 2*P) // S + 1        # output height
+    per_filter = K*K*J + 1             # weights per filter, incl. bias
+    params      = per_filter * M       # memory
+    connections = Wo * Ho * M * per_filter   # work per forward pass
+    print(f"output:      {Wo} x {Ho} x {M}")
+    print(f"params:      {params:,}")
+    print(f"connections: {connections:,}  (~{2*connections:,} FLOPS)")</code></pre>
+
+<div class="figure" id="fig-layerreport">
+  <div class="fig-mount" data-fig="layerreport"></div>
+  <p class="fig-caption"><b>Fig 4.3,</b> <code>layer_report</code>, live. Choose a configuration (the presets are LeNet-5's C1, C2, and C3 from the worked table, plus an AlexNet-scale first layer) and Run: the printout comes from executing the arithmetic above, and the bars compare parameters against connections. C1's numbers should match the worked table exactly.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Two models run on the same phone. Model A: few parameters but huge feature maps re-computing kernels everywhere. Model B: many parameters, tiny feature maps. Which statement is right?</p>
+  <div class="quiz-opts">
+    <button data-k="a">A can be slower than B: inference speed follows connections (FLOPS), not parameter count, while parameters set the memory footprint</button>
+    <button data-k="b">A is faster, since fewer parameters always means fewer operations</button>
+    <button data-k="c">They run equally fast if their total parameter counts are within 10%</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. Each shared weight can be re-executed thousands of times per forward pass, so the operation count (connections, measured in FLOPS) is what sets frames per second; parameters only tell you what fits in memory. Fig 4.2 lets you build exactly this A-versus-B pair.</div>
+  <div class="quiz-fb" data-k="b">Weight sharing breaks that intuition: one 3&times;3 kernel over a large input is 9 weights but hundreds of thousands of multiply-adds. Count connections, not parameters, for speed.</div>
+  <div class="quiz-fb" data-k="c">Parameter count says nothing about how often each parameter is used. A conv layer's work scales with the output grid; a dense layer's does not. The 10% is irrelevant.</div>
+</div>
+
+<h3>Skip connections: how ResNet stays trainable</h3>
+
+<p>
+One structural idea is still unexplained: how does anything with 100+ layers
+train at all? Backpropagation multiplies gradients layer by layer on the way
+down, and Part I of the neural-network story already showed what repeated
+multiplication does to a signal: shrink it a little per layer and after 100
+layers essentially nothing arrives. The fix is almost insultingly simple. A
+<strong>skip connection</strong> adds the block's input straight to its
+output,
+</p>
+
+$$ y = F(x) + x $$
+
+<p>
+so the block learns only the <em>residual</em> <span class="m">$F$</span>,
+the correction on top of identity. Two consequences. Forward: even if a
+block's transformation is nearly useless, the signal passes through intact,
+so depth cannot strangle the activations. Backward: the derivative of
+<span class="m">$F(x) + x$</span> contains a clean "<span class="m">$+\,1$</span>"
+path, so the gradient always has a highway back to early layers, bypassing
+the chain of shrinking factors instead of dying in it. Watch the difference:
+</p>
+
+<div class="figure" id="fig-skipconn">
+  <div class="fig-mount" data-fig="skipconn"></div>
+  <p class="fig-caption"><b>Fig 4.4,</b> the skip-connection demo. A stack of identical blocks, each passing on a fraction of its incoming signal; slide the depth and toggle skips. Without skips the signal reaching the deepest layers decays geometrically (each bar a fixed fraction of the last); with skips the identity path keeps it alive at any depth. A conceptual model of the effect, one number per layer, but the decay it shows is the real reason plain 100-layer stacks refuse to train.</p>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. TRANSFER LEARNING ═══════════════════ -->
+<section id="sec-transfer">
+<h2><span class="secnum">5.</span> Transfer learning</h2>
+
+<p>
+Everything so far assumed ImageNet-scale data. You will almost never have
+it. A hospital hands you 2,000 labelled scans, a factory 500 photos of
+defective parts, and training a 60M-parameter network from scratch on that
+is a memorization exercise, section 3 already told you why. The practical
+answer, and the single most used trick in applied deep learning, is
+<strong>transfer learning</strong>: do not start from random weights, start
+from a model someone already trained on lots of general data.
+</p>
+
+<p>
+The recipe has three moves. <strong>Pre-train</strong>: take a large model
+trained on a big general dataset, in vision almost always an ImageNet
+classifier; you download this, you do not train it.
+<strong>Freeze</strong>: lock most of its weights so they no longer update;
+those early and middle layers already detect edges, textures, and parts, and
+section 6 will show they are generic. <strong>Fine-tune</strong>: chop off
+the classification head, replace it with a freshly initialized head sized
+for <em>your</em> classes, and train only the unfrozen tail on your small
+dataset. The frozen backbone becomes a feature extractor; your data only has
+to teach the last step. Two dials control how aggressively to do this, and
+the lecture's guidance is:
+</p>
+
+<ul>
+  <li><strong>Fewer new examples: freeze more.</strong> Every unfrozen layer is capacity your tiny dataset must fill; with very little data, train the new head only.</li>
+  <li><strong>More dissimilar data: fine-tune more.</strong> Microscopy slides or radar maps share less with ImageNet photos than pet pictures do, so deeper layers' photo-specific features need adjusting, unfreeze further down.</li>
+  <li><strong>Use a smaller learning rate than training from scratch.</strong> Fine-tuning is late-stage training in disguise: the weights already sit near a good optimum. Recall the shape of loss surfaces around optima: big steps near a minimum overshoot and destroy the pre-trained knowledge you came for.</li>
+</ul>
+
+<div class="figure" id="fig-transfer">
+  <div class="fig-mount" data-fig="transfer"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the transfer-learning workbench. A pre-trained backbone (five stages plus head) you can freeze or unfreeze stage by stage; the two sliders, how much new data and how similar it is to ImageNet, drive the recommendation panel, which applies the lecture's rules: freeze more when data is scarce, fine-tune deeper when data is dissimilar, and always fine-tune with a smaller learning rate than from-scratch training. The trainable-parameter readout updates live from the stage sizes.</p>
+</div>
+
+<p>
+In code, the whole trick is a few lines. Illustrative
+<code>torchvision</code>-style sketch, the standard shape of every transfer
+pipeline (this one is for reading, not for the in-page runner):
+</p>
+
+<pre class="code" data-lang="python"><code># illustrative sketch: pre-trained backbone, frozen, new head
+model = torchvision.models.resnet18(weights="IMAGENET1K_V1")  # pre-trained
+
+for p in model.parameters():          # freeze everything
+    p.requires_grad = False
+
+model.fc = nn.Linear(512, num_my_classes)   # new head, randomly initialized
+
+optimizer = torch.optim.SGD(
+    model.fc.parameters(),            # only the head trains
+    lr=0.001,                         # smaller than from-scratch (e.g. 0.1)
+)</code></pre>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You have 800 labelled images of manufacturing defects, visually quite unlike ImageNet photos. Which fine-tuning setup follows the lecture's rules?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Train the whole network from scratch with the usual learning rate: dissimilar data means pre-training is useless</button>
+    <button data-k="b">Start from an ImageNet backbone, freeze the early layers, fine-tune the later layers and the new head, and use a learning rate well below the from-scratch value</button>
+    <button data-k="c">Freeze the entire backbone including the head, and train nothing: 800 images is too few to update any weights</button>
+  </div>
+  <div class="quiz-fb" data-k="a">800 images against millions of parameters from random initialization is guaranteed memorization. Even for dissimilar data the early layers' edges and textures transfer; you fine-tune deeper, you do not discard the backbone.</div>
+  <div class="quiz-fb" data-k="b">Right, and notice you are balancing the two rules against each other: little data says freeze more, dissimilar data says fine-tune more, so you keep the generic early layers frozen, adapt the task-specific later ones, and protect the pre-trained weights with a small learning rate.</div>
+  <div class="quiz-fb" data-k="c">The head maps to <em>ImageNet's</em> 1,000 classes; it cannot output "defect type 3". At minimum you must replace and train a new head, and with dissimilar data you should unfreeze some later layers too.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. INTERPRETABILITY ═══════════════════ -->
+<section id="sec-interp">
+<h2><span class="secnum">6.</span> What CNNs learn, and interpretability</h2>
+
+<p>
+Transfer learning works because of <em>what</em> the layers learn, and we can
+look. Visualize the filters of a trained CNN and representation learning
+becomes visible: <strong>early layers learn simple, generic patterns</strong>,
+oriented edges, colour contrasts, textures, essentially the detectors Part I
+had you design by hand, except learned. <strong>Later layers combine them
+into task-specific parts and objects</strong>: eyes, wheels, feathers,
+whole faces. This is exactly the receptive-field story from Part I made
+flesh, small fields see edges, large fields see things, and it explains the
+freezing heuristic from section 5: early layers transfer anywhere, later
+layers are married to their training task.
+</p>
+
+<div class="figure" id="fig-filters">
+  <div class="fig-mount" data-fig="filters"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> what filters look like, layer by layer. Procedurally generated pattern swatches in the style of trained-CNN visualizations: oriented edges and colour gradients for early layers, textures and motifs for the middle, part-like and object-like structure for late layers (synthetic sketches, not screenshots of a real network). Click a swatch to see the kind of image patch that would excite it most.</p>
+</div>
+
+<p>
+So we can see the filters; can we <em>explain</em> the decisions? Here the
+lecture turns honest and uncomfortable. Interpretability is hard for a
+structural reason: <strong>there is no ground truth for an
+explanation</strong>. When training a classifier, every image comes with the
+right answer; when explaining one, nobody hands you the "correct
+explanation" to compare against, which makes explainability essentially an
+<em>unsupervised</em> problem. Consequences follow quickly. Explanations can
+simply be wrong, plausible-looking heatmaps pointing at irrelevant pixels.
+Worse, some attribution methods are fragile in a way that should alarm you:
+randomize the network's weights, destroying everything it learned, and the
+"explanation" sometimes barely changes, which raises the question of what,
+exactly, it was explaining. And there are often trade-offs between
+performance and interpretability, the most accurate model is rarely the most
+transparent one. The bar we actually want is higher than accuracy: predictions
+that are fair across groups, privacy-preserving, and right <em>for the right
+reasons</em>.
+</p>
+
+<p>
+The sharpest demonstration that accuracy is not understanding is the
+<strong>adversarial example</strong>. Take an image the network classifies
+correctly and confidently. Add a perturbation so small it is invisible to
+you, but chosen carefully, pointed exactly along the classifier's weak
+direction, and the network now confidently declares the panda a vulture, the
+classic example from the lecture. The scene did not change; the pixels moved
+a hair; the prediction flipped. Do it yourself:
+</p>
+
+<div class="figure" id="fig-adversarial">
+  <div class="fig-mount" data-fig="adversarial"></div>
+  <p class="fig-caption"><b>Fig 6.2,</b> the adversarial slider. A small linear classifier (real weights, real scores, built in this page) correctly labels a synthetic stand-in "panda". Slide the perturbation strength: the perturbation, shown magnified because at true scale it is nearly invisible, is aimed at the classifier's weakest direction, and the predicted label flips to "vulture" while the image looks unchanged. The class scores are computed live at every step.</p>
+</div>
+
+<details class="check">
+  <summary>Check: why is explainability described as an unsupervised problem?</summary>
+  <div>
+    <p>Use the supervised/unsupervised distinction from the start of the course.</p>
+    <p><b>Answer.</b> Supervised learning has targets: for every input we know the desired output, so we can measure error and optimize against it. For explanations there is no such target. Nobody can hand you the true explanation of a network's decision to train against or to grade against, so there is no loss function that says "this explanation is 87% correct". That is the defining condition of an unsupervised problem: structure must be found without labelled ground truth. It is why explanation methods can disagree with each other, why some pass sanity checks (like the weight-randomization test) and others fail, and why we cannot simply "train a better explainer" the way we train a better classifier: we would not know what better means. Trust in explanations therefore has to come from indirect evidence, sanity checks, and human judgment, not from a validation accuracy.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. APPLICATIONS ═══════════════════ -->
+<section id="sec-apps">
+<h2><span class="secnum">7.</span> Applications: from labels to pixels</h2>
+
+<p>
+Everything in this lecture so far said "classification", one image in, one
+label out, ImageNet-style: <strong>object classification</strong> answers
+<em>what</em>. The other tasks of practical vision are extensions of that
+question. <strong>Object detection</strong> answers <em>what and where</em>:
+find every object and put a bounding box around it, the second ILSVRC task
+from section 2. And pushing "where" to its logical limit,
+<strong>semantic segmentation</strong> answers the question for every single
+pixel: dense per-pixel classification, where the output is not a label but a
+full-resolution map assigning each pixel to a class. It is the natural
+extension of classification and a stepping stone toward scene understanding
+and visual question answering, systems that must reason about what is where.
+</p>
+
+<p>
+The architectures for these tasks are not built from nothing. Modern
+segmentation models use CNNs as their <strong>backbone</strong>, and a
+pre-trained ImageNet classifier is one of the most common building blocks,
+section 5's transfer recipe applied at the level of whole systems: the
+classifier's feature hierarchy does the seeing, and a task-specific head
+turns features into boxes or masks. One scene, two questions:
+</p>
+
+<div class="figure" id="fig-segmentation">
+  <div class="fig-mount" data-fig="segmentation"></div>
+  <p class="fig-caption"><b>Fig 7.1,</b> classification versus semantic segmentation on one synthetic scene (drawn procedurally, no licensed imagery). Left: the whole image collapses to a single label. Right: every pixel gets a class, and the legend counts each class's pixels live. Move your pointer over either pane to query the pixel under it; classification gives the same answer everywhere, segmentation answers per pixel.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A self-driving car needs to know which pixels of the camera image are road, which are sidewalk, and which are pedestrians. Which task is this, and what is the output's shape?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Classification: one label per image, so the output is a single class</button>
+    <button data-k="b">Detection: a list of bounding boxes with class labels</button>
+    <button data-k="c">Semantic segmentation: a class for every pixel, so the output is a full-resolution map the size of the input image</button>
+  </div>
+  <div class="quiz-fb" data-k="a">"This image contains road" does not say where the road is, and driving is entirely about where. One label per image throws away the spatial answer.</div>
+  <div class="quiz-fb" data-k="b">Boxes get closer, but a box around a curved road boundary contains lots of not-road, and drivable-space decisions need pixel-level boundaries. Detection answers what and roughly where; this needs exactly where.</div>
+  <div class="quiz-fb" data-k="c">Right: dense per-pixel classification. The output has the same spatial dimensions as the input, one class per pixel, like Fig 7.1's right pane. And the model that produces it almost certainly carries a pre-trained ImageNet backbone inside.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 8. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">8.</span> Summary and method card</h2>
+
+<p>
+The single sentence to keep: <strong>deep vision succeeded when architecture,
+data, compute, optimization, and validation scaled together</strong>, and no
+one of them was the hero. LeNet had the architecture in 1998 and went
+nowhere for lack of the rest; ImageNet supplied the data and the scoreboard;
+GPUs supplied the compute; and a lineage of structural ideas, ReLU-era
+scaling in AlexNet, fully convolutional design with 1&times;1 bottlenecks in
+GoogLeNet, skip connections in ResNet, kept depth trainable until the models
+passed human accuracy and the benchmark itself retired. Around that core sit
+the working skills: count parameters when you care about memory and
+connections when you care about speed; steal a pre-trained backbone and
+fine-tune it gently instead of training from scratch; expect early layers to
+be generic and later layers task-specific; and hold your trust loosely,
+because explanations have no ground truth and an invisible perturbation can
+flip a confident answer.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; CNNs in practice (end-to-end vision)</div>
+  <table>
+    <tr><th>Assumption</th><td>Visual recognition benefits from hierarchical features, large labelled datasets, sufficient compute, and architectures matched to image structure.</td></tr>
+    <tr><th>Model class</th><td>Deep convolutional classifiers: stacked convolution, activation, pooling, dense, and softmax layers (LeNet &rarr; AlexNet &rarr; GoogLeNet &rarr; ResNet lineage).</td></tr>
+    <tr><th>Learning / selection</th><td>Train filters and classifier end to end with backpropagation; in practice with pre-training, fine-tuning, data augmentation, and validation.</td></tr>
+    <tr><th>Prediction</th><td>Forward pass through the feature hierarchy; heads adapt one backbone to classification (what), detection (what and where), or segmentation (every pixel).</td></tr>
+    <tr><th>Strengths</th><td>Learns hierarchical visual representations, scales with data and compute, transfers across tasks, strong on many vision problems.</td></tr>
+    <tr><th>Limitations</th><td>Needs substantial data and compute, can inherit dataset biases, may be hard to interpret, brittle to adversarial perturbations, and depends on deployment conditions.</td></tr>
+    <tr><th>Key quantities</th><td>Parameters (memory), connections / FLOPS (speed), depth, dataset size and quality, learning rate schedule for fine-tuning.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: Part I gave images an architecture of
+their own, and this lecture showed what happened when that architecture met
+scale, then packaged the results into tools you can reuse: pre-trained
+backbones, transfer recipes, an honest sense of the failure modes. The next
+step carries the same representation-learning story out of pixels entirely:
+if hierarchical features learned end to end can conquer vision, what happens
+when we point them at text? That is language modelling, next lecture.
+</p>
+</section>
+
+<!-- ═══════════════════ 9. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">9.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+argue, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">Rank what changed between LeNet-5 (1998) and AlexNet (2012) using the lecture's comparison table: parameters went from ~60K to 60M, training examples from 60K to 1.2M, image size from 32&times;32 to 256&times;256&times;3. What was the enabling change that made training the bigger model <em>possible</em> at all?</p>
+  <div class="quiz-opts">
+    <button data-k="a">A fundamentally new learning algorithm replaced backpropagation</button>
+    <button data-k="b">GPU compute: the model was split across two GTX 580s and still took 5 to 6 days, a workload CPUs of the era could not deliver</button>
+    <button data-k="c">Better random initialization of the weights</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The algorithm was the same backpropagation from 1998 (and earlier). What changed was the scale at which it could be run, plus architecture details like ReLU.</div>
+  <div class="quiz-fb" data-k="b">Right. A 1,000&times; parameter jump and a 60&times; pixel jump multiply into a compute bill only parallel hardware could pay; AlexNet was literally architected around two 3GB gaming cards. Data (ImageNet) made the model worth training, GPUs made it trainable, and neither alone would have sufficed.</div>
+  <div class="quiz-fb" data-k="c">Initialization tricks help optimization at the margin, but they do not turn an infeasible compute budget into a feasible one. The binding constraint was hardware.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">A vendor pitches you a "97% accurate" defect classifier and offers a saliency heatmap with each prediction as proof it is trustworthy. Which caution from this lecture applies?</p>
+  <div class="quiz-opts">
+    <button data-k="a">None: a heatmap per prediction is exactly what interpretability requires</button>
+    <button data-k="b">The heatmaps are fine, but 97% is too low a number to trust any model</button>
+    <button data-k="c">Explanations have no ground truth, can be wrong, and some methods barely change when the network's weights are randomized, so a heatmap is not evidence of right-for-the-right-reasons</button>
+  </div>
+  <div class="quiz-fb" data-k="a">A heatmap is an output of an explanation method, not a certificate. The lecture's sanity-check result cuts deep here: some attribution methods produce nearly the same heatmap for a randomized, know-nothing network.</div>
+  <div class="quiz-fb" data-k="b">The number is not the issue; the epistemics are. Even a 99.9% model can be right for wrong reasons (dataset quirks, spurious cues), and the heatmap cannot prove otherwise because no ground-truth explanation exists to validate it against.</div>
+  <div class="quiz-fb" data-k="c">Right. Explainability is an unsupervised problem: there is no target explanation to grade against, explanations can be incorrect, and fragile attribution methods fail basic sanity checks. Demand held-out evaluation under deployment conditions, stress tests, and error analysis, and treat the heatmap as a debugging aid, not proof.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a dataset curation plan</summary>
+  <div>
+    <p>Your team must build an image dataset for classifying 40 species of local birds from trail-camera photos. Propose a curation plan (walk the lecture's six considerations) and name its two biggest risks.</p>
+    <p><b>Answer</b> (one good version). <em>Categories:</em> the 40 species, plus an "other/no bird" class so the model has somewhere to put everything else; decide up front whether visually near-identical species get merged or kept fine-grained (fine-grained is harder but more useful, the ImageNet lesson). <em>Samples:</em> aim for hundreds to thousands per class, and balance them; trail cameras will overrepresent common species, so rare ones need targeted collection or augmentation. <em>Resolution:</em> enough to separate species by plumage detail, but fixed and modest, since it multiplies every future compute bill. <em>Annotation:</em> expert-verified labels, or crowd labels with an adjudication step for lookalike species; label noise caps every model trained later. <em>Sourcing:</em> trail cameras photograph whatever walks by, so scrub images capturing people, respect land permissions, and record capture metadata to audit coverage. <em>Preprocessing:</em> normalize sizes and exposure; document everything so training and deployment match. The two biggest risks: <b>label noise</b> on fine-grained lookalikes (garbage in, garbage out) and <b>sourcing bias</b>, e.g. one camera site, season, or time of day dominating, so the model learns backgrounds and lighting instead of birds, accurate in validation and wrong in the field. Both are curation failures no architecture can repair. And given 40 classes and modest data, the training plan should start from a pre-trained backbone, not from scratch.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): fine-tune or train from scratch?</summary>
+  <div>
+    <p>For each scenario, choose fine-tuning or training from scratch, and justify with the lecture's rules: (a) 300,000 labelled product photos, task and imagery close to ImageNet; (b) 1,500 labelled ultrasound images; (c) 50 million labelled images of a completely new sensor type (thermal), with a large compute budget.</p>
+    <p><b>Answer.</b> (a) Fine-tune, and you may not need much of it: the data is similar to ImageNet, so freeze most of the backbone, train the head (and perhaps the last stage), small learning rate. With 300K examples you could unfreeze more, but starting pre-trained costs nothing and converges faster. (b) Fine-tune, no contest: 1,500 images cannot train a deep network from scratch. The data is dissimilar (ultrasound vs photos), which pushes toward fine-tuning more layers, but the tiny sample size pushes toward freezing more; resolve the tension by freezing the early generic layers, fine-tuning the later ones and the new head, with a small learning rate and heavy augmentation. (c) This is the one case where from-scratch is defensible: data is plentiful, compute is available, and thermal imagery shares little low-level statistics with RGB photos, so the pre-trained early filters are least helpful here. Even so, common practice would still try ImageNet initialization as a baseline, because it rarely hurts and often speeds convergence. The general rule: from-scratch training needs the full ingredient stack from section 0, big data AND big compute; whenever either is missing, transfer.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): why adversarial examples worry deployment engineers</summary>
+  <div>
+    <p>Explain, to a product manager, why adversarial examples are a serious concern for deployed vision systems and not just an academic curiosity. Use what Fig 6.2 demonstrated.</p>
+    <p><b>Answer.</b> Three points. First, the failure is invisible: the perturbation that flips "panda" to "vulture" is too small for a human to see, so no reviewer looking at the input would ever flag it, and the system fails while appearing to work on perfectly normal-looking data. Second, the failure is <em>constructible</em>: it is not a rare accident but something an adversary can compute on purpose, aiming the perturbation along the model's weak directions exactly as the slider in Fig 6.2 does. For a spam filter, a content moderator, or a vehicle's sign detector, that means an attacker with knowledge of the model can manufacture inputs that defeat it reliably. Third, it reveals what the model actually learned: decision boundaries that pass within a hair's breadth of correctly classified points, in directions no human perceives, which means high test accuracy was never evidence of human-like understanding, echoing the interpretability lesson that accurate is not the same as right for the right reasons. Deployment implications: threat-model your inputs (can an adversary craft them?), monitor confidence and distribution shift, consider robustness testing before shipping, and never treat validation accuracy as a security guarantee.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the practice of convolutional networks: an architecture from Part I, multiplied by curated data, parallel compute, and two decades of structural ideas, then made usable at human scale through transfer learning, and made trustworthy only with care, because the models are brittle in ways accuracy does not show. The representation-learning story now leaves pixels: next lecture, the same playbook meets language.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../cnn/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 11: Convolutional Neural Networks</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../language-models/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 13: Language Models</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 12 &middot; CNNs in Practice</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

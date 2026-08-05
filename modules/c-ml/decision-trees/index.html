@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Trees — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on decision trees: tree anatomy, decision regions, entropy, information gain, greedy learning, overfitting, and pruning.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 3 &middot; The ML Bible</div>
+  <h1>Decision Trees</h1>
+  <p class="lede">
+    Last lecture's model answered every question by rummaging through its
+    memories. This one does the opposite: it studies the data once, distills it
+    into a short list of yes/no questions, and then predicts by playing twenty
+    questions with each new example. That shift, from similarity to rules,
+    forces two beautiful ideas into the course: a way to measure uncertainty
+    (entropy) and a way to measure how much a question reduces it (information
+    gain). This lesson builds both from scratch, with an interactive figure for
+    every concept.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: twenty questions</a></li>
+    <li><a href="#sec-anatomy">Anatomy of a tree</a></li>
+    <li><a href="#sec-express">Expressiveness and the overfitting trap</a></li>
+    <li><a href="#sec-entropy">Measuring uncertainty: entropy</a></li>
+    <li><a href="#sec-ig">Information gain</a></li>
+    <li><a href="#sec-greedy">Building the tree greedily</a></li>
+    <li><a href="#sec-good">Good trees, overfitting, and pruning</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: twenty questions</h2>
+
+<p>
+You already know this algorithm from a road trip. In twenty questions, one
+player thinks of a thing and the other identifies it by asking a sequence of
+yes/no questions, each one chosen to narrow the possibilities as fast as
+possible. "Is it alive?" splits the world in half. "Is it bigger than a
+breadbox?" splits it again. A good player reaches the answer in a handful of
+questions; a bad player wastes turns on questions that rule out almost
+nothing. Hold onto that difference between good questions and bad ones,
+because by section 4 it becomes a formula.
+</p>
+
+<p>
+Now make it mechanical. Picture a citrus sorting facility: fruit rolls down a
+conveyor, sensors measure each one's <strong>height</strong> and
+<strong>width</strong>, and a machine has to call it, lemon or orange, in
+milliseconds. The machine's strategy is exactly twenty questions: is the width
+over some cutoff? If yes, ask a follow-up; if no, ask a different follow-up;
+after two or three questions, commit to a label. Try it below. The tree in
+this figure was learned from real measurements, and the walk from top to
+bottom is the entire prediction algorithm:
+</p>
+
+<div class="figure" id="fig-walk">
+  <div class="fig-mount" data-fig="walk"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> prediction is a walk. Set the mystery fruit's height and width, press Classify, and follow it from the root to a leaf. Each box asks one question about one measurement; the answer picks the branch; the leaf at the bottom is the verdict.</p>
+</div>
+
+<p>
+That is a <strong>decision tree</strong>: a model that predicts by asking a
+sequence of feature-based questions, routing an example from the root to a
+leaf. Notice what we did not need: no distances, no scan over stored
+examples, no memory of the training data at all. The tree <em>is</em> the
+model. Two questions drive the rest of the lesson. What exactly is this
+object and what can it express? And, the harder one, where do good questions
+come from?
+</p>
+</section>
+
+<!-- ═══════════════════ 1. ANATOMY ═══════════════════ -->
+<section id="sec-anatomy">
+<h2><span class="secnum">1.</span> Anatomy of a tree</h2>
+
+<p>
+Name the parts first, because every later formula refers to them. An
+<strong>internal node</strong> tests one feature (one attribute of the input).
+A <strong>branch</strong> is one possible answer to that test, and it routes
+the example onward. A <strong>leaf</strong>, also called a terminal node,
+outputs a prediction. To classify a test instance you start at the
+<strong>root</strong> (the top node), answer its test, follow the matching
+branch, and repeat until you land in a leaf. One root-to-leaf path, one
+prediction.
+</p>
+
+<p>
+Which parts are learned and which are chosen? The <strong>parameters</strong>,
+the things training determines, are the splits themselves (which feature each
+node tests, at what threshold) and the overall shape of the tree. The
+<strong>hyperparameters</strong>, chosen by us before training, are the limits
+we place on that shape: the maximum depth, the minimum number of examples in
+a leaf, the minimum improvement a split must offer. Section 6 shows why those
+limits are a matter of survival, not taste.
+</p>
+
+<h3>Every leaf owns a region of space</h3>
+
+<p>
+Here is the picture that makes trees geometric. Take any input in the feature
+space and run it through the tree; it lands in exactly one leaf. So each leaf
+<span class="m">$m$</span> owns a <strong>decision region</strong>
+<span class="m">$R_m$</span>: the set of all inputs that reach it. The regions
+tile the whole space with no gaps and no overlaps. And because every internal
+node tests a <em>single</em> feature against a threshold, every cut is a
+straight line perpendicular to one axis. The resulting boundary is
+<strong>axis-aligned</strong>: a patchwork of rectangles, never a diagonal,
+never a curve. A tree and its region map are the same object drawn two ways:
+</p>
+
+<div class="figure" id="fig-duality">
+  <div class="fig-mount" data-fig="duality"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the tree &harr; regions duality. Click a leaf and its rectangle lights up; click a rectangle and its leaf lights up. Each internal node's threshold is one axis-aligned cut, and stacking the cuts tiles the feature space into one region per leaf.</p>
+</div>
+
+<h3>Two kinds of questions</h3>
+
+<p>
+The kind of test a node can ask depends on the feature's type, using exactly
+the feature vocabulary from lecture 2:
+</p>
+
+<ul>
+  <li><b>Numerical features</b> split on a threshold: <span class="m">$\text{feature} > \text{threshold}$</span>. Width over 6.5 cm? Height over 8 cm? One number, two branches.</li>
+  <li><b>Categorical features</b> split on category: is the feature this value, or which of its values is it? The classic example we will use all lesson: deciding whether to <em>wait for a table at a restaurant</em> (a True/False target) from features like <code>Type</code> (French, Italian, Thai, Burger) and <code>Patrons</code> (None, Some, Full).</li>
+</ul>
+
+<p>
+Numerical splits are the ones you can feel. Below is the citrus data as a
+scatter, with one split under your control. Drag the threshold and watch the
+two groups it creates. As you drag, ask yourself which position makes the two
+groups most single-minded, because that intuition is about to become the
+learning algorithm:
+</p>
+
+<div class="figure" id="fig-splitchooser">
+  <div class="fig-mount" data-fig="splitchooser"></div>
+  <p class="fig-caption"><b>Fig 1.2,</b> the split chooser. Pick the feature (axis), drag the threshold, and read the live class mix of each side. Some thresholds produce nearly pure groups; others produce two coin flips. "Which split is best?" is the question the whole next arc answers.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why are a decision tree's boundaries axis-aligned, and what would it take to get a diagonal one?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Trees are drawn with rectangles by convention; the real boundary can be any shape</button>
+    <button data-k="b">Each node tests a single feature against a threshold, so each cut is perpendicular to one axis; a diagonal needs a test that combines features, like <span class="m">$x_1 + x_2 > c$</span>, which standard trees never ask</button>
+    <button data-k="c">Because the features are categorical, the space cannot have diagonals</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The rectangles are not a drawing convention. They are a direct consequence of what the model is allowed to ask: one feature, one threshold, per node.</div>
+  <div class="quiz-fb" data-k="b">Right. The test "is <span class="m">$x_1 > 6.5$</span>?" cuts space with a vertical line no matter what the data looks like. Only a test mixing features could tilt the cut, and the standard tree grammar does not include one. Fig 6.4 shows the price: a diagonal truth must be approximated by a staircase.</div>
+  <div class="quiz-fb" data-k="c">The citrus features are continuous and the boundary is still axis-aligned. The cause is the single-feature test, not the feature type.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. EXPRESSIVENESS ═══════════════════ -->
+<section id="sec-express">
+<h2><span class="secnum">2.</span> Expressiveness and the overfitting trap</h2>
+
+<p>
+How much can this rectangle language express? Everything, given enough
+rectangles. A decision tree is a <strong>universal function approximator</strong>:
+stack enough axis-aligned cuts and you can carve feature space as finely as
+you like. Here is the blunt construction that proves it. For any training
+set, keep splitting until every training point sits alone in its own leaf,
+then label each leaf with its point's class. One leaf per training point.
+This tree classifies the training set <em>perfectly</em>, every single time,
+no matter how noisy the data is.
+</p>
+
+<p>
+And that is precisely the trap. A tree with one leaf per training point has
+not learned the difference between lemons and oranges; it has memorized 32
+individual fruits, mislabeled ones included. Ask it about a new fruit and it
+answers with whatever noise happened to live in that sliver of space. Perfect
+training accuracy, and nothing to say about the world. The lecture 2 lesson
+applies unchanged: what we want is <strong>generalization</strong>, and an
+unconstrained tree is a memorization machine. So the real goal is a
+<em>small</em> tree whose few splits capture real structure, and we need a
+principled way to find one.
+</p>
+
+<p>
+Why not just search for the smallest tree that fits the data? Because that
+search is computationally hopeless: finding the optimal tree is NP-complete
+(Laurent and Rivest, 1976). The number of possible trees explodes with the
+number of features and thresholds, and no known algorithm finds the best one
+efficiently. So we lower our ambitions and go <strong>greedy</strong>: build
+the tree top-down, and at each node choose the single split that most reduces
+our uncertainty about the target, then recurse. Greedy needs a number, a
+score that says how uncertain a node is, so that "most reduces uncertainty"
+means something. The requirements are easy to state:
+</p>
+
+<ul>
+  <li>A leaf holding examples of only one class should score <b>low</b> (we are certain; good).</li>
+  <li>A leaf holding an even mix of every class should score <b>high</b> (we are clueless; bad).</li>
+</ul>
+
+<p>
+Claude Shannon built exactly this number in 1948, for a completely different
+purpose (how many bits does a message need?), and it drops into our problem
+unchanged. It is called entropy, and it is the next section.
+</p>
+
+<details class="check">
+  <summary>Check: convince yourself the one-leaf-per-point tree exists</summary>
+  <div>
+    <p>Sketch the argument that for any training set (with no two identical inputs labelled differently) you can always build a tree with zero training error. Then say why we refuse to.</p>
+    <p><b>Answer.</b> Take any node holding two or more points. Since the points are distinct, some feature differs between two of them, so a threshold between those two values splits the node into two non-empty parts. Repeat; each split strictly shrinks the largest group, so the recursion ends with every point alone in a leaf, and labelling each leaf by its own point gives zero training error. We refuse because this tree encodes the training set, noise and all: its decision regions are slivers shaped by accidents of sampling, so its error on <em>new</em> data can be terrible. Zero training error is not evidence of learning; lecture 2's validation discipline is how we catch the difference. And searching for the smallest zero-error tree instead is NP-complete, which is why the next sections build a greedy alternative.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. ENTROPY ═══════════════════ -->
+<section id="sec-entropy">
+<h2><span class="secnum">3.</span> Measuring uncertainty: entropy</h2>
+
+<p>
+Start with the simplest uncertain thing in the world: a coin. If the coin is
+fair, you are maximally uncertain about the next flip. If the coin is loaded
+so that heads comes up 90% of the time, you are much less uncertain; betting
+heads is nearly safe. If the coin has heads on both sides, you are not
+uncertain at all. <strong>Entropy</strong> is the number that grades this
+scale. For a discrete random variable <span class="m">$X$</span> taking
+values <span class="m">$x$</span> with probabilities <span class="m">$p(x)$</span>:
+</p>
+
+$$ H(X) := -\sum_{x \in \mathcal{X}} p(x) \log_2 p(x) $$
+
+<p>
+Read it as an average of surprises. An outcome with probability
+<span class="m">$p(x)$</span> carries <span class="m">$-\log_2 p(x)$</span>
+bits of surprise: rare outcomes are big news, certain outcomes are no news.
+Entropy is the expected surprise, the average information content of one
+draw, measured in <b>bits</b> because of the base-2 log. For a coin with
+<span class="m">$P(\text{heads}) = p$</span>, the sum has two terms:
+</p>
+
+$$ H(X) = -p \log_2 p - (1-p) \log_2 (1-p) $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: two coins</div>
+  <p><b>Fair coin, <span class="m">$p = 0.5$</span>:</b></p>
+  $$ H = -\tfrac{1}{2}\log_2 \tfrac{1}{2} - \tfrac{1}{2}\log_2 \tfrac{1}{2}
+     = \tfrac{1}{2}(1) + \tfrac{1}{2}(1) = 1 \text{ bit} $$
+  <p>One full bit of uncertainty per flip, the maximum a two-outcome variable can carry.</p>
+  <p><b>Loaded coin, <span class="m">$p = 0.9$</span>:</b> using <span class="m">$\log_2 0.9 \approx -0.152$</span> and <span class="m">$\log_2 0.1 \approx -3.322$</span>,</p>
+  $$ H = -0.9(-0.152) - 0.1(-3.322) = 0.137 + 0.332 \approx 0.469 \text{ bits} $$
+  <p>Less than half the fair coin's uncertainty. And at <span class="m">$p = 0$</span> or <span class="m">$p = 1$</span> the entropy is exactly 0: a certain outcome carries no surprise at all. (We adopt the convention <span class="m">$0 \log 0 = 0$</span>.)</p>
+</div>
+
+<div class="figure" id="fig-entropy">
+  <div class="fig-mount" data-fig="entropy"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the binary entropy curve. Drag either coin along the <span class="m">$p$</span> axis. The curve peaks at exactly 1 bit at <span class="m">$p = 0.5$</span> and falls to 0 at both ends. Park the coins at two different biases and the readout says which one is more loaded, meaning more predictable, meaning lower entropy.</p>
+</div>
+
+<p>
+The curve is the whole story of one variable: certainty at the edges, maximal
+confusion in the middle. But splits involve <em>two</em> variables, the target
+and the feature we are testing, so we need entropy's social life too.
+</p>
+
+<h3>Joint and conditional entropy</h3>
+
+<p>
+The <strong>joint entropy</strong> of two variables measures the uncertainty
+in the pair taken together:
+</p>
+
+$$ H(X, Y) = -\sum_{x \in \mathcal{X}} \sum_{y \in \mathcal{Y}}
+   p(x, y) \log_2 p(x, y) $$
+
+<p>
+The lecture's example: let <span class="m">$X$</span> be whether it is raining
+and <span class="m">$Y$</span> whether it is cloudy, with the joint table
+<span class="m">$P(R, C) = \tfrac{24}{100}$</span>,
+<span class="m">$P(R, \neg C) = \tfrac{1}{100}$</span>,
+<span class="m">$P(\neg R, C) = \tfrac{25}{100}$</span>,
+<span class="m">$P(\neg R, \neg C) = \tfrac{50}{100}$</span>. Plugging the
+four cells into the formula gives
+<span class="m">$H(X, Y) \approx 1.56$</span> bits. (Homework fact from the
+slides: for two binary variables the maximum possible is
+<span class="m">$H(X,Y) = 2$</span> bits, reached when all four cells are
+equally likely.)
+</p>
+
+<p>
+More useful for us: how uncertain is <span class="m">$Y$</span> once we
+<em>know</em> the value of <span class="m">$X$</span>? That is the
+<strong>conditional entropy given a specific value</strong>:
+</p>
+
+$$ H(Y \mid X = x) = -\sum_{y \in \mathcal{Y}} p(y \mid x) \log_2 p(y \mid x) $$
+
+<p>
+Work the weather numbers. If it is raining
+(<span class="m">$P(R) = 0.25$</span>), then
+<span class="m">$P(C \mid R) = \tfrac{24}{25} = 0.96$</span>, so
+</p>
+
+$$ H(Y \mid X = \text{R}) = -0.96 \log_2 0.96 - 0.04 \log_2 0.04
+   \approx 0.057 + 0.186 \approx 0.24 \text{ bits} $$
+
+<p>
+Knowing it rains makes cloudiness nearly certain. If it is not raining,
+<span class="m">$P(C \mid \neg R) = \tfrac{25}{75} = \tfrac{1}{3}$</span>, and
+the same computation gives
+<span class="m">$H(Y \mid X = \neg\text{R}) \approx 0.92$</span> bits, much
+more uncertain. So the leftover uncertainty depends on which answer we got.
+To get one number for the feature overall, average over the answers, weighted
+by how likely each answer is. That is the
+<strong>expected conditional entropy</strong>:
+</p>
+
+$$ H(Y \mid X) = \mathbb{E}_{x \sim X}\big[ H(Y \mid X = x) \big]
+   = \sum_{x \in \mathcal{X}} p(x)\, H(Y \mid X = x) $$
+
+<p>
+For the weather: <span class="m">$H(Y \mid X) = 0.25(0.24) + 0.75(0.92)
+\approx 0.75$</span> bits. A tidy consistency check, using the chain rule
+below: <span class="m">$H(Y \mid X) + H(X) = 0.75 + 0.81 = 1.56 = H(X, Y)$</span>,
+where <span class="m">$H(X) = H(0.25) \approx 0.81$</span> bits. The pieces
+fit.
+</p>
+
+<h3>Properties worth memorizing</h3>
+
+<ul>
+  <li><b>Non-negative:</b> <span class="m">$H(X) \ge 0$</span> always.</li>
+  <li><b>Chain rule:</b> <span class="m">$H(X, Y) = H(X \mid Y) + H(Y) = H(Y \mid X) + H(X)$</span>. Total uncertainty = uncertainty of one part + leftover uncertainty of the other.</li>
+  <li><b>Independence:</b> if <span class="m">$X$</span> and <span class="m">$Y$</span> are independent, <span class="m">$H(Y \mid X) = H(Y)$</span>. Knowing <span class="m">$X$</span> tells you nothing.</li>
+  <li><b>Information never hurts:</b> <span class="m">$H(Y \mid X) \le H(Y)$</span>. Knowing something can only reduce (or preserve) your uncertainty, never increase it.</li>
+  <li><b>Self-knowledge:</b> <span class="m">$H(Y \mid Y) = 0$</span>. Once you know <span class="m">$Y$</span>, there is no uncertainty about <span class="m">$Y$</span>.</li>
+</ul>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why is entropy exactly zero for a pure node and maximal for a 50/50 split?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Because the formula divides by the number of classes, which cancels at 50/50</button>
+    <button data-k="b">It is a convention chosen so the numbers look nice; any decreasing function would do the same job</button>
+    <button data-k="c">A pure node has one outcome with <span class="m">$p = 1$</span>, and <span class="m">$1 \cdot \log_2 1 = 0$</span>: a certain draw carries no surprise. At 50/50 every draw is maximally surprising on average, and the curve's peak at <span class="m">$p = 0.5$</span> is exactly 1 bit</button>
+  </div>
+  <div class="quiz-fb" data-k="a">There is no division by class count in <span class="m">$H = -\sum p \log_2 p$</span>. The behaviour at the extremes comes from the <span class="m">$p \log p$</span> terms themselves.</div>
+  <div class="quiz-fb" data-k="b">The shape is not arbitrary: entropy is the expected number of bits needed to communicate the outcome, which is a real quantity with real units. (Gini in section 6 is a different ruler, but it is also principled, not cosmetic.)</div>
+  <div class="quiz-fb" data-k="c">Exactly. Certainty means zero surprise per draw, so the average surprise is zero. An even mix maximizes the average surprise, and for two classes that maximum is 1 bit. Confirm both ends on the curve in Fig 3.1.</div>
+</div>
+
+<details class="check">
+  <summary>Check: compute one entropy by hand</summary>
+  <div>
+    <p>A node holds 8 examples: 2 positive, 6 negative. Compute its entropy in bits. (Useful values: <span class="m">$\log_2 \tfrac{1}{4} = -2$</span>, <span class="m">$\log_2 \tfrac{3}{4} \approx -0.415$</span>.)</p>
+    <p><b>Answer.</b> The class proportions are <span class="m">$p = \tfrac{2}{8} = 0.25$</span> and <span class="m">$1 - p = 0.75$</span>. So
+    <span class="m">$H = -0.25 \log_2 0.25 - 0.75 \log_2 0.75 = 0.25(2) + 0.75(0.415) = 0.5 + 0.311 \approx 0.811$</span> bits.
+    Sanity checks: it is below 1 (the node is not a 50/50 mix) and above 0 (it is not pure). Drag a coin to <span class="m">$p = 0.25$</span> in Fig 3.1 and read the same number off the curve.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 4. INFORMATION GAIN ═══════════════════ -->
+<section id="sec-ig">
+<h2><span class="secnum">4.</span> Information gain</h2>
+
+<p>
+Now assemble the split-scoring machine. Before a split, our uncertainty about
+the target <span class="m">$Y$</span> at a node is <span class="m">$H(Y)$</span>.
+After splitting on a feature (or test) <span class="m">$X$</span>, the
+leftover uncertainty is the expected conditional entropy
+<span class="m">$H(Y \mid X)$</span>: each child's entropy, weighted by the
+fraction of examples that flow into it. The difference is what the question
+bought us. That difference is the <strong>information gain</strong>:
+</p>
+
+$$ IG(Y \mid X) := H(Y) - H(Y \mid X) $$
+
+<p>
+It is measured in bits: how many bits of uncertainty about
+<span class="m">$Y$</span> did knowing <span class="m">$X$</span> remove?
+(This quantity is also called the <em>mutual information</em> between
+<span class="m">$Y$</span> and <span class="m">$X$</span>; same formula, two
+names.) By the "information never hurts" property it is never negative, it is
+zero when the feature is independent of the target, and it is capped by
+<span class="m">$H(Y)$</span> itself, which is achieved only by a split into
+perfectly pure children. High information gain is exactly the "good question"
+from twenty questions, now with units.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one full information-gain computation</div>
+  <p>A node holds 7 fruits: 2 lemons and 5 oranges, with heights (cm): oranges at 6.2, 6.5, 6.8, 6.9, 7.4 and lemons at 8.6, 9.4. <b>Step 1: entropy before.</b> The class proportions are <span class="m">$\tfrac{2}{7}$</span> and <span class="m">$\tfrac{5}{7}$</span>:</p>
+  $$ H(Y) = -\tfrac{2}{7}\log_2\tfrac{2}{7} - \tfrac{5}{7}\log_2\tfrac{5}{7}
+     = 0.2857(1.807) + 0.7143(0.485) = 0.516 + 0.347 \approx 0.863 \text{ bits} $$
+  <p><b>Step 2: split.</b> Try the test <span class="m">$\text{height} > 7$</span>. Left child (height <span class="m">$\le 7$</span>): 4 oranges, 0 lemons. Right child (height <span class="m">$> 7$</span>): 1 orange (the 7.4) and both lemons.</p>
+  <p><b>Step 3: children's entropies.</b> Left is pure: <span class="m">$H = 0$</span>. Right is a 2-lemon/1-orange mix:</p>
+  $$ H_{\text{right}} = -\tfrac{2}{3}\log_2\tfrac{2}{3} - \tfrac{1}{3}\log_2\tfrac{1}{3}
+     = 0.6667(0.585) + 0.3333(1.585) \approx 0.918 \text{ bits} $$
+  <p><b>Step 4: weight and subtract.</b> The left child gets <span class="m">$\tfrac{4}{7}$</span> of the examples, the right <span class="m">$\tfrac{3}{7}$</span>:</p>
+  $$ H(Y \mid \text{split}) = \tfrac{4}{7}(0) + \tfrac{3}{7}(0.918) \approx 0.394,
+     \qquad IG = 0.863 - 0.394 \approx 0.470 \text{ bits} $$
+  <p>Decent, but not the best available. Slide the threshold up to 8.0 and the split becomes perfectly pure on both sides: <span class="m">$IG = 0.863 - 0 = 0.863$</span> bits, the entire entropy of the node. You will verify this in code in Fig 5.2.</p>
+</div>
+
+<p>
+One computation, four steps, and it turns every candidate split into a single
+number. Now do it by feel. The figure below runs this exact computation live
+on the full citrus scatter while you drag. Hunt for the maximum:
+</p>
+
+<div class="figure" id="fig-igcalc">
+  <div class="fig-mount" data-fig="igcalc"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the information-gain calculator. Every drag recomputes <span class="m">$H(Y)$</span>, both children's entropies, the weighted average <span class="m">$H(Y \mid \text{split})$</span>, and the gain. The meter shows how close you are to the best split anywhere on either feature. When you find it, you have done, by hand, exactly what the learning algorithm does.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A node holds 8 emails, 4 spam and 4 not. Feature A ("has a link") splits them 4 spam / 0 vs 0 / 4 not. Feature B ("sent at night") splits them 2/2 vs 2/2. Which feature has higher information gain, and what are the two gains?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Feature B: it splits the examples into equal-sized halves, which is more balanced</button>
+    <button data-k="b">Feature A: its children are pure, so <span class="m">$IG_A = H(Y) - 0 = 1$</span> bit, while B's children are each still 50/50, so <span class="m">$IG_B = 1 - 1 = 0$</span> bits</button>
+    <button data-k="c">They are equal: both split 8 examples into two groups of 4</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Balanced <em>sizes</em> are irrelevant; what matters is the class mix inside each child. B's children are exactly as confused as the parent.</div>
+  <div class="quiz-fb" data-k="b">Right. The parent is a 50/50 mix, so <span class="m">$H(Y) = 1$</span> bit. A's children have entropy 0 each, so all 1 bit is gained. B's children each have entropy 1, and the weighted average is <span class="m">$\tfrac{4}{8}(1) + \tfrac{4}{8}(1) = 1$</span>, so nothing is gained. Asking B is asking a question whose answer you cannot use.</div>
+  <div class="quiz-fb" data-k="c">Group sizes match, but information gain scores the change in <em>uncertainty</em>, not the change in geometry. Compute the children's entropies for each and they differ completely.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. GREEDY BUILDING ═══════════════════ -->
+<section id="sec-greedy">
+<h2><span class="secnum">5.</span> Building the tree greedily</h2>
+
+<p>
+We have the score; now the algorithm writes itself. At each node, consider
+every available split <span class="m">$s$</span> from the set of candidates
+<span class="m">$S$</span> (every feature, and for numerical features every
+threshold between consecutive values), and take the one that maximizes the
+gain:
+</p>
+
+$$ s^\star = \operatorname*{arg\,max}_{s \in S}
+   \left[ H(Y) - \sum_{v \in \text{children}(s)} p(v)\, H(Y \mid v) \right] $$
+
+<p>The full procedure, top to bottom:</p>
+
+<ol>
+  <li>Start with the whole training set <span class="m">$D_{tr}$</span> at the root.</li>
+  <li>At the current node, pick the best split <span class="m">$s^\star$</span> by the criterion above.</li>
+  <li>Partition the node's examples according to <span class="m">$s^\star$</span>, one child per answer.</li>
+  <li>Recurse on each child, until its examples are pure or no useful split remains.</li>
+  <li>Label each leaf by its class (the majority class, if it ends impure).</li>
+</ol>
+
+<p>
+"Greedy" is the honest word for step 2: the algorithm grabs the best
+<em>local</em> improvement and never reconsiders. It might miss a globally
+better tree that starts with a mediocre first split. We accept that, because
+section 2 showed the alternative is NP-complete.
+</p>
+
+<h3>The restaurant example, worked in full</h3>
+
+<p>
+Time for the classic categorical example. Twelve evenings, one decision:
+do we wait for a table? Each evening is described by categorical features;
+we focus on <code>Patrons</code> (how full is it?) and <code>Type</code>
+(what cuisine?), with <code>Hungry</code> and <code>Fri/Sat</code> also
+available as candidates.
+<!-- Content note: the lecture states IG(Type) = 0 and IG(Patrons) ≈ 0.541.
+     The row-level table below is the standard 12-example restaurant dataset
+     those slide numbers are computed from (shown with 4 of its attributes);
+     the full table is an addition beyond the source file, included so the
+     worked example and Fig 5.1 can be verified row by row. -->
+</p>
+
+<div class="wtable-wrap">
+<table class="wtable">
+  <tr><th>#</th><th>Patrons</th><th>Type</th><th>Hungry</th><th>Fri/Sat</th><th>Wait?</th></tr>
+  <tr><td>1</td><td>Some</td><td>French</td><td>Yes</td><td>No</td><td><b>Yes</b></td></tr>
+  <tr><td>2</td><td>Full</td><td>Thai</td><td>Yes</td><td>No</td><td>No</td></tr>
+  <tr><td>3</td><td>Some</td><td>Burger</td><td>No</td><td>No</td><td><b>Yes</b></td></tr>
+  <tr><td>4</td><td>Full</td><td>Thai</td><td>Yes</td><td>Yes</td><td><b>Yes</b></td></tr>
+  <tr><td>5</td><td>Full</td><td>French</td><td>No</td><td>Yes</td><td>No</td></tr>
+  <tr><td>6</td><td>Some</td><td>Italian</td><td>Yes</td><td>No</td><td><b>Yes</b></td></tr>
+  <tr><td>7</td><td>None</td><td>Burger</td><td>No</td><td>No</td><td>No</td></tr>
+  <tr><td>8</td><td>Some</td><td>Thai</td><td>Yes</td><td>No</td><td><b>Yes</b></td></tr>
+  <tr><td>9</td><td>Full</td><td>Burger</td><td>No</td><td>Yes</td><td>No</td></tr>
+  <tr><td>10</td><td>Full</td><td>Italian</td><td>Yes</td><td>Yes</td><td>No</td></tr>
+  <tr><td>11</td><td>None</td><td>Thai</td><td>No</td><td>No</td><td>No</td></tr>
+  <tr><td>12</td><td>Full</td><td>Burger</td><td>Yes</td><td>Yes</td><td><b>Yes</b></td></tr>
+</table>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: Type vs Patrons at the root</div>
+  <p>The root holds 6 Yes and 6 No, so <span class="m">$H(Y) = H(0.5) = 1$</span> bit exactly.</p>
+  <p><b>Candidate 1: split on Type.</b> Count each branch from the table: French gets rows {1, 5}, one Yes and one No. Italian gets {6, 10}, one Yes and one No. Thai gets {2, 4, 8, 11}, two Yes and two No. Burger gets {3, 7, 9, 12}, two Yes and two No. Every branch is a 50/50 mix, so every child has entropy 1:</p>
+  $$ H(Y \mid \text{Type}) = \tfrac{2}{12}(1) + \tfrac{2}{12}(1) + \tfrac{4}{12}(1) + \tfrac{4}{12}(1) = 1
+     \quad\Rightarrow\quad IG(\text{Type}) = 1 - 1 = 0 $$
+  <p>Four branches, twelve examples shuffled, and not one bit gained. Knowing the cuisine tells you nothing about waiting.</p>
+  <p><b>Candidate 2: split on Patrons.</b> None gets rows {7, 11}, both No: entropy 0. Some gets {1, 3, 6, 8}, all Yes: entropy 0. Full gets {2, 4, 5, 9, 10, 12}, two Yes and four No: <span class="m">$H(\tfrac{1}{3}) = \tfrac{1}{3}(1.585) + \tfrac{2}{3}(0.585) \approx 0.918$</span>. So:</p>
+  $$ H(Y \mid \text{Patrons}) = \tfrac{2}{12}(0) + \tfrac{4}{12}(0) + \tfrac{6}{12}(0.918) \approx 0.459
+     \quad\Rightarrow\quad IG(\text{Patrons}) = 1 - 0.459 \approx 0.541 $$
+  <p>Over half a bit from one question, with two of the three branches settled instantly. Greedy splits on Patrons, no contest. (The lecture adds a second consideration: informative splits near the root also shorten the <em>average depth</em> to a decision, which matters when questions cost time or money.)</p>
+</div>
+
+<p>
+Now build the whole thing yourself. The figure computes every candidate's
+gain at every node, so you can either follow greedy or sabotage it and watch
+what happens:
+</p>
+
+<div class="figure" id="fig-builder">
+  <div class="fig-mount" data-fig="builder"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the greedy tree builder on the 12 restaurant evenings. The orange node is being decided; each button shows a candidate feature's real information gain there. Try splitting the root on Type to feel a zero-gain split, then Reset and let auto-greedy run: Patrons first, then Type on the Full branch, then Fri/Sat and Hungry, down to all-pure leaves in four splits.</p>
+</div>
+
+<h3>The same algorithm in Python</h3>
+
+<p>
+Three short functions and the whole learner exists. Entropy first, straight
+from the definition:
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def entropy(labels):
+    _, counts = np.unique(labels, return_counts=True)
+    p = counts / counts.sum()
+    return -(p * np.log2(p)).sum()          # H = -Σ p log2 p</code></pre>
+
+<p>
+Information gain compares a parent to its children, weighting each child by
+the fraction of examples it receives:
+</p>
+
+<pre class="code" data-lang="python"><code>def information_gain(parent, children):
+    n = len(parent)
+    h_children = sum(len(c) / n * entropy(c) for c in children)
+    return entropy(parent) - h_children     # IG = H(Y) - H(Y|split)</code></pre>
+
+<p>
+And the builder is the recursion from the algorithm box: find the best split,
+partition, recurse, stop at pure leaves or a depth limit:
+</p>
+
+<pre class="code" data-lang="python"><code>def build_tree(X, y, depth=0, max_depth=3):
+    if len(np.unique(y)) == 1 or depth == max_depth:
+        return Leaf(majority(y))            # pure enough, or out of budget
+    feat, thr, gain = best_split(X, y)      # max information gain over all
+    if gain &lt;= 0:                           # features and thresholds
+        return Leaf(majority(y))
+    mask = X[:, feat] &lt;= thr
+    return Node(feat, thr,
+                left=build_tree(X[mask], y[mask], depth + 1, max_depth),
+                right=build_tree(X[~mask], y[~mask], depth + 1, max_depth))</code></pre>
+
+<p>
+Do not take my word that <code>information_gain</code> works. Run it. The
+exercise below executes the real function against the seven fruits from the
+section 4 worked example, so you can reproduce the 0.470 and then beat it:
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> a live <code>information_gain</code>. Set the threshold to 7.0 and Run: parent entropy 0.8631, weighted children 0.3936, gain 0.4696, matching the hand computation. Then hunt for the threshold that reaches the maximum 0.8631, which is where a greedy learner would actually split.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A classmate's <code>information_gain(parent, children)</code> returns <code>entropy(parent) - sum(entropy(c) for c in children)</code>. On the split {4 oranges} vs {1 orange, 2 lemons} from Fig 5.2, their function returns <span class="m">$0.863 - 0.918 &lt; 0$</span>. What did they forget?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The weights: each child's entropy must be multiplied by its share of the examples, <span class="m">$\tfrac{4}{7}(0) + \tfrac{3}{7}(0.918) = 0.394$</span>, which makes the gain 0.470, never negative</button>
+    <button data-k="b">They should use natural log instead of log base 2</button>
+    <button data-k="c">They should take the max of the children's entropies, not the sum</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. <span class="m">$H(Y \mid X)$</span> is an <em>expected</em> entropy: children that receive few examples contribute proportionally little. Forget the weights and a tiny messy child can outweigh a huge pure one, even driving the "gain" negative, which the real quantity never is.</div>
+  <div class="quiz-fb" data-k="b">The log base only changes the units (nats instead of bits). Both the bug and the fix are base-independent.</div>
+  <div class="quiz-fb" data-k="c">The definition averages, it does not take a max. The missing ingredient is the probability weighting <span class="m">$p(v)$</span> of each child.</div>
+</div>
+
+<details class="check">
+  <summary>Check: explain in one sentence why IG(Type) is exactly zero, not just small</summary>
+  <div>
+    <p><b>Answer.</b> Every one of Type's four branches has exactly the same Yes/No proportion as the parent (50/50), so each child's entropy equals the parent's entropy, the weighted average of the children equals the parent exactly, and the difference is exactly zero. In distribution terms: on this table, Type is independent of the target, and the "independence" property from section 3 says <span class="m">$H(Y \mid X) = H(Y)$</span> in that case. Zero gain is not a rounding artifact; it is the signature of a feature that carries no information about the answer.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. GOOD TREES ═══════════════════ -->
+<section id="sec-good">
+<h2><span class="secnum">6.</span> Good trees, overfitting, and pruning</h2>
+
+<p>
+What makes a tree good? It has to be expressive enough to capture the real
+structure and simple enough to generalize, and those pull in opposite
+directions. Too small a tree <strong>underfits</strong>: its leaves stay
+impure because it never got to ask enough questions, and it misses structure
+that is genuinely there. Too large a tree <strong>overfits</strong>: its
+leaves become pure for the wrong reasons, purified by memorizing noise. As a
+bonus it becomes unreadable, which throws away the interpretability that
+made us like trees in the first place. The tie-breaking principle is
+<strong>Occam's razor</strong>: prefer the simplest tree that explains the
+data. In practice that means small trees with the informative splits near the
+root, which is exactly what greedy information gain encourages.
+</p>
+
+<p>
+Greedy growing has three specific failure modes worth naming. First, greedy
+choices are local: the best split now may not lead to the best tree overall.
+Second, every split slices the data thinner, so nodes deep in the tree make
+their decisions from tiny subsets, and statistics estimated from six examples
+are guesses. Third, grow deep enough and you arrive back at section 2's
+monster, one leaf per example. Watch all three happen to real data:
+</p>
+
+<div class="figure" id="fig-depth">
+  <div class="fig-mount" data-fig="depth"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the depth dial. Left: the decision regions fracture into tiny slivers as depth grows, each sliver built to capture a few noisy points. Right: training accuracy climbs toward 100% while validation accuracy turns back down. Click the depth you would ship and the figure checks you against the computed optimum.</p>
+</div>
+
+<p>
+The fixes all limit tree size, and each one is a hyperparameter from
+section 1. <b>Restrict the depth</b>: stop asking questions after
+<span class="m">$d$</span> levels. <b>Set a minimum leaf size</b>: refuse
+splits that would leave a child with fewer than <span class="m">$m$</span>
+examples, so no rule ever rests on a handful of points. <b>Require a minimum
+information gain</b>: refuse splits that barely help, since they are usually
+fitting noise. And the fourth fix works after the fact: <b>prune</b>. Grow
+the tree generously, then delete branches that do not improve performance on
+a validation set, collapsing each deleted branch into a majority-vote leaf.
+Pruning gets to see the whole grown tree before deciding, which lets it undo
+greedy's early enthusiasm:
+</p>
+
+<div class="figure" id="fig-pruning">
+  <div class="fig-mount" data-fig="pruning"></div>
+  <p class="fig-caption"><b>Fig 6.2,</b> pruning an overgrown tree. Click internal nodes to collapse them into leaves; validation accuracy (computed on a real held-out set) updates instantly. The overgrown tree wins on training data and loses on validation; a few well-chosen cuts reverse that.</p>
+</div>
+
+<h3>Two extensions the same machinery buys you</h3>
+
+<p>
+<b>Continuous features</b> we have already been handling all lesson: sort the
+observed values, try the threshold between each consecutive pair, and keep
+the threshold with maximum information gain. Nothing new is needed; the
+candidate set <span class="m">$S$</span> just includes all those thresholds.
+<b>Regression trees</b> take one more step: when the target is a continuous
+number rather than a class, entropy no longer applies, so choose splits that
+most reduce the <em>squared error</em> of each child around its mean instead,
+and let each leaf predict the mean target of its examples. Same greedy
+recursion, different purity ruler. (The end quiz asks you to design this
+yourself before you read it again.)
+</p>
+
+<h3>A second ruler: Gini impurity</h3>
+
+<p>
+Entropy is not the only way to score a node's confusion, and Assignment 2
+uses the main alternative, so meet it now. The <strong>Gini impurity</strong>
+of a dataset <span class="m">$D$</span> with <span class="m">$C$</span>
+classes in proportions <span class="m">$p_i$</span> is
+</p>
+
+$$ \operatorname{Gini}(D) = 1 - \sum_{i=1}^{C} p_i^2 $$
+
+<p>
+Read it as: draw one example, guess a label by drawing again from the same
+mix, and Gini is the probability you guess wrong. Worked once, on the
+2-lemon/5-orange node from section 4:
+<span class="m">$\operatorname{Gini} = 1 - (\tfrac{2}{7})^2 - (\tfrac{5}{7})^2
+= 1 - \tfrac{4}{49} - \tfrac{25}{49} = \tfrac{20}{49} \approx 0.408$</span>.
+Like entropy it is zero for a pure node and maximal at an even mix (0.5
+instead of 1 bit for two classes), and splits are scored the same way,
+weighted parent-minus-children. The two rulers have slightly different
+shapes but nearly always rank splits the same way:
+</p>
+
+<div class="figure" id="fig-gini">
+  <div class="fig-mount" data-fig="gini"></div>
+  <p class="fig-caption"><b>Fig 6.3,</b> Gini vs entropy. Left: both curves over <span class="m">$p$</span>; toggle the &divide;2 scaling to see how close their shapes are. Right: both criteria scoring the same candidate split on the seven fruits from Fig 5.2. The readout names the best threshold under each ruler, and the marked split is where both agree; here, as they usually do, the two rulers pick the same one.</p>
+</div>
+
+<h3>k-NN or a tree? Same data, different bets</h3>
+
+<p>
+We now have two classifiers, and they disagree in an instructive way. k-NN
+bets that <em>local similarity</em> drives labels: it stores everything,
+compares at query time, and draws boundaries that follow the data's geometry.
+A tree bets that a <em>short sequence of single-feature questions</em> drives
+labels: it compresses training data into rules, never looks at it again, and
+draws axis-aligned boundaries. Reach for a tree when you want an
+interpretable rule you can read aloud, when features are mixed, discrete,
+missing, or badly scaled (a threshold does not care about units, which is why
+trees skip lecture 2's standardization ritual), or when prediction has to be
+fast: one root-to-leaf path instead of a scan of all <span class="m">$N$</span>
+points. Reach for k-NN when labels really are driven by local similarity,
+when you want a minimal-assumption baseline, or when a meaningful distance
+exists, as with images, text, and shapes. And when the truth is diagonal,
+watch what each one does:
+</p>
+
+<div class="figure" id="fig-knnvstree">
+  <div class="fig-mount" data-fig="knnvstree"></div>
+  <p class="fig-caption"><b>Fig 6.4,</b> k-NN vs tree on the same data, where the true boundary is the diagonal <span class="m">$x_2 = x_1$</span>. k-NN's similarity boundary follows the diagonal naturally; the tree can only build a staircase out of axis-aligned cuts, and buying more steps costs depth and leaves.</p>
+</div>
+
+<p>
+One deployment story to make the stakes real: the Xbox Kinect classified the
+body part of every pixel of a depth image, in real time, using decision trees
+(grown into forests), trained on millions of examples (Shotton et al., CVPR
+2011). Fast prediction is not a small perk; it is why a tree-based model sat
+inside a living room device instead of a datacentre.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In bias/variance terms, what does pruning a grown tree do?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Decreases bias and decreases variance: pruned trees are simply better everywhere</button>
+    <button data-k="b">Decreases bias and increases variance: fewer nodes means less stability</button>
+    <button data-k="c">Increases bias and decreases variance: a smaller tree can express less (it may miss fine structure), but its predictions stop depending on the noise of the particular training sample</button>
+  </div>
+  <div class="quiz-fb" data-k="a">If pruning were free, we would prune to a stump. The gain in stability is paid for in expressiveness; the art is pruning only branches whose "structure" was noise.</div>
+  <div class="quiz-fb" data-k="b">Backwards on both counts: removing capacity makes a model more biased and less variable, not the reverse.</div>
+  <div class="quiz-fb" data-k="c">Right. Every capacity-limiting fix in this section (depth caps, minimum leaf size, minimum gain, pruning) trades bias up for variance down. The win in Fig 6.2 happens because the variance removed was hurting validation more than the added bias does.</div>
+</div>
+
+<details class="check">
+  <summary>Check: explain overfitting in trees, and three ways to fight it</summary>
+  <div>
+    <p>Explain what overfitting looks like in a decision tree, name three concrete ways to reduce it, and give the bias/variance trade-off of each.</p>
+    <p><b>Answer.</b> An overfit tree has grown deep enough to carve decision regions around individual training points, so its leaves are pure on training data (accuracy near 100%) while validation accuracy sags: the tree has encoded sampling noise as if it were structure, exactly the pattern in Fig 6.1. Three fixes: <b>(1) a maximum-depth limit</b>: caps how fine the partition can get; raises bias (real structure deeper than the cap is unreachable) and lowers variance (no more noise-sized slivers). <b>(2) a minimum leaf size</b>: every prediction must rest on at least <span class="m">$m$</span> examples; raises bias near genuine fine boundaries and lowers variance by refusing rules justified by a couple of points. <b>(3) pruning on validation data</b>: grow first, then delete branches that fail to help held-out performance; raises bias only where a branch is deleted and lowers variance most surgically, since the deletion decision is made with evidence the training fit never saw. (A minimum information gain per split is a fourth, with the same flavour.)</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">7.</span> Summary and method card</h2>
+
+<p>
+The whole lesson in one paragraph. A decision tree predicts by playing twenty
+questions: internal nodes test single features, branches route the example,
+and one leaf answers. Every leaf owns an axis-aligned decision region, and a
+big enough tree can fit anything, including noise, which is why finding a
+good tree is a search for a <em>small</em> one. The optimal search is
+NP-complete, so we build greedily, and greedy needs a score: entropy measures
+a node's uncertainty in bits, and information gain,
+<span class="m">$IG = H(Y) - H(Y \mid X)$</span>, measures how much a split
+reduces it. Grow by maximum gain, then defend against overfitting with depth
+limits, minimum leaf sizes, minimum gains, and pruning judged on validation
+data, exactly the discipline lecture 2 taught.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Decision Trees</div>
+  <table>
+    <tr><th>Assumption</th><td>Useful decisions can be made by asking a sequence of simple feature-based questions.</td></tr>
+    <tr><th>Model class</th><td>Tree-structured rules: internal nodes test features, branches route examples, leaves output predictions.</td></tr>
+    <tr><th>Learning / selection</th><td>Build greedily by choosing informative splits, typically scored by entropy and information gain (or Gini impurity).</td></tr>
+    <tr><th>Prediction</th><td>Route the input from the root to a leaf; output the leaf's class (majority) or mean target (regression trees).</td></tr>
+    <tr><th>Strengths</th><td>Interpretable, fast at test time, handles discrete/mixed features naturally, models nonlinear (axis-aligned) decision regions.</td></tr>
+    <tr><th>Limitations</th><td>Can overfit badly when grown too deep; greedy splitting may miss the globally best tree; axis-aligned cuts approximate diagonal structure poorly.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Maximum depth, minimum leaf size, minimum information gain, pruning policy (all tuned on validation data).</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: similarity (k-NN), then rules, this
+lecture, and next a bigger leap: <em>parametric functions</em>. Linear
+regression stops asking questions and stops storing examples; it summarizes
+data into a small set of numbers, the parameters of a function, chosen by
+minimizing a loss. Trees introduced the idea that training means optimizing a
+criterion; the rest of the course makes that criterion differentiable. Two
+names to remember from this one: Claude Shannon, whose entropy became our
+split score, and Leo Breiman, who took the tree you just built and grew it
+into random forests, the ensemble method waiting later in the course.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">8.</span> End-of-lesson quiz</h2>
+
+<p>
+Two computational checks first, on a fresh dataset with a fresh impurity
+measure, then three transfer questions that ask you to design, not recall.
+Attempt each before expanding the answer.
+</p>
+
+<p>
+A small lender has 8 past loan applications. Each records the applicant's
+credit score band, whether they previously defaulted, and the decision that
+turned out to be correct:
+</p>
+
+<div class="wtable-wrap">
+<table class="wtable">
+  <tr><th>#</th><th>Credit score</th><th>Prev. default</th><th>Correct decision</th></tr>
+  <tr><td>1</td><td>High</td><td>No</td><td><b>Approve</b></td></tr>
+  <tr><td>2</td><td>High</td><td>No</td><td><b>Approve</b></td></tr>
+  <tr><td>3</td><td>High</td><td>Yes</td><td>Deny</td></tr>
+  <tr><td>4</td><td>Low</td><td>No</td><td><b>Approve</b></td></tr>
+  <tr><td>5</td><td>Low</td><td>No</td><td><b>Approve</b></td></tr>
+  <tr><td>6</td><td>Low</td><td>No</td><td>Deny</td></tr>
+  <tr><td>7</td><td>Low</td><td>Yes</td><td>Deny</td></tr>
+  <tr><td>8</td><td>High</td><td>Yes</td><td>Deny</td></tr>
+</table>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">Using Gini impurity, what is the gain of splitting the 8 applications on <b>previous default</b>? (Parent: 4 Approve, 4 Deny.)</p>
+  <div class="quiz-opts">
+    <button data-k="a">0.200</button>
+    <button data-k="b">0.300</button>
+    <button data-k="c">0.500</button>
+  </div>
+  <div class="quiz-fb" data-k="a">0.200 is the <em>weighted children's impurity</em>, the middle step. The gain is the parent's impurity minus that: <span class="m">$0.5 - 0.2 = 0.3$</span>.</div>
+  <div class="quiz-fb" data-k="b">Right. Parent: <span class="m">$1 - (\tfrac{4}{8})^2 - (\tfrac{4}{8})^2 = 0.5$</span>. Default = Yes holds rows {3, 7, 8}, all Deny: Gini 0. Default = No holds rows {1, 2, 4, 5, 6}, four Approve and one Deny: <span class="m">$1 - (\tfrac{4}{5})^2 - (\tfrac{1}{5})^2 = 1 - 0.64 - 0.04 = 0.32$</span>. Weighted: <span class="m">$\tfrac{3}{8}(0) + \tfrac{5}{8}(0.32) = 0.2$</span>. Gain: <span class="m">$0.5 - 0.2 = 0.3$</span>.</div>
+  <div class="quiz-fb" data-k="c">0.500 is the parent's impurity alone. A gain compares before and after: subtract the weighted children's impurity from it.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">Compute the Gini gain of splitting on <b>credit score</b>, decide which feature a greedy learner splits on first, and classify a new applicant with a <b>low</b> credit score and <b>no</b> previous default.</p>
+  <div class="quiz-opts">
+    <button data-k="a">Credit score has the higher gain; the new applicant is denied</button>
+    <button data-k="b">The two features tie, so the learner picks randomly; the applicant cannot be classified</button>
+    <button data-k="c">Credit score's gain is exactly 0 (both bands are 2/2 mixes, as impure as the parent), so greedy splits on previous default; the applicant follows the No branch, where the majority (4 of 5) is Approve</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Count the branches: High = {1, 2, 3, 8} is 2 Approve / 2 Deny, and Low = {4, 5, 6, 7} is 2 Approve / 2 Deny. Both children have Gini 0.5, the same as the parent, so the gain is 0, the restaurant's IG(Type) = 0 story all over again.</div>
+  <div class="quiz-fb" data-k="b">Not a tie: previous default gains 0.3 (Quiz 1) while credit score gains exactly 0. One question is informative, the other is not.</div>
+  <div class="quiz-fb" data-k="c">Right on all three counts. Credit score's children mirror the parent's 50/50 mix, so it gains nothing, exactly like Type in the restaurant example. Greedy takes previous default (gain 0.3). The new applicant has no previous default, lands in the {1, 2, 4, 5, 6} leaf, and its majority, 4 Approve to 1 Deny, says <b>Approve</b>.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design the regression-tree split criterion</summary>
+  <div>
+    <p>Targets are now continuous numbers (say, house prices), so entropy over class proportions no longer applies. Adapt the splitting criterion, and say how a leaf should predict.</p>
+    <p><b>Answer</b> (one good version). Replace "uncertainty" with "spread". Score a set of targets by its squared error around its own mean, <span class="m">$SSE = \sum_i (t^{(i)} - \bar{t})^2$</span>, and score a split by how much it reduces the total: choose the split maximizing <span class="m">$SSE_{\text{parent}} - (SSE_{\text{left}} + SSE_{\text{right}})$</span>, the exact analogue of parent-minus-weighted-children. A leaf predicts the <b>mean</b> of its training targets, because the mean is the constant that minimizes squared error, which makes the criterion and the prediction rule two halves of one decision. The learned function is piecewise constant: one flat value per decision region. Everything else, greedy recursion, depth limits, minimum leaf size, pruning on validation, transfers without modification.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): design a stopping rule and defend it</summary>
+  <div>
+    <p>You must decide when to stop splitting. Propose a concrete stopping rule and argue what it trades off.</p>
+    <p><b>Answer</b> (one good version). Stop splitting a node when <em>any</em> of the following holds: the node is pure; it holds fewer than <span class="m">$2m$</span> examples (so both children could not reach a minimum leaf size of <span class="m">$m$</span>, say <span class="m">$m = 5$</span>); or the best available split's information gain is below a threshold <span class="m">$\varepsilon$</span> (say 0.01 bits). The trade-off is bias versus variance, tuned by <span class="m">$m$</span> and <span class="m">$\varepsilon$</span>. Set them high and you stop early: low variance, but real fine structure is never discovered (higher bias), and there is a subtle failure, since a split with near-zero gain can unlock high-gain splits below it (an XOR-style pattern, where neither feature helps alone but together they separate perfectly), which early stopping never sees. Set them low and you approach the one-leaf-per-point monster. That blindness of early stopping is the argument for the grow-then-prune strategy of Fig 6.2: growing sees the future, pruning judges it on validation data.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): when does an axis-aligned tree struggle?</summary>
+  <div>
+    <p>Describe a dataset geometry where decision trees are inherently clumsy, explain why, and say what that implies about choosing or fixing the model.</p>
+    <p><b>Answer</b> (one good version). Any boundary that is genuinely diagonal, for instance "approve when income is at least three times the loan payment", a rule about <span class="m">$x_1 - 3x_2$</span>, not about either feature alone. A tree must approximate that line with a staircase of axis-aligned cuts (Fig 6.4): each extra stair costs another split, accuracy improves only slowly with depth, and the many small leaves are each estimated from few examples, inviting the overfitting of section 6. Implications: representation matters, because a single engineered feature (the income-to-payment ratio) turns the diagonal into an axis-aligned threshold and collapses the tree to depth 1; alternatively pick a model whose boundaries suit the geometry (k-NN here, or later, linear models, which draw exactly the tilted lines trees cannot). The general lesson: every model family has boundary shapes it finds cheap and shapes it finds expensive, and knowing which is which is half of model selection.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is decision trees: twenty questions, made rigorous. Prediction is a root-to-leaf walk, learning is a greedy hunt for questions with maximum information gain, and the danger is a tree big enough to memorize its own training noise, held back by depth limits, leaf sizes, and pruning judged on validation data. Next lecture we stop asking questions altogether: instead of rules or memories, we fit a function, and learning becomes the minimization of a loss. Linear regression.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../knn/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 2: k-Nearest Neighbours</div>
+  </a>
+  <a href="../linear-regression/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 4: Linear Regression</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 3 &middot; Decision Trees</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

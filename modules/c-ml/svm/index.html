@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Support Vector Machines — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on support vector machines: max-margin classification, support vectors, soft margins and slack, feature maps, and the kernel trick.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 8 &middot; The ML Bible</div>
+  <h1>Support Vector Machines</h1>
+  <p class="lede">
+    A linear classifier draws one line and stops. But on separable data there
+    are infinitely many lines that get every training point right, and they are
+    not equally trustworthy: some pass so close to the data that a whisper of
+    noise would flip a label. This lesson builds the classifier that takes the
+    geometry seriously. It picks the boundary with the widest empty buffer,
+    discovers that only a handful of points actually determine it, learns to
+    forgive messy data with slack, and then pulls one trick, the kernel, that
+    bends straight lines into circles. Every idea comes with a figure you can
+    grab.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: infinitely many perfect lines</a></li>
+    <li><a href="#sec-margin">Max-margin: the widest buffer</a></li>
+    <li><a href="#sec-sv">Support vectors: the points that matter</a></li>
+    <li><a href="#sec-duality">Optional depth: Lagrangians and the dual</a></li>
+    <li><a href="#sec-slack">Soft margins: paying for violations</a></li>
+    <li><a href="#sec-kernels">Kernels: nonlinear boundaries, linear machinery</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> Infinitely many perfect lines</h2>
+
+<p>
+Take a two-class dataset that a line can separate. How many separating lines
+are there? Infinitely many. Tilt a working line by a hair, or slide it a
+millimetre, and it still gets every training point right. Training accuracy
+cannot tell them apart: every one of them scores 100%. So the question that
+launches this lecture is not "can I separate the data", it is "which of the
+infinitely many perfect separators should I trust on tomorrow's data?"
+</p>
+
+<p>
+Here is the intuition to hold onto. A line that squeaks past the training
+points is living dangerously. New samples land near old ones, and a boundary
+that clears the data by a wide buffer keeps classifying them correctly when
+they wobble. A boundary that skims the data flips labels at the first hint of
+noise. Try it yourself. Below are three candidate boundaries on the same
+separable data; each one is scored by its <strong>margin</strong>, the buffer
+between the boundary and the closest training point:
+</p>
+
+<div class="figure" id="fig-whichline">
+  <div class="fig-mount" data-fig="whichline"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> three perfect classifiers, three very different buffers. Drag any endpoint to reshape a line; each line's margin (distance to its nearest point, computed live) updates in the readout, and the dashed tick marks the point that limits it. All three separate the training data. Only one of them would survive noisy test data comfortably.</p>
+</div>
+
+<p>
+The rest of the lesson is what happens when you take "pick the widest buffer"
+seriously. Section 1 turns it into an optimization problem. Section 2 finds
+the surprise hiding in its solution: most of the training data is irrelevant.
+Section 4 handles data that no line can separate cleanly, and section 5
+handles data that no line can separate at all.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. MAX-MARGIN ═══════════════════ -->
+<section id="sec-margin">
+<h2><span class="secnum">1.</span> Max-margin: the widest buffer</h2>
+
+<p>
+The model itself is the same linear classifier you already know. Compute a
+score, take its sign:
+</p>
+
+$$ z = w^\top x + b, \qquad y = \operatorname{sign}(z) $$
+
+<p>
+One notation change from logistic regression, and it is load-bearing: labels
+are now <span class="m">$t \in \{-1, +1\}$</span> instead of
+<span class="m">$\{0, 1\}$</span>. The payoff is a one-expression test for
+correctness. A point is correctly classified exactly when its label and its
+score agree in sign, that is, when
+<span class="m">$t^{(i)}(w^\top x^{(i)} + b) > 0$</span>. One product tells
+you everything: positive means right, negative means wrong, and its size
+measures how confidently right or wrong.
+</p>
+
+<p>
+The big idea of the lecture: keep this classifier, but among all parameter
+settings that classify the training data correctly, choose the boundary that
+is most robust to small changes in the data, the one with the largest margin.
+That is the whole design philosophy, and everything below is bookkeeping to
+make it precise.
+</p>
+
+<h3>Measuring the buffer: the two margin hyperplanes</h3>
+
+<p>
+Scores give us a natural way to draw the buffer. The decision boundary is the
+set of points where <span class="m">$z = 0$</span>. Now draw two more lines,
+the level sets <span class="m">$w^\top x + b = +1$</span> and
+<span class="m">$w^\top x + b = -1$</span>. These are the
+<strong>margin hyperplanes</strong>, and the strip between them is the margin.
+A point with score <span class="m">$z \in [-1, 1]$</span> lies inside that
+strip (the classifier still predicts with
+<span class="m">$\operatorname{sign}(z)$</span> there; the strip is a buffer,
+not a dead zone).
+</p>
+
+<p>
+How wide is the strip? Walk from the <span class="m">$-1$</span> line to the
+<span class="m">$+1$</span> line along the perpendicular direction
+<span class="m">$\hat{w} = w / \lVert w \rVert$</span>. Each unit step in that
+direction changes the score by exactly <span class="m">$\lVert w \rVert$</span>,
+because <span class="m">$w^\top \hat{w} = \lVert w \rVert$</span>. The total
+score change across the strip is <span class="m">$2$</span>, so the distance
+walked, the <strong>margin width</strong>, is
+</p>
+
+$$ M = \frac{2}{\lVert w \rVert} $$
+
+<p>
+Read that formula twice, because it is the engine of the whole lecture:
+<em>a small weight vector means a wide margin</em>. Watch it happen:
+</p>
+
+<div class="figure" id="fig-marginwidth">
+  <div class="fig-mount" data-fig="marginwidth"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> where <span class="m">$2/\lVert w \rVert$</span> comes from. The three lines are the level sets <span class="m">$w^\top x + b = -1, 0, +1$</span>. Slide <span class="m">$\lVert w \rVert$</span>: the boundary does not move, but the <span class="m">$\pm 1$</span> lines do, because a longer <span class="m">$w$</span> makes the score climb faster per step. Shrink <span class="m">$\lVert w \rVert$</span> and the buffer balloons.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: margin width for a given w</div>
+  <p>Take <span class="m">$w = (3, 4)^\top$</span> with any offset <span class="m">$b$</span>. Then</p>
+  $$ \lVert w \rVert = \sqrt{3^2 + 4^2} = \sqrt{25} = 5,
+     \qquad M = \frac{2}{5} = 0.4 $$
+  <p>Now rescale to <span class="m">$w' = (0.6,\, 0.8)^\top$</span>, <span class="m">$b' = b/5$</span>. The decision boundary <span class="m">$w'^\top x + b' = 0$</span> is <em>the same line</em> (both sides just got divided by 5), but <span class="m">$\lVert w' \rVert = 1$</span>, so <span class="m">$M = 2$</span>. Same boundary, five times the margin? Not for free: the <span class="m">$\pm 1$</span> hyperplanes moved outward, and the data now has to clear them. That requirement is what stops <span class="m">$w$</span> from shrinking to zero, and it is the constraint in the program below.</p>
+</div>
+
+<h3>The hard-margin program</h3>
+
+<p>
+Two requirements pin down the optimal parameters. First, every training point
+must be correctly classified <em>with a full margin</em>, meaning it clears
+its margin hyperplane:
+<span class="m">$t^{(i)}(w^\top x^{(i)} + b) \ge 1$</span> for all
+<span class="m">$i$</span>. Second, the margin
+<span class="m">$M = 2/\lVert w \rVert$</span> should be as large as possible.
+Maximizing <span class="m">$2/\lVert w \rVert$</span> is the same as
+minimizing <span class="m">$\lVert w \rVert$</span>, and minimizing
+<span class="m">$\tfrac{1}{2}\lVert w \rVert^2$</span> is the same again but
+differentiable everywhere, so the optimization we actually pose is:
+</p>
+
+$$ \min_{w, b} \; \tfrac{1}{2}\lVert w \rVert^2
+   \quad \text{s.t.} \quad t^{(i)}(w^\top x^{(i)} + b) \ge 1 \;\; \forall i $$
+
+<p>
+This is the <strong>hard-margin</strong> support vector machine: "hard"
+because the constraints demand perfect separation with a full buffer, no
+exceptions. It is a quadratic objective with linear constraints, a convex
+problem with one global optimum. Note what kind of animal this is: unlike
+least squares there is no closed-form formula, and unlike logistic regression
+it is not an unconstrained problem you can just run gradient descent on. It
+is a <em>constrained</em> optimization, and section 3 shows the machinery
+built for exactly that. First, though, the solution has a structure worth
+meeting in person.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. SUPPORT VECTORS ═══════════════════ -->
+<section id="sec-sv">
+<h2><span class="secnum">2.</span> Support vectors: the points that matter</h2>
+
+<p>
+Think about which constraints in that program actually do any work. A point
+sitting far from the boundary satisfies
+<span class="m">$t z \ge 1$</span> with room to spare; its constraint is
+slack, and deleting it would change nothing. The only constraints that bite
+are the ones that hold with equality, the points sitting <em>exactly on</em>
+the margin hyperplanes. Those points are called
+<strong>support vectors</strong>: they support the margin the way pillars
+support a roof. Everything else in the training set could move around, or
+vanish entirely, and as long as it stays outside the buffer the optimal
+boundary would not shift by a hair.
+</p>
+
+<p>
+Solving the training problem makes this literal. The solution (section 3
+derives it) hands back one number per training point, a weight
+<span class="m">$\alpha^{(i)} \ge 0$</span>, and the optimal weight vector is
+built from the data itself:
+</p>
+
+$$ w = \sum_{i=1}^{N} \alpha^{(i)}\, t^{(i)}\, x^{(i)} $$
+
+<p>
+Here is the punchline: for every point that is not a support vector,
+<span class="m">$\alpha^{(i)} = 0$</span>. The support vectors are precisely
+the points with nonzero weight,
+<span class="m">$S = \{\, i : \alpha^{(i)} > 0 \,\}$</span>, and in the
+hard-margin case they lie exactly on the margin. Prediction on a new point
+<span class="m">$\hat{x}$</span> therefore consults only them:
+</p>
+
+$$ y = \operatorname{sign}\!\left( b + \sum_{i \in S}
+   \alpha^{(i)}\, t^{(i)}\, x^{(i)\top} \hat{x} \right) $$
+
+<p>
+A dataset of a million points might be summarized by a dozen. Now feel it.
+This is the signature figure of the lesson: drag the boundary yourself and
+watch your buffer, then let the machine solve for the widest one, then grab
+individual points and learn, physically, which ones matter:
+</p>
+
+<div class="figure" id="fig-maxmargin">
+  <div class="fig-mount" data-fig="maxmargin"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the max-margin explorer. Drag the square handle to slide the boundary and the round handle to rotate it; the readout shows your margin width, the full symmetric buffer your line earns, computed live as twice the distance to its nearest point. Press Solve and the exact max-margin boundary appears with its support vectors ringed and <span class="m">$M = 2/\lVert w \rVert$</span> live. Then drag points: a non-support point does nothing until it enters the margin, while a support vector drags the entire boundary with it.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Two boundaries both classify the training set perfectly. Boundary 1 passes 0.1 units from its nearest training point; boundary 2 passes 1.4 units from its nearest. Why should we expect boundary 2 to generalize better?</p>
+  <div class="quiz-opts">
+    <button data-k="a">We should not: both have 100% training accuracy, so they are equally good models</button>
+    <button data-k="b">Test points tend to land near training points, and a wide buffer keeps a perturbed point on the correct side; a skimming boundary flips predictions under tiny amounts of noise</button>
+    <button data-k="c">Boundary 2 must have a larger <span class="m">$\lVert w \rVert$</span>, which makes its predictions numerically more precise</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Training accuracy is exactly the yardstick that cannot distinguish them; that was the point of the hook. Robustness to small changes in the data is the tiebreaker, and it favours the wider buffer.</div>
+  <div class="quiz-fb" data-k="b">Right. The margin is insurance against the wobble between training data and future data drawn from the same distribution. Reproduce it in Fig 2.1: a skimming line and the solved line agree on the training set but disagree on the region near the data's edge.</div>
+  <div class="quiz-fb" data-k="c">Backwards on the algebra: at the standard scaling, the <em>wider</em> margin has the <em>smaller</em> <span class="m">$\lVert w \rVert$</span>, since <span class="m">$M = 2/\lVert w \rVert$</span>. And the reason is geometric robustness, not floating-point precision.</div>
+</div>
+
+<details class="check">
+  <summary>Check: which points are the support vectors, exactly?</summary>
+  <div>
+    <p>Give the geometric description and the algebraic description, and say what the other points contribute.</p>
+    <p><b>Answer.</b> Geometrically (hard-margin case): the training points that lie exactly on the margin hyperplanes <span class="m">$w^\top x + b = \pm 1$</span>, the closest points to the boundary; they are the ringed points in Fig 2.1. Algebraically: the points with nonzero dual weight, <span class="m">$S = \{i : \alpha^{(i)} > 0\}$</span>. Every other point has <span class="m">$\alpha^{(i)} = 0$</span> and contributes exactly nothing to <span class="m">$w = \sum_i \alpha^{(i)} t^{(i)} x^{(i)}$</span> or to any prediction. You can delete every non-support point and retrain; the classifier that comes back is identical.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. OPTIMIZATION ASIDE ═══════════════════ -->
+<section id="sec-duality">
+<h2><span class="secnum">3.</span> Optional depth: Lagrangians and the dual</h2>
+
+<div class="aside-optional">
+<div class="aside-label">Optional depth &middot; the slides mark this "interested reader, not on the exam"</div>
+
+<p>
+You can use SVMs without this section. But two ideas here explain <em>why</em>
+support vectors exist and <em>why</em> kernels will be possible, so it earns
+its place as an aside.
+</p>
+
+<h3>Constrained minima live on boundaries</h3>
+
+<p>
+An unconstrained minimum sits where the function is flat,
+<span class="m">$\nabla f = 0$</span>: roll downhill until nothing pushes you
+anywhere. A <em>constrained</em> minimum is different. It is the best legal
+point, and often the unconstrained optimum is illegal, so the answer gets
+pressed up against the edge of the feasible set, at a point where a contour
+of <span class="m">$f$</span> just touches the constraint boundary. The SVM
+is exactly this situation: the unconstrained minimizer of
+<span class="m">$\tfrac{1}{2}\lVert w \rVert^2$</span> is
+<span class="m">$w = 0$</span>, which classifies nothing, so the solution
+lands on the constraint boundary, where some points hold
+<span class="m">$t z = 1$</span> with equality. Those are the support
+vectors, seen through an optimization lens.
+</p>
+
+<h3>The Lagrangian, and a game</h3>
+
+<p>
+The standard machine for constraints. Write each constraint as
+<span class="m">$g_i(x) \le 0$</span> and price violations with a multiplier
+<span class="m">$\lambda_i \ge 0$</span>:
+</p>
+
+$$ L(x, \lambda) = f(x) + \sum_i \lambda_i\, g_i(x), \qquad \lambda_i \ge 0 $$
+
+<p>
+The constrained problem becomes a min-max,
+<span class="m">$\min_x \max_{\lambda \ge 0} L(x, \lambda)$</span>, called the
+<strong>primal</strong>. The story is a game between two players. The
+optimizer picks <span class="m">$x$</span> to make
+<span class="m">$L$</span> small. The enforcer picks the multipliers to make
+it large, and the enforcer's only leverage is violation: if
+<span class="m">$g_i(x) > 0$</span> they can send
+<span class="m">$\lambda_i \to \infty$</span> and blow the objective up, so
+the optimizer is forced to stay feasible. If instead
+<span class="m">$g_i(x) < 0$</span> strictly, the term
+<span class="m">$\lambda_i g_i$</span> is negative and the enforcer's best
+move is <span class="m">$\lambda_i = 0$</span>. That last observation has a
+name, complementary slackness, and it is exactly why non-support points get
+<span class="m">$\alpha = 0$</span>.
+</p>
+
+<p>
+Swap the players and you get the <strong>dual</strong>,
+<span class="m">$\max_{\lambda \ge 0} \min_x L(x, \lambda)$</span>.
+<strong>Weak duality</strong> always holds: the dual value never exceeds the
+primal value (moving second is an advantage, so the inner minimizer drags the
+dual down). <strong>Strong duality</strong> is equality of the two, which
+holds under regularity conditions, and the hard-margin SVM, being convex with
+affine constraints, qualifies. So we are allowed to solve the dual instead of
+the primal, and for SVMs the dual is the better door.
+</p>
+
+<h3>The SVM dual</h3>
+
+<p>
+Run the machinery on the hard-margin program (multipliers renamed
+<span class="m">$\alpha$</span>, one per training point) and out comes:
+</p>
+
+$$ \max_{\alpha} \;\; \sum_{i=1}^{N} \alpha^{(i)}
+   \;-\; \tfrac{1}{2} \sum_{i,j=1}^{N}
+   \alpha^{(i)} \alpha^{(j)}\, t^{(i)} t^{(j)}\, x^{(i)\top} x^{(j)}
+   \quad \text{s.t.} \quad \alpha^{(i)} \ge 0, \;\;
+   \sum_{i=1}^{N} \alpha^{(i)} t^{(i)} = 0 $$
+
+<p>
+with the optimal weights recovered as
+<span class="m">$w = \sum_i \alpha^{(i)} t^{(i)} x^{(i)}$</span>, the formula
+section 2 used. Now look closely at where the data appears in the dual. Not
+as raw coordinates. Only inside the products
+<span class="m">$x^{(i)\top} x^{(j)}$</span>, dot products between pairs of
+training points. The dual never needs to know <em>where</em> the points are,
+only <em>how similar</em> every pair is. File that away: in section 5 we
+will swap those dot products for something more interesting, and the entire
+algorithm will come along for the ride.
+</p>
+
+<details class="check">
+  <summary>Check (optional depth): why can a point strictly outside the margin never be a support vector?</summary>
+  <div>
+    <p>Argue it from complementary slackness.</p>
+    <p><b>Answer.</b> Write the SVM constraint as <span class="m">$g_i(w, b) = 1 - t^{(i)}(w^\top x^{(i)} + b) \le 0$</span>. At the optimum, complementary slackness holds for each point: <span class="m">$\alpha^{(i)} g_i = 0$</span>, so at least one factor is zero. A point strictly outside the margin has <span class="m">$t^{(i)} z^{(i)} > 1$</span>, hence <span class="m">$g_i < 0$</span> strictly, hence <span class="m">$\alpha^{(i)} = 0$</span>: the enforcer never prices a constraint that is not tight. With <span class="m">$\alpha^{(i)} = 0$</span> the point contributes nothing to <span class="m">$w = \sum_i \alpha^{(i)} t^{(i)} x^{(i)}$</span>, so it cannot be a support vector. The game version: the enforcer only pushes on points that are actually leaning against the fence.</p>
+  </div>
+</details>
+
+</div>
+</section>
+
+<!-- ═══════════════════ 4. SOFT MARGINS ═══════════════════ -->
+<section id="sec-slack">
+<h2><span class="secnum">4.</span> Soft margins: paying for violations</h2>
+
+<p>
+The hard-margin program has a brittle failure mode: if even one training
+point sits on the wrong side, or merely inside the buffer, there is no
+feasible solution at all. Real data is rarely perfectly separable. Labels are
+noisy, classes overlap, and a single mislabelled point should not be allowed
+to veto the entire classifier, or worse, wrench the boundary into a terrible
+position just to satisfy its constraint.
+</p>
+
+<p>
+The fix is to make violations legal but expensive. Give every training point
+a <strong>slack variable</strong> <span class="m">$\xi_i \ge 0$</span>
+measuring how badly it misses the full-margin requirement, relax each
+constraint by that amount, and charge for the total slack in the objective:
+</p>
+
+$$ \min_{w, b, \xi} \;\; \tfrac{1}{2}\lVert w \rVert^2
+   + C \sum_{i=1}^{N} \xi_i
+   \quad \text{s.t.} \quad
+   t^{(i)}(w^\top x^{(i)} + b) \ge 1 - \xi_i, \;\; \xi_i \ge 0 $$
+
+<p>
+This is the <strong>soft-margin</strong> SVM. The slack value tells you
+exactly where a point sits, and the four regimes are worth memorizing:
+</p>
+
+<ul>
+  <li><b><span class="m">$\xi_i = 0$</span></b>: outside the margin or exactly on it, correctly classified. The point needed no forgiveness.</li>
+  <li><b><span class="m">$0 < \xi_i < 1$</span></b>: inside the margin but still on the correct side. Correct, but inside the buffer.</li>
+  <li><b><span class="m">$\xi_i = 1$</span></b>: sitting exactly on the decision boundary, ambiguous.</li>
+  <li><b><span class="m">$\xi_i > 1$</span></b>: on the wrong side, misclassified.</li>
+</ul>
+
+<p>
+A useful consequence falls out immediately: every misclassified point has
+<span class="m">$\xi_i > 1$</span>, so the number of training errors is at
+most <span class="m">$\sum_i \xi_i$</span>. The total slack is an upper bound
+on the error count, which is why penalizing it is a sane proxy for penalizing
+mistakes.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: read off each point's slack regime</div>
+  <p>Boundary: <span class="m">$w = (1, 1)^\top$</span>, <span class="m">$b = -3$</span>, so <span class="m">$z = x_1 + x_2 - 3$</span> and the margin width is <span class="m">$M = 2/\sqrt{2} = \sqrt{2} \approx 1.41$</span>. Classify four points, all with true label <span class="m">$t = +1$</span>, using <span class="m">$\xi = \max(0,\, 1 - t z)$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    x = (3, 2):&nbsp;&nbsp;&nbsp;&nbsp;z = 3+2&minus;3 = 2,&nbsp;&nbsp;tz = 2,&nbsp;&nbsp;&nbsp;ξ = 0&nbsp;&nbsp;&nbsp;&rarr; outside the margin, correct<br>
+    x = (2, 1.5):&nbsp;&nbsp;z = 0.5,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tz = 0.5,&nbsp;ξ = 0.5 &rarr; inside the margin, correct side<br>
+    x = (1.5, 1.5): z = 0,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tz = 0,&nbsp;&nbsp;&nbsp;ξ = 1&nbsp;&nbsp;&nbsp;&rarr; on the boundary, ambiguous<br>
+    x = (1, 1):&nbsp;&nbsp;&nbsp;&nbsp;z = &minus;1,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tz = &minus;1,&nbsp;&nbsp;ξ = 2&nbsp;&nbsp;&nbsp;&rarr; wrong side, misclassified
+  </p>
+  <p>Total slack <span class="m">$\sum_i \xi_i = 0 + 0.5 + 1 + 2 = 3.5$</span>, and indeed the actual number of clear errors, 1, sits below that bound.</p>
+</div>
+
+<h3>C: the price of a violation</h3>
+
+<p>
+The hyperparameter <span class="m">$C > 0$</span> sets the exchange rate
+between the two things the objective wants: a wide margin (small
+<span class="m">$\lVert w \rVert^2$</span>) and few violations (small
+<span class="m">$\sum \xi_i$</span>). Large <span class="m">$C$</span> makes
+violations expensive, so the optimizer buys a narrow margin that almost
+nothing crosses. Small <span class="m">$C$</span> makes violations cheap, so
+the optimizer buys an enormous margin and lets points pile up inside it. In
+the dual, the entire change is one line: the multipliers get capped,
+<span class="m">$0 \le \alpha^{(i)} \le C$</span>. Slide the price and watch
+the trade happen, with every point coloured by its slack regime:
+</p>
+
+<div class="figure" id="fig-softc">
+  <div class="fig-mount" data-fig="softc"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the C dial on genuinely non-separable data. Each setting of <span class="m">$C$</span> retrains a real soft-margin SVM; the readout shows the true margin width <span class="m">$2/\lVert w \rVert$</span>, the total slack <span class="m">$\sum \xi_i$</span>, and the error count it bounds. Rings mark each point's slack regime. Small <span class="m">$C$</span>: wide margin, small weights, slack everywhere. Large <span class="m">$C$</span>: narrow margin, violations nearly forbidden.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In the soft-margin program, what happens as <span class="m">$C \to 0$</span>?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The margin narrows and the classifier starts memorizing individual training points</button>
+    <button data-k="b">All slack variables are forced to zero, recovering the hard-margin solution</button>
+    <button data-k="c">The violation penalty vanishes, so the objective is essentially <span class="m">$\tfrac{1}{2}\lVert w \rVert^2$</span> alone: the weights shrink toward zero, the margin width <span class="m">$2/\lVert w \rVert$</span> blows up, and slack accumulates freely as the buffer swallows the data</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Other direction: that is the large-<span class="m">$C$</span> regime, where violations are so expensive the boundary contorts to avoid them.</div>
+  <div class="quiz-fb" data-k="b">That is the <span class="m">$C \to \infty$</span> limit: infinite price per unit of slack forces <span class="m">$\xi = 0$</span> everywhere, which is exactly the hard-margin constraint set.</div>
+  <div class="quiz-fb" data-k="c">Right. With violations free, nothing opposes shrinking <span class="m">$w$</span>, so <span class="m">$\lVert w \rVert \to 0$</span> and <span class="m">$M \to \infty$</span> while the slacks grow. Drag the slider in Fig 4.1 to its left end and watch all three readouts do exactly this.</div>
+</div>
+
+<details class="check">
+  <summary>Check: the two limits of C, in full (margin, weights, slack)</summary>
+  <div>
+    <p>For linearly separable data, describe the soft-margin solution as <span class="m">$C \to \infty$</span> and as <span class="m">$C \to 0$</span>: what happens to the margin, the weights, and the slack variables?</p>
+    <p><b>Answer.</b> <b><span class="m">$C \to \infty$</span> (separable data):</b> each unit of slack costs infinitely much, so the optimum sets every <span class="m">$\xi_i = 0$</span>. The constraints collapse back to <span class="m">$t^{(i)} z^{(i)} \ge 1$</span> and the problem becomes the hard-margin program: finite <span class="m">$\lVert w \rVert$</span>, margin equal to the widest separating buffer, support vectors on the margin. <b><span class="m">$C \to 0$</span>:</b> slack is free, so the objective reduces to minimizing <span class="m">$\tfrac{1}{2}\lVert w \rVert^2$</span> with no effective constraints. The weights collapse, <span class="m">$w \to 0$</span>, so the margin width <span class="m">$2/\lVert w \rVert \to \infty$</span>; the score of every point heads toward the constant <span class="m">$b$</span>, so the slacks head toward <span class="m">$\xi_i = 1 - t^{(i)} b$</span>, roughly 1 on average, and the classifier degenerates toward predicting a single class by the sign of <span class="m">$b$</span>. Neither extreme is a model you would ship; <span class="m">$C$</span> is a knob you tune on validation data, exactly like <span class="m">$k$</span> in KNN.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 5. KERNELS ═══════════════════ -->
+<section id="sec-kernels">
+<h2><span class="secnum">5.</span> Kernels: nonlinear boundaries, linear machinery</h2>
+
+<p>
+Slack forgives noise near a boundary that is basically right. It cannot
+rescue a boundary that is the wrong <em>shape</em>. Picture one class sitting
+in a disk and the other class wrapped around it in a ring, two concentric
+circles. No line separates them, and no amount of slack fixes that, because
+the failure is not noise, it is geometry: the true boundary is a circle and
+our model can only draw lines.
+</p>
+
+<h3>Feature maps: change the space, not the model</h3>
+
+<p>
+Here is the move, and it is one of the great ideas in machine learning. Keep
+the linear classifier. Change the coordinates. A <strong>feature map</strong>
+<span class="m">$\phi$</span> transforms each input
+<span class="m">$x \mapsto \phi(x)$</span> into a higher-dimensional space
+where a linear boundary <em>can</em> separate the data; a flat cut in feature
+space then folds back into a curved boundary in input space. For the circles
+the right extra feature is staring at us: the squared radius
+<span class="m">$r^2 = x_1^2 + x_2^2$</span>, since the inner class has small
+<span class="m">$r^2$</span> and the ring has large
+<span class="m">$r^2$</span>. Lift with
+<span class="m">$\phi(x) = (x_1,\, x_2,\, x_1^2 + x_2^2)$</span> and the two
+classes separate by height. Press the button:
+</p>
+
+<div class="figure" id="fig-lift">
+  <div class="fig-mount" data-fig="lift"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the lift. Two concentric classes, hopeless for a line in 2-D. Lift each point to height <span class="m">$x_1^2 + x_2^2$</span> and a flat plane separates them; drag to orbit the 3-D view. Drop the plane back down and the cut <span class="m">$x_1^2 + x_2^2 = c$</span> lands in the input space as a circle of radius <span class="m">$\sqrt{c}$</span>, with <span class="m">$c$</span> computed from the actual data gap. Linear in feature space, nonlinear in input space.</p>
+</div>
+
+<p>
+One honest caution before the enthusiasm. With enough hand-built features you
+can separate <em>any</em> finite training set, in the extreme by giving every
+training point its own indicator feature and memorizing the data. Separating
+the training set is cheap; the lift only earns its keep when the new
+coordinates capture structure that also holds for tomorrow's data.
+Generalization has to be checked, not assumed, and the tuning figure at the
+end of this section shows exactly how an over-flexible feature space fails.
+</p>
+
+<h3>The kernel trick: similarity without coordinates</h3>
+
+<p>
+Feature maps have a cost problem. Useful maps explode the dimension: a
+degree-<span class="m">$d$</span> polynomial map over many inputs generates
+combinatorially many features, and we would have to build and store every
+lifted vector. Now recall the observation from section 3: the SVM dual, and
+the prediction rule, touch the data <em>only through dot products</em>. In
+feature space, that means we only ever need
+<span class="m">$\phi(u)^\top \phi(v)$</span>, a single number per pair,
+never the coordinates of <span class="m">$\phi(u)$</span> themselves. So
+define a <strong>kernel</strong>, a similarity function that computes that
+number directly from the raw inputs:
+</p>
+
+$$ K(u, v) = \phi(u)^\top \phi(v) $$
+
+<p>
+If <span class="m">$K$</span> is cheap to evaluate, we get the geometry of
+the huge feature space at the price of the small input space. That bargain is
+the <strong>kernel trick</strong>. The classic example, and the one worth
+expanding once by hand, is the <strong>polynomial kernel</strong>
+<span class="m">$K(x, y) = (1 + x^\top y)^d$</span>. Take
+<span class="m">$d = 2$</span> in two dimensions and just expand the square:
+</p>
+
+$$ (1 + x_1 y_1 + x_2 y_2)^2
+   = 1 + x_1^2 y_1^2 + x_2^2 y_2^2
+   + 2 x_1 y_1 + 2 x_2 y_2 + 2 x_1 x_2 y_1 y_2 $$
+
+<p>
+Stare at the right side: it is exactly
+<span class="m">$\phi(x)^\top \phi(y)$</span> for the six-dimensional feature
+map
+</p>
+
+$$ \phi(x) = \left(1,\; x_1^2,\; x_2^2,\; \sqrt{2}\,x_1,\; \sqrt{2}\,x_2,\;
+   \sqrt{2}\,x_1 x_2\right) $$
+
+<p>
+which contains the raw coordinates, their squares, and their product: enough
+to express circles, ellipses, and parabolas as linear cuts. We never built
+that six-vector. Squaring one number smuggled in the whole thing.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the trick, verified on real numbers</div>
+  <p>Take <span class="m">$x = (1, 2)^\top$</span> and <span class="m">$y = (2, 1)^\top$</span>.</p>
+  <p><b>Direct route.</b> <span class="m">$x^\top y = 1 \cdot 2 + 2 \cdot 1 = 4$</span>, so <span class="m">$K(x, y) = (1 + 4)^2 = 25$</span>. Three multiplications and a square.</p>
+  <p><b>Long route.</b> Build both feature vectors:
+  <span class="m">$\phi(x) = (1,\, 1,\, 4,\, \sqrt{2},\, 2\sqrt{2},\, 2\sqrt{2})$</span> and
+  <span class="m">$\phi(y) = (1,\, 4,\, 1,\, 2\sqrt{2},\, \sqrt{2},\, 2\sqrt{2})$</span>. Their dot product:</p>
+  $$ 1 + 4 + 4 + \underbrace{\sqrt{2}\cdot 2\sqrt{2}}_{4}
+     + \underbrace{2\sqrt{2}\cdot \sqrt{2}}_{4}
+     + \underbrace{2\sqrt{2}\cdot 2\sqrt{2}}_{8} = 25 $$
+  <p>Same answer, 25, and the long route had to construct two six-dimensional vectors to get it. At degree 10 with a hundred input features, the long route is astronomically wide and the direct route is still one dot product and one power.</p>
+</div>
+
+<div class="figure" id="fig-kerncalc">
+  <div class="fig-mount" data-fig="kerncalc"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the kernel trick, verified live. Drag <span class="m">$x$</span> and <span class="m">$y$</span>; both routes are recomputed on every move, the cheap <span class="m">$(1 + x^\top y)^2$</span> and the expensive <span class="m">$\phi(x)^\top \phi(y)$</span> with the six-vectors shown in full. They agree to machine precision at every position, which is the whole trick.</p>
+</div>
+
+<h3>The RBF kernel: similarity that decays with distance</h3>
+
+<p>
+The most used kernel of all skips the feature map entirely and just writes
+down a sensible similarity. The <strong>RBF kernel</strong> (radial basis
+function, also called the Gaussian kernel) says two points are similar when
+they are close:
+</p>
+
+$$ K(u, v) = \exp\!\left( -\gamma\, \lVert u - v \rVert^2 \right),
+   \qquad \gamma = \frac{1}{2\sigma^2} $$
+
+<p>
+It equals 1 when <span class="m">$u = v$</span>, decays toward 0 as the
+points separate, and <span class="m">$\gamma$</span> sets how fast: large
+<span class="m">$\gamma$</span> means similarity dies within a tiny
+neighbourhood, small <span class="m">$\gamma$</span> means everyone is
+somewhat similar to everyone. The remarkable fact is that this one-line
+formula corresponds to a feature map into an <em>infinite-dimensional</em>
+space (the end quiz unpacks why, via the Taylor series of the exponential).
+An infinitely expressive feature space from a formula you can compute on a
+napkin.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: RBF for a near pair and a far pair</div>
+  <p>Take <span class="m">$\gamma = 0.5$</span>.</p>
+  <p><b>Near pair.</b> <span class="m">$u = (1, 1)$</span>, <span class="m">$v = (1.2,\, 0.9)$</span>:
+  <span class="m">$\lVert u - v \rVert^2 = 0.2^2 + 0.1^2 = 0.05$</span>, so
+  <span class="m">$K = e^{-0.5 \times 0.05} = e^{-0.025} \approx 0.975$</span>. Almost maximally similar.</p>
+  <p><b>Far pair.</b> <span class="m">$u = (1, 1)$</span>, <span class="m">$v = (4, 3)$</span>:
+  <span class="m">$\lVert u - v \rVert^2 = 3^2 + 2^2 = 13$</span>, so
+  <span class="m">$K = e^{-0.5 \times 13} = e^{-6.5} \approx 0.0015$</span>. Essentially strangers.</p>
+  <p>And always <span class="m">$K(u, u) = e^{0} = 1$</span>: every point is perfectly similar to itself.</p>
+</div>
+
+<h3>The kernelized SVM</h3>
+
+<p>
+Now cash the cheque. Take the dual from section 3 and replace every
+input-space dot product <span class="m">$x^{(i)\top} x^{(j)}$</span> with a
+kernel evaluation:
+</p>
+
+$$ \max_{\alpha} \;\; \sum_i \alpha^{(i)}
+   - \tfrac{1}{2} \sum_{i,j} \alpha^{(i)} \alpha^{(j)}\,
+     t^{(i)} t^{(j)}\, K\!\left(x^{(i)}, x^{(j)}\right) $$
+
+<p>
+subject to the same constraints as before,
+<span class="m">$\sum_i \alpha^{(i)} t^{(i)} = 0$</span> with
+<span class="m">$\alpha^{(i)} \ge 0$</span> in the hard case or
+<span class="m">$0 \le \alpha^{(i)} \le C$</span> in the soft case.
+Prediction kernelizes the same way:
+<span class="m">$y = \operatorname{sign}\big(b + \sum_{i \in S} \alpha^{(i)}
+t^{(i)} K(x^{(i)}, \hat{x})\big)$</span>. Nothing else changes. The same
+solver, the same support vectors, the same margins, now living in a feature
+space we never visit. This program of "make it linear somewhere else, pay
+only for similarities" is the heart of kernel methods, the research program
+Bernhard Sch&ouml;lkopf's group built out into a whole field.
+</p>
+
+<p>
+Expressive does not mean automatically good. The RBF kernel can draw almost
+any boundary, which means it can also draw nonsense around noise, and
+<span class="m">$\gamma$</span> and <span class="m">$C$</span> must be tuned,
+on validation data, to land between underfitting and overfitting. Feel the
+whole trade-off:
+</p>
+
+<div class="figure" id="fig-kernexplore">
+  <div class="fig-mount" data-fig="kernexplore"></div>
+  <p class="fig-caption"><b>Fig 5.3,</b> the kernel boundary explorer. A real kernel SVM (solved by SMO on every change) on interleaved two-moon data. Toggle the kernel: linear fails, polynomial bends, RBF flexes. Then push <span class="m">$\gamma$</span>: tiny values underfit toward a nearly straight cut, huge values grow overfit islands around individual points. Support vectors are ringed; the lighter band is the margin region <span class="m">$|f(x)| < 1$</span>.</p>
+</div>
+
+<h3>XOR: the classic impossibility, dissolved by one feature</h3>
+
+<p>
+The oldest counterexample to linear classification is XOR: four points on the
+corners of a square, labelled by whether their coordinates agree in sign. No
+line gets more than three of the four right, which is exactly the failure the
+classification lecture left as a cliffhanger. But one multiplication solves
+it. The product <span class="m">$x_1 x_2$</span> is positive on one diagonal
+and negative on the other, so the feature map
+<span class="m">$\phi(x_1, x_2) = (x_1,\, x_2,\, x_1 x_2)$</span> lifts the
+four corners into <span class="m">$\mathbb{R}^3$</span>, where the flat plane
+<span class="m">$x_3 = 0$</span> separates them perfectly:
+</p>
+
+<div class="figure" id="fig-xormap">
+  <div class="fig-mount" data-fig="xormap"></div>
+  <p class="fig-caption"><b>Fig 5.4,</b> XOR, before and after. Left: drag the line's endpoints and try to beat 3 of 4; the correct-count is computed live and the fourth point always escapes. Right: apply <span class="m">$\phi(x) = (x_1, x_2, x_1 x_2)$</span> and the corners split by height, separated by the plane <span class="m">$x_3 = 0$</span>; drag to orbit. The induced kernel is <span class="m">$K(u, v) = u_1 v_1 + u_2 v_2 + u_1 u_2 v_1 v_2$</span>.</p>
+</div>
+
+<h3>The kernels, in code</h3>
+
+<p>
+Everything in this lecture that touches numbers fits in a few honest lines:
+</p>
+
+<pre class="code" data-lang="python"><code>def margin_width(w):
+    return 2 / np.linalg.norm(w)          # M = 2 / ||w||
+
+def polynomial_kernel(x, y, d):
+    return (1 + x @ y) ** d               # never builds phi
+
+def rbf_kernel(x, y, gamma):
+    return np.exp(-gamma * np.sum((x - y) ** 2))</code></pre>
+
+<p>
+And in practice you rarely hand-roll the solver. The library call exposes
+exactly the two knobs this lesson taught, and everything else is the dual
+being solved for you by a quadratic-programming routine:
+</p>
+
+<pre class="code" data-lang="python"><code>from sklearn.svm import SVC
+
+clf = SVC(kernel="rbf", C=1.0, gamma=0.5)  # C and gamma: the two knobs
+clf.fit(X_train, t_train)                  # solves the dual with a QP solver
+clf.predict(X_test)                        # consults only the support vectors</code></pre>
+
+<p>
+Now write the kernels yourself. The exercise below runs your choice of
+implementation against the fixed points from the worked examples and checks
+it against the hand arithmetic, including the 25-equals-25 identity:
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 5.5,</b> complete the kernel. Pick the return line for each function and press Run: the code executes for real against the lesson's fixed points. The polynomial check verifies your value against <span class="m">$\phi(x)^\top \phi(y)$</span> built explicitly; the RBF check verifies <span class="m">$K(u,u) = 1$</span> and the hand-computed near-pair value 0.9753. Wrong choices fail with the actual numbers.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In one sentence, what exactly is the kernel trick?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Because the dual and the prediction rule touch data only through dot products, replacing <span class="m">$x^\top y$</span> with <span class="m">$K(x,y) = \phi(x)^\top \phi(y)$</span> trains the SVM in <span class="m">$\phi$</span>'s feature space without ever computing <span class="m">$\phi$</span></button>
+    <button data-k="b">Any similarity function you like can be dropped in as a kernel, since similarity is all the SVM needs</button>
+    <button data-k="c">Kernels compress the feature space to fewer dimensions so the dot products are cheaper to compute</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Exactly. The dual's only contact with the data is the matrix of pairwise dot products, so swapping in kernel values re-poses the identical optimization in feature space, at input-space prices. Fig 5.2 is this fact verified numerically.</div>
+  <div class="quiz-fb" data-k="b">Almost, and the gap matters: a kernel must actually equal <span class="m">$\phi(u)^\top \phi(v)$</span> for some feature map, otherwise the "geometry" the SVM optimizes does not exist. The end quiz asks you to argue validity for a kernel you design.</div>
+  <div class="quiz-fb" data-k="c">Backwards: the implicit feature space is usually far <em>larger</em>, infinite-dimensional for RBF. The saving is that we never touch its coordinates at all, not that there are fewer of them.</div>
+</div>
+
+<details class="check">
+  <summary>Check: give a feature map that separates XOR, and write its induced kernel</summary>
+  <div>
+    <p>The four points <span class="m">$(\pm 1, \pm 1)$</span> are labelled by <span class="m">$t = \operatorname{sign}(x_1 x_2)$</span>: the diagonal pair <span class="m">$(1,1), (-1,-1)$</span> is one class, the anti-diagonal pair the other. Give a map <span class="m">$\phi : \mathbb{R}^2 \to \mathbb{R}^3$</span> that makes them linearly separable, and the kernel it induces.</p>
+    <p><b>Answer.</b> Take <span class="m">$\phi(x_1, x_2) = (x_1,\, x_2,\, x_1 x_2)$</span>. The third coordinate is <span class="m">$+1$</span> for both points of one class and <span class="m">$-1$</span> for both points of the other, so the plane <span class="m">$x_3 = 0$</span> (weight vector <span class="m">$(0, 0, 1)$</span>, bias 0) separates them with a full margin of 1 on each side. The induced kernel is the dot product of two mapped points: <span class="m">$K(u, v) = \phi(u)^\top \phi(v) = u_1 v_1 + u_2 v_2 + u_1 u_2 v_1 v_2$</span>. Back in the input space, the "plane" <span class="m">$x_1 x_2 = 0$</span> is the pair of coordinate axes: a boundary no line could ever be. Fig 5.4 draws the whole story.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Check (coding): complete the kernels and verify the trick</summary>
+  <div>
+    <p>In Fig 5.5, select an implementation for <code>polynomial_kernel</code> and <code>rbf_kernel</code> and run both checks. Which lines are correct, and what exactly does each check verify?</p>
+    <p><b>Answer.</b> The correct lines are <code>(1 + x @ y) ** d</code> and <code>np.exp(-gamma * np.sum((x - y) ** 2))</code>. The polynomial check recomputes the same quantity the slow way, building <span class="m">$\phi(x) = (1, x_1^2, x_2^2, \sqrt{2}x_1, \sqrt{2}x_2, \sqrt{2}x_1x_2)$</span> explicitly and taking the 6-term dot product; for <span class="m">$x=(1,2), y=(2,1)$</span> both routes give exactly 25, the kernel-trick identity. The tempting wrong option <code>(x @ y) ** d</code> drops the constant 1, which silently deletes the linear features <span class="m">$\sqrt{2}x_1, \sqrt{2}x_2$</span> and the constant from the feature map, a genuinely different (weaker) feature space. For RBF, forgetting to square the distance changes the decay shape, and dropping the <code>exp</code> gives a negative "similarity", which no dot product of real feature vectors can be: <span class="m">$K(u,u) = \lVert \phi(u) \rVert^2 \ge 0$</span> always.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">6.</span> Summary and method card</h2>
+
+<p>
+One classifier, three escalating ideas. First: among all perfect linear
+separators, prefer the one with the widest margin, because the buffer is
+insurance against the gap between training data and the future. Second: the
+solution is built entirely from the few points that touch the margin, the
+support vectors; everyone else has <span class="m">$\alpha = 0$</span> and
+might as well not exist. Third: since training and prediction consume the
+data only through dot products, a kernel swaps in the geometry of an enormous
+feature space at input-space prices, and the same linear machinery draws
+circles, moons, and XOR. Soft margins glue it to reality by pricing
+violations with <span class="m">$C$</span>, and <span class="m">$C$</span>
+and <span class="m">$\gamma$</span> are tuned the only honest way, on
+validation data.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Support Vector Machines</div>
+  <table>
+    <tr><th>Assumption</th><td>Good boundaries separate classes with a large margin; nonlinear separation comes from a suitable similarity (kernel) function.</td></tr>
+    <tr><th>Model class</th><td>Margin-based linear classifiers <span class="m">$y = \operatorname{sign}(w^\top x + b)$</span>, extended to nonlinear boundaries by kernels.</td></tr>
+    <tr><th>Learning / selection</th><td>Solve a constrained optimization (a convex QP); in the dual, the solution and all predictions depend only on support vectors and kernel evaluations.</td></tr>
+    <tr><th>Prediction</th><td><span class="m">$y = \operatorname{sign}\big(b + \sum_{i \in S} \alpha^{(i)} t^{(i)} K(x^{(i)}, \hat{x})\big)$</span>, a kernel vote over the support set only.</td></tr>
+    <tr><th>Strengths</th><td>Strong geometric intuition, effective in high dimensions, a robust soft-margin extension for noisy data, flexible nonlinear classification via kernels.</td></tr>
+    <tr><th>Limitations</th><td>Kernel and regularization choices matter and must be tuned; training is expensive at large scale; the nonlinear features are implicit but still hand-designed, via the choice of kernel.</td></tr>
+    <tr><th>Key hyperparameters</th><td><span class="m">$C$</span> (price of a margin violation) and the kernel with its parameters (degree <span class="m">$d$</span>, RBF <span class="m">$\gamma$</span>), tuned on validation.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: we have gone from similarity (KNN) to
+rules (trees) to parametric fits (linear and logistic regression) to
+committees (ensembles), and now to margins and kernels, the most geometric
+model in the sequence and the last of the classical ones. The kernel idea,
+hand-designing the similarity instead of the features, is also this course's
+final act of manual feature engineering. Next lecture the features stop being
+designed and start being learned: neural networks.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">7.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+argue, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">You delete one correctly classified training point that sits far outside the margin, then retrain the (hard-margin) SVM. What happens to the decision boundary?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It shifts slightly toward the remaining data, since every point pulls on the fit</button>
+    <button data-k="b">The margin widens, because there is one fewer constraint to satisfy</button>
+    <button data-k="c">Nothing at all: that point had <span class="m">$\alpha = 0$</span>, so it contributed nothing to <span class="m">$w = \sum_i \alpha^{(i)} t^{(i)} x^{(i)}$</span>, and the same solution is still optimal and still feasible</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That intuition fits least squares, where every residual tugs the fit. The SVM solution is built only from support vectors; a far-away point exerts exactly zero pull.</div>
+  <div class="quiz-fb" data-k="b">Its constraint was already slack (satisfied with room to spare), so removing it changes the feasible set only in a region the optimum never touched. The old solution remains optimal.</div>
+  <div class="quiz-fb" data-k="c">Right, and you can verify it physically in Fig 2.1: drag any unringed point around outside the buffer and the boundary ignores it completely, until the moment it reaches the margin and becomes a support vector.</div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">You train an RBF-kernel SVM with a very large <span class="m">$\gamma$</span> (say 500) on a few hundred noisy points. Training accuracy is 100%; test accuracy is terrible. What went wrong?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Large <span class="m">$\gamma$</span> makes the kernel nearly linear, so the model underfit the data</button>
+    <button data-k="b">With huge <span class="m">$\gamma$</span>, similarity dies off before reaching even nearby neighbours, so each training point carves out its own tiny island: the model memorized the training set, noise included</button>
+    <button data-k="c">Nothing is wrong with <span class="m">$\gamma$</span>; only <span class="m">$C$</span> controls overfitting in an SVM</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Other direction: it is <em>tiny</em> <span class="m">$\gamma$</span> that flattens the kernel toward "everyone is similar", giving near-linear underfit boundaries. Slide <span class="m">$\gamma$</span> down in Fig 5.3 to see it.</div>
+  <div class="quiz-fb" data-k="b">Right. <span class="m">$K = e^{-\gamma \lVert u - v \rVert^2}$</span> with <span class="m">$\gamma = 500$</span> is essentially zero beyond distance 0.1 or so, so the decision function is a sum of pin-prick bumps, one per support vector. Perfect training separation, no generalization: overfitting in its purest visual form, the islands in Fig 5.3.</div>
+  <div class="quiz-fb" data-k="c">Both knobs regulate capacity: <span class="m">$C$</span> prices violations, <span class="m">$\gamma$</span> sets the geometry's flexibility. Either one, pushed to its extreme, can overfit or underfit on its own.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a kernel for a similarity of your own</summary>
+  <div>
+    <p>Invent a kernel for some non-vector notion of similarity (documents, sets of tags, anything) and argue that it is a valid kernel, meaning it really equals a dot product in some feature space.</p>
+    <!-- Note: the closure properties of kernels (sums/products/scalings) go slightly
+         beyond lecture-08-source-content.md; included because the spec's transfer
+         question asks the reader to argue kernel validity. -->
+    <p><b>Answer</b> (one good version). Suppose "similar" for two documents means "share many vocabulary words". Define <span class="m">$K(A, B)$</span> = the number of distinct words appearing in both documents. Validity argument: exhibit the feature map. Let <span class="m">$\phi(A)$</span> be the binary indicator vector over the whole vocabulary, one coordinate per word, 1 if the word occurs in <span class="m">$A$</span>. Then <span class="m">$\phi(A)^\top \phi(B)$</span> counts exactly the shared words, so <span class="m">$K = \phi^\top \phi$</span> by construction and the kernel is valid: the geometry the SVM will optimize genuinely exists. That construction, "define the similarity you want, then exhibit (or prove the existence of) a <span class="m">$\phi$</span> that realizes it", is the general recipe. Handy closure facts when the direct construction is awkward: sums of kernels, products of kernels, and positive scalings of kernels are kernels again, so you can assemble complicated valid similarities from simple verified parts.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): SVM or logistic regression? Argue both ways</summary>
+  <div>
+    <p>Name a situation where you would prefer an SVM over logistic regression, and one where you would prefer logistic regression, and justify each with what you know about the two models.</p>
+    <!-- Note: the SVM-vs-logistic-regression comparison goes beyond
+         lecture-08-source-content.md; it is the transfer question the lesson spec
+         explicitly requests, answered from properties taught in lectures 6 and 8. -->
+    <p><b>Answer</b> (one good version). <b>Prefer the SVM</b> when the boundary is what matters and the data is modest in size but awkward in shape: a few thousand samples, high-dimensional features, genuinely nonlinear structure. Kernels give you nonlinear boundaries without designing features, the margin objective cares only about the hard cases near the boundary, and the solution is sparse in the support vectors. <b>Prefer logistic regression</b> when you need calibrated probabilities rather than bare labels (risk scores, ranking, downstream expected-value decisions), or when the dataset is enormous: its unconstrained objective trains happily with stochastic gradient methods at scales where solving a kernel SVM's dual, whose kernel matrix grows as <span class="m">$N^2$</span>, stops being practical. The models even disagree philosophically: logistic regression listens to every point a little (every sample moves the gradient), while the SVM listens only to the points near the boundary and ignores the rest entirely. Which behaviour you want depends on whether the mass of easy points carries information you care about.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): what would a truncated RBF kernel do to the boundary?</summary>
+  <div>
+    <p>The RBF kernel corresponds to an infinite-dimensional feature map. Suppose you truncate that expansion at a finite order. What kind of kernel do you get, and how would the decision boundary change?</p>
+    <p><b>Answer.</b> Factor the RBF kernel: <span class="m">$e^{-\gamma\lVert u - v\rVert^2} = e^{-\gamma\lVert u\rVert^2}\, e^{-\gamma\lVert v\rVert^2}\, e^{2\gamma\, u^\top v}$</span>, and Taylor-expand the last factor: <span class="m">$e^{2\gamma u^\top v} = \sum_{k=0}^{\infty} \frac{(2\gamma)^k}{k!} (u^\top v)^k$</span>. Each term <span class="m">$(u^\top v)^k$</span> is a polynomial kernel of degree <span class="m">$k$</span>, so RBF is an infinite, factorially-damped sum of polynomial kernels of every degree: that is the sense in which its feature space is infinite-dimensional, containing polynomial features of all orders. Truncating at order <span class="m">$k_{\max}$</span> keeps only finitely many terms, which is a valid kernel (a positive-weighted sum of polynomial kernels) whose feature space is finite: polynomial features up to degree <span class="m">$k_{\max}$</span>. Consequences for the boundary: it becomes a polynomial surface of bounded degree, so the razor-thin local flexibility of true RBF disappears. No more islands around single points, smoother and more rigid cuts, less overfitting risk, but also no ability to carve fine local structure, and the similarity no longer decays all the way to zero for far pairs the way the true exponential does. Truncation is, in effect, a capacity knob: it moves the model back down the ladder from "infinitely flexible" toward the polynomial kernels of fixed degree.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the support vector machine: pick the boundary with the widest buffer, discover that only the points touching the buffer matter, pay for violations with slack priced by <span class="m">$C$</span>, and swap dot products for kernels so the same linear machinery draws curves. It is also the end of an era in this course: the last model whose features, or similarities, a human designs by hand. Next lecture the model designs its own. Neural networks.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../bias-variance-ensembles/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 7: Bias, Variance &amp; Ensembles</div>
+  </a>
+  <a href="../neural-networks/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 9: Neural Networks</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 8 &middot; Support Vector Machines</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

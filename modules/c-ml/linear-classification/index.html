@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linear Classification — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on linear classification: scores, thresholds, decision boundaries, precision and recall, the perceptron, and multi-class strategies.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 5 &middot; The ML Bible</div>
+  <h1>Linear Classification</h1>
+  <p class="lede">
+    Last lecture we learned to predict numbers. This lecture we learn to make
+    decisions. The move is smaller than it sounds: keep the exact same linear
+    score from regression, then chop it at a threshold, and a number becomes a
+    verdict. That one chop creates everything new here: decision boundaries,
+    the two kinds of mistakes, precision and recall, and the perceptron, the
+    1958 algorithm that learns a boundary by being corrected one error at a
+    time. Every concept gets an interactive figure with real computed numbers.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: from predictions to decisions</a></li>
+    <li><a href="#sec-asreg">Classification as regression</a></li>
+    <li><a href="#sec-boundary">Decision boundaries</a></li>
+    <li><a href="#sec-cost">The cost of mistakes</a></li>
+    <li><a href="#sec-metrics">Metrics beyond accuracy</a></li>
+    <li><a href="#sec-perceptron">The perceptron</a></li>
+    <li><a href="#sec-multiclass">Multi-class classification</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> From predictions to decisions</h2>
+
+<p>
+Think about the systems that actually act on you. A bank does not tell you
+"your creditworthiness is 0.73"; it approves the loan or it rejects it. A
+photo app does not report "dogness: 0.9"; it files the picture under dog or
+not dog. A fraud system does not email you a suspicion level; it blocks the
+transaction or lets it through. Under the hood, every one of these systems
+still computes a continuous number, a <strong>score</strong>: risk, fraud,
+churn, dogness. The decision comes from one extra step. Compare the score to
+a cutoff, and act.
+</p>
+
+<p>
+That pipeline, <code>score &rarr; threshold &rarr; class label</code>, is the
+whole subject of this lecture. <strong>Classification</strong> means assigning
+each input to one of a finite set of labels: two labels makes the problem
+<strong>binary</strong>, more than two makes it <strong>multi-class</strong>.
+Regression predicted continuous outputs; classification predicts discrete
+ones. And here is the good news: we reuse the entire regression machinery,
+collect data, pick a model, pick a loss, optimize, regularize. Only the
+target changed. Feel the pipeline first, before any math:
+</p>
+
+<div class="figure" id="fig-pipeline">
+  <div class="fig-mount" data-fig="pipeline"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the score-to-decision pipeline, live. Drag the applicant along the feature axis. The linear score <span class="m">$s(x) = w_0 + w_1 x_1$</span> is computed for real, compared against the threshold at zero, and the label flips the instant the score crosses it. One continuous number, one cutoff, one decision.</p>
+</div>
+
+<p>
+Notice what the chop forces on us. The moment a number becomes a decision,
+two new questions appear that regression never had to answer. Where exactly
+does the flip happen? That is the <strong>decision boundary</strong>, section
+2. And when the decision is wrong, how wrong is it, and does the direction of
+the error matter? That is the cost of mistakes, sections 3 and 4. Then we
+learn the boundary from data (section 5) and handle more than two classes
+(section 6).
+</p>
+</section>
+
+<!-- ═══════════════════ 1. CLASSIFICATION AS REGRESSION ═══════════════════ -->
+<section id="sec-asreg">
+<h2><span class="secnum">1.</span> Classification as regression</h2>
+
+<p>
+We already own a machine that turns features into a number. It is the linear
+model from last lecture:
+</p>
+
+$$ f(w, x) = w_0 + w^\top x = w_0 + \sum_{i=1}^{d} w_i x_i $$
+
+<p>
+Each feature <span class="m">$x_i$</span> contributes to the total in
+proportion to its weight <span class="m">$w_i$</span>, and
+<span class="m">$w_0$</span> shifts the whole thing up or down. A linear
+classifier is exactly this: a <em>weighted scoring rule</em>. Income adds
+points, missed payments subtract points, and the final tally decides.
+Simple, fast, and you can read the model's reasoning straight off the
+weights.
+</p>
+
+<p>
+So here is the cheapest possible classifier, and it genuinely works. Encode
+the two classes as numeric targets <span class="m">$t \in \{-1, +1\}$</span>.
+Fit the linear model to those targets with the same least-squares loss we
+minimized last lecture:
+</p>
+
+$$ J_{\text{square}}(w) = \frac{1}{N} \sum_{n=1}^{N}
+   \left( w^\top x^{(n)} - t^{(n)} \right)^2 $$
+
+<p>
+The fitted line tries to output values near <span class="m">$+1$</span> over
+the positive examples and near <span class="m">$-1$</span> over the negative
+ones. It will never be exactly right, a line cannot equal two constants at
+once, but we do not need it to be. We only need its <em>sign</em>. Threshold
+the fitted score at zero and read off a class. That is the
+<strong>decision rule</strong>:
+</p>
+
+$$ y(x) = \operatorname{sign}\!\left( w_0 + w^\top x \right)
+   = \begin{cases} +1 & \text{if } w_0 + w^\top x \ge 0 \\[2pt]
+     -1 & \text{otherwise}\end{cases} $$
+
+<p>In NumPy the whole prediction step is one line for the entire dataset:</p>
+
+<pre class="code" data-lang="python"><code># X has a leading column of ones, so w[0] is the intercept w0
+def predict(X, w):
+    return np.sign(X @ w)     # one score per row, chopped to -1 / +1</code></pre>
+
+<p>
+Watch the trick happen, and then watch it misbehave. The figure below fits a
+real least-squares line to 1-D two-class data and thresholds it at zero. The
+crossing point becomes the boundary, and the two sides of it become the two
+predicted classes. Then press the button that adds a few extreme but
+perfectly valid positive examples far to the right:
+</p>
+
+<!-- Addition beyond lecture-05-source-content.md: the source presents
+     least-squares-then-threshold; the distant-outlier failure mode shown
+     here (squared loss penalizing confidently-correct points) is added to
+     motivate the move past squared loss, foreshadowing logistic regression. -->
+<div class="figure" id="fig-regthresh">
+  <div class="fig-mount" data-fig="regthresh"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> regression as a classifier. The orange line is the genuine least-squares fit to targets <span class="m">$t = \pm 1$</span>; where it crosses zero becomes the decision boundary, and the shaded regions are the two predicted classes. Add the distant positive points: the squared loss drags the line toward them, the crossing slides right, and previously correct points get misclassified. Squared loss punishes the model for being <em>too confidently right</em>, which is the first hint that classification wants its own loss.</p>
+</div>
+
+<p>
+Keep that failure in your pocket. Least squares cares about the distance
+between the score and <span class="m">$\pm 1$</span>, but classification only
+cares about the side. Points far into their own region are the easiest cases
+in the world, yet squared loss treats them as huge errors and warps the
+boundary to appease them. Fixing this properly is next lecture's job. For
+now the takeaway is positive: threshold a regression and you have a working
+classifier, plus a precise geometric object to study, the place where the
+decision flips.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. DECISION BOUNDARIES ═══════════════════ -->
+<section id="sec-boundary">
+<h2><span class="secnum">2.</span> Decision boundaries</h2>
+
+<p>
+The <strong>decision boundary</strong> is the set of inputs where the
+classifier switches classes, which for our rule is exactly where the score is
+zero:
+</p>
+
+$$ w_0 + w^\top x = 0 $$
+
+<p>
+On one side the score is positive and the model says <span class="m">$+1$</span>;
+on the other it is negative and the model says <span class="m">$-1$</span>.
+Each side is called a <strong>half-space</strong>. The boundary itself is the
+same equation in every dimension, but its shape grows with
+<span class="m">$d$</span>: a single <em>point</em> in 1-D, a <em>line</em>
+in 2-D, a <em>plane</em> in 3-D, and a hyperplane beyond that.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the 1-D boundary</div>
+  <p>Take <span class="m">$w_0 = -1$</span> and <span class="m">$w_1 = 2$</span>, so the score is <span class="m">$s(x_1) = -1 + 2x_1$</span>. Set it to zero and solve:</p>
+  $$ -1 + 2x_1 = 0 \;\;\Rightarrow\;\; x_1 = -\frac{w_0}{w_1} = \frac{1}{2} $$
+  <p>The boundary is the single point <span class="m">$x_1 = 0.5$</span>. Check both sides with real numbers. At <span class="m">$x_1 = 2$</span>: <span class="m">$s = -1 + 4 = 3 \ge 0$</span>, predict <span class="m">$+1$</span>. At <span class="m">$x_1 = 0$</span>: <span class="m">$s = -1 &lt; 0$</span>, predict <span class="m">$-1$</span>. Because <span class="m">$w_1 &gt; 0$</span>, the score grows to the right, so the positive half-line is the right side. Flip the sign of <span class="m">$w_1$</span> and the sides swap while the boundary point moves to <span class="m">$-w_0/w_1$</span>.</p>
+</div>
+
+<p>
+In 2-D the geometry gets richer and more useful. The weight vector
+<span class="m">$w = (w_1, w_2)$</span> is <em>perpendicular</em> to the
+boundary line and points into the positive half-space; it is called the
+<strong>normal vector</strong>. The intercept <span class="m">$w_0$</span>
+slides the line back and forth without rotating it. Every linear classifier
+you will ever meet, this lecture's perceptron, next lecture's logistic
+regression, later the SVM, is at heart a choice of this one line. Build the
+intuition with your hands:
+</p>
+
+<div class="figure" id="fig-boundary">
+  <div class="fig-mount" data-fig="boundary"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the decision boundary in 1-D, 2-D, and 3-D. In 2-D, drag the arrowhead to rotate the normal vector <span class="m">$w$</span> (the line stays perpendicular to it), drag anywhere else on the plot to slide the boundary through that point, or use the sliders; the shaded half-spaces, the live equation, and the count of correctly classified points all update from the real score. The 1-D tab shows the same equation collapsing to the worked point <span class="m">$x_1 = -w_0/w_1$</span>, and the 3-D tab shows the boundary becoming a plane.</p>
+</div>
+
+<p>
+Two honest remarks before moving on. First, interpretability: a linear
+classifier's verdict always decomposes into per-feature contributions
+<span class="m">$w_i x_i$</span>, which is why regulated industries love it.
+Second, the obvious limitation: all of this assumes a straight boundary is
+<em>appropriate</em> for the data. Section 5 shows a four-point dataset where
+no straight line works at all.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A 1-D classifier has <span class="m">$w_0 = 6$</span> and <span class="m">$w_1 = -2$</span>. Where is the decision boundary, and which side is predicted positive?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Boundary at <span class="m">$x_1 = 3$</span>; the right side (<span class="m">$x_1 &gt; 3$</span>) is positive</button>
+    <button data-k="b">Boundary at <span class="m">$x_1 = 3$</span>; the left side (<span class="m">$x_1 \le 3$</span>) is positive</button>
+    <button data-k="c">Boundary at <span class="m">$x_1 = -3$</span>; the left side is positive</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The boundary location is right: <span class="m">$x_1 = -w_0/w_1 = -6/(-2) = 3$</span>. But test a point: at <span class="m">$x_1 = 5$</span>, <span class="m">$s = 6 - 10 = -4$</span>, negative. With <span class="m">$w_1 &lt; 0$</span> the score falls as <span class="m">$x_1$</span> grows.</div>
+  <div class="quiz-fb" data-k="b">Right. Solve <span class="m">$6 - 2x_1 = 0$</span> to get <span class="m">$x_1 = 3$</span>, then check a side: at <span class="m">$x_1 = 0$</span>, <span class="m">$s = 6 \ge 0$</span>, so the left half-line is the positive one. The sign of <span class="m">$w_1$</span> picks the direction, the ratio <span class="m">$-w_0/w_1$</span> picks the spot.</div>
+  <div class="quiz-fb" data-k="c">Watch the sign: <span class="m">$-w_0/w_1 = -6/(-2) = +3$</span>, not <span class="m">$-3$</span>. Then verify a test point to find the positive side.</div>
+</div>
+
+<details class="check">
+  <summary>Check: read a 2-D boundary without a picture</summary>
+  <div>
+    <p>A classifier in 2-D has <span class="m">$w_0 = -4$</span>, <span class="m">$w_1 = 1$</span>, <span class="m">$w_2 = 1$</span>. Describe the boundary and decide the predicted class of the point <span class="m">$(1, 1)$</span>.</p>
+    <p><b>Answer.</b> The boundary is the line <span class="m">$-4 + x_1 + x_2 = 0$</span>, i.e. <span class="m">$x_1 + x_2 = 4$</span>, a line of slope <span class="m">$-1$</span> through <span class="m">$(4, 0)$</span> and <span class="m">$(0, 4)$</span>. The normal vector <span class="m">$(1,1)$</span> points up-right, so the far side (large <span class="m">$x_1 + x_2$</span>) is positive. At <span class="m">$(1,1)$</span> the score is <span class="m">$-4 + 1 + 1 = -2 &lt; 0$</span>, so predict <span class="m">$-1$</span>. You can reproduce this in Fig 2.1 by setting the sliders to these exact values.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. THE COST OF MISTAKES ═══════════════════ -->
+<section id="sec-cost">
+<h2><span class="secnum">3.</span> The cost of mistakes</h2>
+
+<p>
+A classifier's output is right or wrong, so the most direct way to score it
+is to count. That is the <strong>zero/one loss</strong>: pay nothing for a
+correct label, pay one for any error.
+</p>
+
+$$ L_{0\text{-}1}(y(x), t) = \begin{cases} 0 & \text{if } y(x) = t \\[2pt]
+   1 & \text{if } y(x) \neq t \end{cases} $$
+
+<p>
+It is the honest count of mistakes, and it has two serious limitations.
+The first is mathematical: it is not differentiable, it is flat almost
+everywhere with sudden jumps, so the gradient machinery from last lecture
+gets no signal from it. Hold that thought for section 5 and for logistic
+regression. The second limitation is the one this section is about: zero/one
+loss treats all errors as equal, and in the real world they are not.
+</p>
+
+<p>
+With two classes there are exactly two ways to be wrong, and they have
+names. A <strong>false positive</strong> is crying wolf: the truth is
+<span class="m">$t = -1$</span> but the model says
+<span class="m">$y = +1$</span>. A <strong>false negative</strong> is a miss:
+the truth is <span class="m">$t = +1$</span> but the model says
+<span class="m">$y = -1$</span>. Now attach a scenario. A diabetes screen
+flags patients for a follow-up test. A false positive means one healthy
+person gets an unnecessary follow-up, annoying and a little costly. A false
+negative means a diseased patient walks away undiagnosed. These are not the
+same size of bad. The same asymmetry shows up everywhere decisions carry
+consequences: a falsely approved loan, a missed fraud, a wrongly escalated
+alert each carry their own real cost.
+</p>
+
+<p>
+The fix is an <strong>asymmetric loss</strong>: charge different penalties
+for the two error types, say <span class="m">$\alpha$</span> per false
+positive and <span class="m">$\beta$</span> per false negative. The total
+cost of a classifier on a dataset becomes
+<span class="m">$\alpha \cdot FP + \beta \cdot FN$</span>, where
+<span class="m">$FP$</span> and <span class="m">$FN$</span> count each error
+type. The deep point: the loss is not bookkeeping, it is <em>the channel
+through which you tell the model which mistakes matter</em>. Change the
+penalties and the best decision threshold moves. Prove it to yourself:
+</p>
+
+<div class="figure" id="fig-costdemo">
+  <div class="fig-mount" data-fig="costdemo"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the price of a threshold. Sixty screened patients, each with a real computed risk score; drag the threshold and the false positives (healthy, flagged) and false negatives (diseased, missed) are counted live. The curve underneath is the total cost <span class="m">$\alpha \cdot FP + \beta \cdot FN$</span> at every possible threshold, with the minimum marked. Slide <span class="m">$\beta$</span> up to say "a miss is ten times worse" and watch the optimal threshold walk left, flagging more people to avoid missing anyone.</p>
+</div>
+
+<p>
+Read the figure's lesson back in words. With equal penalties
+(<span class="m">$\alpha = \beta = 1$</span>) the asymmetric cost <em>is</em>
+the zero/one count of errors, and the best threshold sits where the two
+classes trade off evenly. Make misses expensive and the threshold drops: the
+screen becomes eager, accepting many false alarms to catch nearly every true
+case. Make false alarms expensive and it becomes conservative. The model did
+not change. The data did not change. Only the statement of what we care
+about changed, and the right decision moved. Which raises the next question:
+if error counts can mislead, what numbers <em>should</em> we report?
+</p>
+</section>
+
+<!-- ═══════════════════ 4. METRICS BEYOND ACCURACY ═══════════════════ -->
+<section id="sec-metrics">
+<h2><span class="secnum">4.</span> Metrics beyond accuracy</h2>
+
+<p>
+<strong>Accuracy</strong> answers "how often are we right?". It is one
+number, it is easy, and under class imbalance it is a trap. Screen 100
+patients of whom 10 are diseased, and the classifier that says "healthy" to
+everyone scores 90% accuracy while catching zero cases. The number looks
+great and the classifier is useless. To do better we need metrics that ask a
+sharper question: not how often are we wrong, but <em>what kind</em> of
+errors are we making?
+</p>
+
+<p>
+Start by sorting every prediction into one of four bins. A
+<strong>true positive</strong> (TP) is a positive we caught, a
+<strong>true negative</strong> (TN) a negative we correctly cleared, and the
+two error types from section 3 fill the off-diagonal: false positives (FP)
+and false negatives (FN). Arranged as a 2&times;2 table, this is the
+<strong>confusion matrix</strong>, and every metric below is arithmetic on
+its four cells:
+</p>
+
+$$ R = \frac{TP}{TP + FN}, \qquad P = \frac{TP}{TP + FP},
+   \qquad F_1 = 2\,\frac{P \cdot R}{P + R},
+   \qquad \text{Acc} = \frac{TP + TN}{TP + TN + FP + FN} $$
+
+<ul>
+  <li><b>Recall</b> <span class="m">$R$</span>: of all the truly positive cases, how many did we catch? Of all the fraud that happened, how much did we flag? The denominator is the truth column, so recall is blind to false alarms.</li>
+  <li><b>Precision</b> <span class="m">$P$</span>: of everything we flagged positive, how much was truly positive? The denominator is our own flag pile, so precision is blind to misses.</li>
+  <li><b><span class="m">$F_1$</span></b>: the harmonic mean of the two. The harmonic mean punishes imbalance, so a model cannot buy a good <span class="m">$F_1$</span> by maxing one metric and abandoning the other.</li>
+</ul>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one full confusion matrix</div>
+  <p>The diabetes screen from section 3, on 100 patients of whom 10 are diseased. Suppose the screen flags 15 people, and 6 of them are genuinely diseased. Fill the four cells: <span class="m">$TP = 6$</span> (diseased, flagged), <span class="m">$FN = 10 - 6 = 4$</span> (diseased, missed), <span class="m">$FP = 15 - 6 = 9$</span> (healthy, flagged), <span class="m">$TN = 90 - 9 = 81$</span> (healthy, cleared). Now the metrics, digit by digit:</p>
+  $$ R = \frac{6}{6+4} = 0.60 \qquad P = \frac{6}{6+9} = \frac{6}{15} = 0.40 $$
+  $$ F_1 = 2 \cdot \frac{0.40 \times 0.60}{0.40 + 0.60} = 2 \cdot \frac{0.24}{1.00} = 0.48
+     \qquad \text{Acc} = \frac{6 + 81}{100} = 0.87 $$
+  <p>Now the punchline. The lazy "everyone is healthy" classifier has <span class="m">$TP = 0$</span>, <span class="m">$FP = 0$</span>, <span class="m">$FN = 10$</span>, <span class="m">$TN = 90$</span>: accuracy <span class="m">$0.90$</span>, <em>better</em> than our screen, with recall <span class="m">$0$</span> and precision undefined. Accuracy ranked a useless model above a useful one. Recall exposes the fraud instantly: <span class="m">$0.60$</span> versus <span class="m">$0$</span>.</p>
+</div>
+
+<p>From the confusion matrix in code, the metrics are three lines:</p>
+
+<pre class="code" data-lang="python"><code>def precision_recall_f1(y_pred, y_true):
+    tp = np.sum((y_pred == 1) &amp; (y_true == 1))
+    fp = np.sum((y_pred == 1) &amp; (y_true == -1))
+    fn = np.sum((y_pred == -1) &amp; (y_true == 1))
+    precision = tp / (tp + fp)
+    recall    = tp / (tp + fn)
+    f1 = 2 * precision * recall / (precision + recall)
+    return precision, recall, f1</code></pre>
+
+<p>
+Here is the part that makes all of this dynamic rather than static: the
+confusion matrix is a function of the <em>threshold</em>. Slide the cutoff
+down and you flag more people, so recall rises and precision usually falls.
+Slide it up and the reverse. Precision and recall are two ends of one lever.
+Feel the lever:
+</p>
+
+<div class="figure" id="fig-cmatrix">
+  <div class="fig-mount" data-fig="cmatrix"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the confusion-matrix explorer, on the same 60 screened patients as Fig 3.1. Drag the threshold through the scores; every point is re-binned into TP, FP, TN, or FN on the spot, and precision, recall, <span class="m">$F_1$</span>, and accuracy are recomputed from the four live counts. Push the threshold left until recall hits 1.00 and watch what happens to precision.</p>
+</div>
+
+<p>
+Every threshold position in Fig 4.1 produces one (recall, precision) pair.
+Sweep the threshold across its whole range, collect all the pairs, and you
+get the <strong>precision-recall curve</strong>: a portrait of every
+trade-off this scorer can offer. Each point on the curve is one threshold
+setting. The threshold picks <em>where you stand</em> on the curve, but the
+curve itself belongs to the model; train a better scorer (or a worse one)
+and the entire curve shifts. That separation is exactly what makes PR curves
+the right tool for comparing models before anyone has committed to a
+threshold:
+</p>
+
+<div class="figure" id="fig-prcurve">
+  <div class="fig-mount" data-fig="prcurve"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> the precision-recall curve, traced from real threshold sweeps over the Fig 4.1 data. The orange marker is the threshold you set in Fig 4.1, drag in either figure and the other follows. Toggle the weaker model, a noisier score on the same patients, and its whole curve sits lower: at any recall you want, it offers less precision.</p>
+</div>
+
+<p>
+One discipline note before the quiz, because these ideas blur together in
+week 10 if you let them. Keep three quantities distinct. The
+<strong>training loss</strong> is what the optimizer minimizes; it must be
+well behaved (differentiable, so far squared error, soon cross-entropy).
+The <strong>evaluation metric</strong> is how you judge the model on
+validation and test data; precision, recall, <span class="m">$F_1$</span>
+live here, and they need not be differentiable because nothing optimizes
+them directly. The <strong>deployment objective</strong> is what the
+organization actually cares about, dollars, missed diagnoses, user trust,
+and it usually is not even computable from the dataset. Good practitioners
+translate the third into the second and pick the first to serve it.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A fraud model reviews 1000 transactions of which 40 are fraudulent. It flags 50; 30 of those are real fraud. What are its precision and recall?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$P = 0.75$</span>, <span class="m">$R = 0.60$</span></button>
+    <button data-k="b"><span class="m">$P = 0.97$</span>, <span class="m">$R = 0.75$</span>, since accuracy is 0.97</button>
+    <button data-k="c"><span class="m">$P = 30/50 = 0.60$</span>, <span class="m">$R = 30/40 = 0.75$</span></button>
+  </div>
+  <div class="quiz-fb" data-k="a">You swapped the denominators. Precision divides by what the model flagged (50); recall divides by the fraud that truly happened (40).</div>
+  <div class="quiz-fb" data-k="b">Accuracy is a different metric. It happens to be <span class="m">$(30 + 940)/1000 = 0.97$</span> here, but precision divides true positives by the 50 flagged transactions, not by the whole dataset. Note the all-clear model scores <span class="m">$960/1000 = 0.96$</span> accuracy, which is why we compute <span class="m">$P$</span> and <span class="m">$R$</span> at all.</div>
+  <div class="quiz-fb" data-k="c">Right. <span class="m">$TP = 30$</span>, <span class="m">$FP = 20$</span>, <span class="m">$FN = 10$</span>, so <span class="m">$P = 30/50 = 0.60$</span> and <span class="m">$R = 30/40 = 0.75$</span>. For the record, <span class="m">$F_1 = 2(0.60)(0.75)/1.35 = 0.67$</span> and accuracy is <span class="m">$0.97$</span>, barely above the 0.96 of a model that flags nothing.</div>
+</div>
+
+<details class="check">
+  <summary>Check: why recall is the metric that matters for disease screening</summary>
+  <div>
+    <p>Argue in three or four sentences why a screening program should watch recall above precision or accuracy, and name the cost of pushing recall too aggressively.</p>
+    <p><b>Answer.</b> A screen exists to make sure true cases do not slip through: the catastrophic error is the false negative, a sick patient sent home, and recall is precisely the fraction of true cases caught. Accuracy is dominated by the huge healthy majority, so it barely moves when the screen misses patients, and precision only audits the people we flagged, saying nothing about the ones we failed to flag. The cost of chasing recall to 1.0 is a flood of false positives: every flagged patient consumes a follow-up test, money, and worry, which is Fig 4.1's trade in action. In practice you set a recall floor from the medical stakes, then take whatever precision the PR curve offers at that recall, and that is a decision about values, not statistics.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 5. THE PERCEPTRON ═══════════════════ -->
+<section id="sec-perceptron">
+<h2><span class="secnum">5.</span> The perceptron</h2>
+
+<p>
+So far we chose weights by recycling least squares, and Fig 1.1 showed the
+price. Time to learn the boundary <em>as a boundary</em>. The algorithm that
+first did this is worth meeting properly, history included. In 1958 Frank
+Rosenblatt introduced the <strong>perceptron</strong>, a learning rule
+inspired by a simplified neuron: inputs arrive with weights, the sum crosses
+a threshold, and the unit fires or does not. The optimism around it was
+enormous. In 1969 Marvin Minsky and Seymour Papert's book
+<em>Perceptrons</em> proved that a single perceptron is nothing more than a
+linear classifier, with everything that implies, including a famous
+four-point dataset it can never solve. That result, and the clarity it
+forced about needing layers and nonlinearities, shaped the next fifty years
+of the field. We will hit the same wall ourselves at the end of this
+section.
+</p>
+
+<h3>The setup and the goal</h3>
+
+<p>
+Binary labels <span class="m">$t \in \{-1, +1\}$</span>. Linear score
+<span class="m">$z = w^\top x$</span>, where from here on we fold the
+intercept in: prepend a constant feature <span class="m">$x_0 = 1$</span> to
+every input so that <span class="m">$w_0$</span> rides along inside
+<span class="m">$w$</span> and the algebra stays clean. Prediction
+<span class="m">$y(x) = \operatorname{sign}(z)$</span>, the same decision
+rule as before. The goal is the most literal one imaginable: choose
+<span class="m">$w$</span> to minimize the number of mistakes,
+</p>
+
+$$ \operatorname*{arg\,min}_w \; J_{0\text{-}1}(w)
+   = \sum_n \mathbb{I}\!\left[ t^{(n)} \neq \operatorname{sign}\!\left(w^\top x^{(n)}\right) \right] $$
+
+<p>
+Zero/one loss has no useful gradient, so the perceptron does not descend it.
+It does something more direct. First, a compact test for "mistake". Multiply
+the score by the true label to get the <strong>signed score</strong>
+<span class="m">$t^{(n)}\, w^\top x^{(n)}$</span>. If the prediction is
+right, score and label share a sign and the product is positive. If wrong,
+they disagree and
+</p>
+
+$$ t^{(n)} \, w^\top x^{(n)} < 0 \qquad \text{(the mistake condition)} $$
+
+<p>
+One number now encodes both correctness (its sign) and confidence (its
+size). The whole algorithm is: walk through the examples, and every time the
+signed score is negative, nudge the weights by the misclassified example
+itself:
+</p>
+
+$$ w_{\text{new}} = w_{\text{old}} + t^{(n)} x^{(n)} $$
+
+<p>
+If a positive point was on the wrong side, add it to <span class="m">$w$</span>,
+pulling the normal vector toward it. If a negative point was on the wrong
+side, subtract it, pushing the normal away. Correct points are left
+completely alone. Why does the nudge help? Compute the new signed score on
+the offending example:
+</p>
+
+$$ t^{(n)} \, w_{\text{new}}^\top x^{(n)}
+   = t^{(n)} \left( w_{\text{old}} + t^{(n)} x^{(n)} \right)^\top x^{(n)}
+   = t^{(n)} \, w_{\text{old}}^\top x^{(n)} + \lVert x^{(n)} \rVert^2 $$
+
+<p>
+using <span class="m">$(t^{(n)})^2 = 1$</span>. The update adds
+<span class="m">$\lVert x^{(n)} \rVert^2$</span>, a strictly positive
+quantity, to the signed score. Every update pushes that example's signed
+score up, toward positive, toward correct. It may take several visits, and
+fixing one point can disturb another, but each individual correction moves
+in the right direction. The full algorithm:
+</p>
+
+<ol>
+  <li>Initialize <span class="m">$w$</span> (zeros are fine).</li>
+  <li>Repeat over the examples: pick <span class="m">$(x^{(n)}, t^{(n)})$</span>, predict <span class="m">$y^{(n)} = \operatorname{sign}(w^\top x^{(n)})$</span>. If correct, do nothing. If wrong, update <span class="m">$w \leftarrow w + t^{(n)} x^{(n)}$</span>.</li>
+  <li>Stop when a full pass makes no mistakes, or after a fixed number of passes.</li>
+</ol>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: two updates to convergence</div>
+  <p>Three examples with the constant feature folded in, <span class="m">$\tilde{x} = (1, x_1, x_2)$</span>:
+  <span class="m">$x^{(1)} = (1, 2)$</span> with <span class="m">$t^{(1)} = -1$</span>,&nbsp;
+  <span class="m">$x^{(2)} = (2, -1)$</span> with <span class="m">$t^{(2)} = +1$</span>,&nbsp;
+  <span class="m">$x^{(3)} = (-1, 1)$</span> with <span class="m">$t^{(3)} = -1$</span>.
+  Start at <span class="m">$w = (0, 0, 0)$</span>.</p>
+  <p><b>Visit <span class="m">$x^{(1)}$</span>.</b> Score <span class="m">$w^\top \tilde{x}^{(1)} = 0$</span>, so <span class="m">$y = \operatorname{sign}(0) = +1 \neq -1$</span>: mistake. Update <span class="m">$w \leftarrow (0,0,0) - (1, 1, 2) = (-1, -1, -2)$</span>. Recheck the signed score: it was <span class="m">$0$</span>, and now <span class="m">$t\, w^\top \tilde{x} = -1 \times (-1 - 1 - 4) = 6$</span>. It rose by exactly <span class="m">$\lVert \tilde{x} \rVert^2 = 1 + 1 + 4 = 6$</span>, as the algebra promised.</p>
+  <p><b>Visit <span class="m">$x^{(2)}$</span>.</b> Score <span class="m">$= -1 + (-1)(2) + (-2)(-1) = -1$</span>, so <span class="m">$y = -1 \neq +1$</span>: mistake, signed score <span class="m">$-1$</span>. Update <span class="m">$w \leftarrow (-1,-1,-2) + (1, 2, -1) = (0, 1, -3)$</span>. New signed score: <span class="m">$+1 \times (0 + 2 + 3) = 5 = -1 + 6$</span>, up by <span class="m">$\lVert \tilde{x} \rVert^2 = 1 + 4 + 1 = 6$</span> again.</p>
+  <p><b>Visit <span class="m">$x^{(3)}$</span>.</b> Score <span class="m">$= 0 - 1 - 3 = -4$</span>, <span class="m">$y = -1 = t$</span>: correct, no update.</p>
+  <p><b>Pass 2.</b> <span class="m">$x^{(1)}$</span>: score <span class="m">$0 + 2 - 6 = -4$</span>, correct. <span class="m">$x^{(2)}$</span>: score <span class="m">$5$</span>, correct. <span class="m">$x^{(3)}$</span>: score <span class="m">$-4$</span>, correct. A clean pass: converged after just two updates, with final <span class="m">$w = (0, 1, -3)$</span>, i.e. the boundary <span class="m">$x_1 - 3 x_2 = 0$</span>.</p>
+</div>
+
+<p>
+Now watch the same dance on a bigger dataset. This is the signature figure
+of the lesson. Turn on "predict the fix" and the animation will pause on
+every mistake to ask you, before revealing, which way the weights should
+move:
+</p>
+
+<div class="figure" id="fig-perceptron">
+  <div class="fig-mount" data-fig="perceptron"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the perceptron learning, one example at a time. The highlighted point is the one being visited; the readout shows its real signed score <span class="m">$t\, w^\top \tilde{x}$</span>. On a mistake the update <span class="m">$w \leftarrow w + t \tilde{x}$</span> is applied and drawn: the normal vector <span class="m">$w$</span> gets the vector <span class="m">$t\, \tilde{x}$</span> added to it, and the boundary rotates. Ghost lines show where the boundary used to be. Step, play, change the speed, pick a different starting <span class="m">$w$</span>, or let it run to a full clean pass.</p>
+</div>
+
+<h3>Convergence, and the wall</h3>
+
+<!-- Addition beyond lecture-05-source-content.md: the source states the
+     convergence guarantee without attribution; the Novikoff (1962) credit
+     is added context. -->
+<p>
+Call a dataset <strong>linearly separable</strong> if some straight boundary
+classifies every example correctly. The perceptron's guarantee, proved by
+Novikoff in 1962, is clean: <em>if the data is linearly separable, the
+perceptron converges</em>, reaching a boundary with zero mistakes in a
+finite number of updates. No learning rate to tune, no local minima. But
+the guarantee's hypothesis carries all the weight. If the data is
+<em>not</em> linearly separable, the perceptron may update forever, cycling
+through weight vectors, because there is always some mistake left to
+trigger another nudge.
+</p>
+
+<p>
+And non-separable data does not need to be exotic. Minsky and Papert's
+counterexample is four points. Take two binary inputs and label them by
+XOR, "exclusive or": the label is positive when exactly one input is 1.
+The two positive points sit on one diagonal, the two negative points on the
+other. A single perceptron can represent AND and OR without trouble, but no
+line in the plane puts both diagonals on opposite sides. Try it yourself,
+seriously, try:
+</p>
+
+<div class="figure" id="fig-xor">
+  <div class="fig-mount" data-fig="xor"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the XOR wall. Drag the line's two handles and try to separate the four points; the correct count is computed live, and for XOR it never reaches 4 of 4. Switch the gate to AND or OR and the same line succeeds easily. Then press "let the perceptron try": on AND and OR it converges, on XOR it thrashes forever, capped here at 60 updates for mercy.</p>
+</div>
+
+<p>
+The XOR wall is a limit on the <em>representation</em>, not on the learning
+rule. The perceptron finds a separating line whenever one exists; XOR is a
+world where none exists in the raw features. The escape routes define the
+rest of the course: map the inputs into a feature space where the classes do
+separate (the end quiz has you build exactly this for XOR), or stack
+perceptron-like units into layers, which is the founding idea of neural
+networks. Either way, the takeaway stands: the perceptron is the simplest
+story of learning a decision boundary by repeated correction, and its
+failure told the field what to build next.
+</p>
+
+<h3>Run it yourself</h3>
+
+<p>
+The loop below is the real algorithm on the worked example's dataset. It
+executes in the page: change the starting weights or the number of passes
+and check the trace against the hand computation above.
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 5.3,</b> a live <code>perceptron_fit</code>. With the default zero start on the tiny dataset, the trace reproduces the worked math exactly: two updates, final <span class="m">$w = (0, 1, -3)$</span>. Change the start weights and the path differs but, on this separable data, it always ends at a clean pass. Switch to the larger dataset for a longer run.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You run the perceptron on a dataset where the two classes overlap: a few positive and negative points are mixed together, and no line separates them. What happens?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It converges to the line with the fewest mistakes, since each update reduces the total error</button>
+    <button data-k="b">It never converges: some example is always misclassified, so updates fire forever, and in practice you stop it after a fixed number of passes</button>
+    <button data-k="c">It converges, but only if the weights start at zero</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Tempting, but false. Each update fixes one example's signed score while possibly breaking others; nothing in the rule tracks or minimizes the total mistake count. The convergence guarantee needs separability.</div>
+  <div class="quiz-fb" data-k="b">Right. The stopping condition is a full pass with zero mistakes, and on overlapping data that pass never comes, so the weights cycle. The practical fix is a pass cap (as in Fig 5.3's code), and the principled fix is next lecture's differentiable loss.</div>
+  <div class="quiz-fb" data-k="c">The starting point changes the path and the final boundary, but not the convergence question. Separable data converges from any start; non-separable data converges from none.</div>
+</div>
+
+<details class="check">
+  <summary>Check: complete the update and predict the final boundary</summary>
+  <div>
+    <p>On the tiny dataset of the worked example, suppose you instead start at <span class="m">$w = (0, 0, -1)$</span>. Fill in the perceptron's steps for the first pass and state the final boundary. (Then verify with Fig 5.3.)</p>
+    <p><b>Answer.</b> Visit <span class="m">$x^{(1)} = (1,2)$</span>, <span class="m">$t = -1$</span>: score <span class="m">$0 + 0 - 2 = -2$</span>, prediction <span class="m">$-1$</span>, correct, no update. Visit <span class="m">$x^{(2)} = (2,-1)$</span>, <span class="m">$t = +1$</span>: score <span class="m">$0 + 0 + 1 = 1$</span>, prediction <span class="m">$+1$</span>, correct. Visit <span class="m">$x^{(3)} = (-1,1)$</span>, <span class="m">$t = -1$</span>: score <span class="m">$0 + 0 - 1 = -1$</span>, correct. A clean first pass with zero updates: this starting <span class="m">$w$</span> already separates the data. The final boundary is <span class="m">$-x_2 = 0$</span>, the horizontal axis, with the positive half-space below it (since <span class="m">$w_2 = -1$</span>, the score grows as <span class="m">$x_2$</span> falls). All three points sit strictly on their correct sides, so the perceptron, which only ever reacts to mistakes, leaves <span class="m">$w$</span> untouched. Moral: the perceptron stops at <em>any</em> separating boundary, not a best or widest one; margins arrive later in the course with SVMs.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. MULTI-CLASS CLASSIFICATION ═══════════════════ -->
+<section id="sec-multiclass">
+<h2><span class="secnum">6.</span> Multi-class classification</h2>
+
+<p>
+Everything so far was two classes. Real problems often have
+<span class="m">$K &gt; 2$</span>: digit recognition has ten classes, a
+triage system has several severity levels. Some models we already know
+extend to <span class="m">$K$</span> classes without any surgery. Multi-class
+k-NN just reports the most common class among the <span class="m">$k$</span>
+neighbours; a vote never cared how many parties there were. Multi-class
+decision trees are equally untroubled: impurity counts all
+<span class="m">$K$</span> classes and a leaf predicts its most frequent one.
+Linear classifiers need more thought, because a single score line only
+splits the world in two. There are two families of strategies: build one
+model that emits <span class="m">$K$</span> scores, or combine many binary
+classifiers.
+</p>
+
+<h3>Direct: one-hot least squares</h3>
+
+<p>
+Encode each label as a <strong>one-hot</strong> vector, length
+<span class="m">$K$</span> with a single 1 in the class's slot. Fit one
+linear scoring function per class by least squares, exactly the section 1
+trick run <span class="m">$K$</span> times:
+</p>
+
+$$ y_k(x) = w_k^\top x + b_k, \qquad
+   \hat{y}(x) = \operatorname*{arg\,max}_k \; y_k(x) $$
+
+<p>
+At prediction time, every class announces a score and the largest one wins.
+This is a fine baseline and it inherits least squares' speed, but a caution
+from the source material worth keeping verbatim in spirit: the
+<span class="m">$K$</span> scores are not calibrated probabilities. They can
+be negative, they do not sum to one, and their absolute sizes mean nothing;
+only the argmax is trustworthy.
+</p>
+
+<h3>Reductions: one-vs-rest and one-vs-one</h3>
+
+<p>
+<strong>One-vs-rest</strong> (OvR) trains <span class="m">$K$</span> binary
+classifiers, the <span class="m">$k$</span>-th separating class
+<span class="m">$k$</span> from everything else, and predicts the class
+whose classifier shouts loudest. The failure mode is baked in: on a given
+input, several classifiers may say "yes, mine" or none may. Then you need a
+tie-break rule, and comparing raw scores across independently trained
+classifiers is dubious, because each was trained on a different problem and
+their scales need not agree.
+</p>
+
+<p>
+<strong>One-vs-one</strong> (OvO) trains a classifier for every
+<em>pair</em> of classes, <span class="m">$\binom{K}{2} = K(K-1)/2$</span>
+of them; each pairwise classifier votes for one of its two classes, and the
+most-voted class wins. Each binary problem is small and clean, but the cost
+grows quadratically in <span class="m">$K$</span> (for
+<span class="m">$K = 10$</span> that is already 45 classifiers), and the
+votes can do something genuinely strange: pairwise preferences can
+<em>cycle</em>, <span class="m">$C_1 \succ C_2$</span>,
+<span class="m">$C_2 \succ C_3$</span>, <span class="m">$C_3 \succ C_1$</span>,
+a three-way tie with no majority winner, just like a rock-paper-scissors
+election.
+</p>
+
+<div class="figure" id="fig-multiclass">
+  <div class="fig-mount" data-fig="multiclass"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> three strategies, one dataset. Toggle between one-hot least squares (argmax of three real fitted scores), one-vs-rest, and one-vs-one; the coloured regions are recomputed from the actual trained classifiers. Drag the query point and the readout shows its three scores or its three pairwise votes and how the winner is chosen. In the OvR and OvO views, the washed-out zones are the conflicts: regions where no classifier claims the point, several do, or the vote ties.</p>
+</div>
+
+<p>
+The honest summary: multi-class is not just binary repeated. Every strategy
+above works, and every one of them owes you a definition of how scores,
+votes, or conflicts get resolved. When a library hands you a multi-class
+linear classifier, one of these three stories (usually OvR or a softmax
+generalization you will meet soon) is running underneath.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A one-vs-one system over classes <span class="m">$\{1, 2, 3\}$</span> reports: the (1 vs 2) classifier picks 1, the (1 vs 3) classifier picks 3, and the (2 vs 3) classifier picks 2. What does the system predict?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Class 1, because it won its first matchup</button>
+    <button data-k="b">Class 3, because it beat class 1, which beat class 2</button>
+    <button data-k="c">No majority exists: each class has exactly one vote, the preferences form a cycle, and a tie-break rule outside the votes must decide</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Matchup order carries no authority; OvO aggregates by vote count, and the counts here are 1, 1, 1.</div>
+  <div class="quiz-fb" data-k="b">That chain reasoning assumes preferences are transitive, and this example is precisely the proof that pairwise winners need not be: 1 beats 2, 2 beats 3, and yet 3 beats 1.</div>
+  <div class="quiz-fb" data-k="c">Right. The tally is 1-1-1, a cycle, and OvO has no internal answer. Implementations fall back to score magnitudes, class priors, or arbitrary order, and you can summon this exact situation in Fig 6.1 by parking the query in the grey central zone of the OvO view.</div>
+</div>
+
+<details class="check">
+  <summary>Check: one-vs-rest says yes twice. Now what?</summary>
+  <div>
+    <p>An OvR system over three classes evaluates a query and gets scores <span class="m">$y_1 = +0.8$</span>, <span class="m">$y_2 = +0.3$</span>, <span class="m">$y_3 = -0.5$</span>. Two classifiers claim the point. What is predicted, and what is the caveat?</p>
+    <p><b>Answer.</b> The standard rule is argmax: predict class 1, since <span class="m">$0.8$</span> is the largest score. The caveat is that this comparison is not really licensed. Classifier 1 was trained on "class 1 vs rest" and classifier 2 on "class 2 vs rest", two different problems with independently scaled scores; <span class="m">$0.8$</span> from one is not necessarily more confident than <span class="m">$0.3$</span> from the other. Argmax is a pragmatic tie-break, not a principled probability comparison, which is one motivation for the calibrated, softmax-based multi-class models coming later in the course. The same applies when every score is negative: nobody says yes, and argmax quietly picks the least emphatic no.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">7.</span> Summary and method card</h2>
+
+<p>
+The whole lecture compresses into one sentence: compute a linear score,
+threshold it, and take the consequences seriously. The score is regression's
+<span class="m">$w_0 + w^\top x$</span>, unchanged. The threshold creates a
+decision boundary, a point, line, or plane, whose normal vector is
+<span class="m">$w$</span>. The consequences are where all the substance
+lives: errors split into false positives and false negatives with genuinely
+different costs, accuracy stops being a trustworthy summary the moment
+classes are imbalanced, and precision, recall, and the PR curve report what
+kind of mistakes a threshold buys you. The perceptron learns the boundary by
+the simplest correction rule imaginable, adding misclassified examples into
+the weights, and it provably converges exactly when a separating line
+exists. XOR shows how easily one fails to exist. And multi-class turns out
+to be a design problem, argmax scores, one-vs-rest, one-vs-one, each with a
+conflict mode you must resolve by explicit rule.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Linear Classification</div>
+  <table>
+    <tr><th>Assumption</th><td>A linear score suffices to separate the classes in the chosen feature space.</td></tr>
+    <tr><th>Model class</th><td>Score <span class="m">$s(x) = w_0 + w^\top x$</span>, then threshold to a label; the threshold defines the boundary <span class="m">$w_0 + w^\top x = 0$</span>.</td></tr>
+    <tr><th>Learning / selection</th><td>Choose weights, intercept, threshold, loss, and evaluation metric to fit the task. The perceptron updates <span class="m">$w \leftarrow w + t\,x$</span> only on misclassified examples.</td></tr>
+    <tr><th>Prediction</th><td><span class="m">$y(x) = \operatorname{sign}(w_0 + w^\top x)$</span>; multi-class via argmax of <span class="m">$K$</span> scores, one-vs-rest, or one-vs-one.</td></tr>
+    <tr><th>Strengths</th><td>Simple, efficient, interpretable (per-feature contributions <span class="m">$w_i x_i$</span>), with a clear geometric picture.</td></tr>
+    <tr><th>Limitations</th><td>Only linear boundaries (XOR is unsolvable); hard thresholds are not differentiable and are threshold-sensitive; the perceptron converges only on linearly separable data.</td></tr>
+    <tr><th>Next step</th><td>Replace the hard threshold with a differentiable probabilistic model (logistic regression), then nonlinear feature maps, kernels, and neural networks.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: similarity (kNN), rules (trees),
+parametric functions (linear regression), and now decisions. The two
+sharpest complaints from today, that hard thresholds kill gradients and that
+scores are not probabilities, are both answered by one idea: replace the
+cliff of <span class="m">$\operatorname{sign}$</span> with a smooth ramp
+that outputs the probability of the positive class. That is the sigmoid,
+that is logistic regression, and that is next lecture.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">8.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design, not
+recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A rare-disease detector reports 99.0% accuracy on a test set where 1% of patients are diseased. Your supervisor is impressed. Should you be?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Yes: 99% accuracy is excellent by any standard</button>
+    <button data-k="b">Not yet: the all-healthy baseline scores 99.0% on this data, so the number is uninformative until you see recall and precision (or the PR curve)</button>
+    <button data-k="c">No: accuracy above 95% always signals overfitting</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Compute the baseline first. Predicting "healthy" for everyone is right 99% of the time here, while catching zero patients. Matching a useless model is not excellence.</div>
+  <div class="quiz-fb" data-k="b">Right. Under 1% prevalence, accuracy is dominated by the easy negatives. The detector could have recall 0 or recall 0.9 and show the same 99.0%; only error-type-aware metrics can tell those two systems apart, which is the entire argument of section 4.</div>
+  <div class="quiz-fb" data-k="c">High accuracy is not evidence of overfitting by itself; that diagnosis needs a train-test gap. The issue here is imbalance making the metric hollow, not memorization.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">During a perceptron run, example <span class="m">$x = (1, 2, -1)$</span> (bias folded in) with <span class="m">$t = +1$</span> has signed score <span class="m">$t\,w^\top x = -2$</span>. The update fires. What is the signed score of this same example immediately after?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$-2 + \lVert x \rVert^2 = -2 + 6 = +4$</span>: the update adds exactly the squared norm</button>
+    <button data-k="b">Exactly 0: the update places the point on the boundary</button>
+    <button data-k="c">It cannot be computed without knowing <span class="m">$w$</span></button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. <span class="m">$t\,(w + t x)^\top x = t\,w^\top x + t^2 \lVert x \rVert^2 = -2 + (1 + 4 + 1) = 4$</span>. This example lands on the correct side in one step, though a larger initial deficit could need several visits.</div>
+  <div class="quiz-fb" data-k="b">The update does not aim for the boundary; it adds the fixed amount <span class="m">$\lVert x \rVert^2 = 6$</span> to the signed score, wherever that lands it.</div>
+  <div class="quiz-fb" data-k="c">The beauty of the algebra is that <span class="m">$w$</span> cancels: the <em>change</em> in signed score is <span class="m">$\lVert x \rVert^2$</span> regardless of the current weights.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design an asymmetric loss and defend the numbers</summary>
+  <div>
+    <p>Pick an application you know (airport security screening, spam filtering, a smoke detector, code review bots). Assign penalties <span class="m">$\alpha$</span> (false positive) and <span class="m">$\beta$</span> (false negative), justify the ratio, and predict how the ratio moves the operating threshold.</p>
+    <p><b>Answer</b> (one honest version, smoke detector). A false positive is an alarm during cooking: cost is annoyance and a minute of waving a towel, call it <span class="m">$\alpha = 1$</span>. A false negative is an undetected fire: property and possibly lives, conservatively thousands of times worse, so <span class="m">$\beta = 5000$</span>. With <span class="m">$\beta/\alpha$</span> that extreme, the cost-minimizing threshold in the Fig 3.1 sense sits far into the cautious side: the detector should fire on weak evidence, accepting frequent false alarms, because one miss outweighs thousands of them. That matches how real detectors behave. The reasoning template for any domain: price both errors in comparable units (money, time, harm), take the ratio, and remember the threshold implements <em>values</em>, so different stakeholders (the person cooking vs the fire marshal) may legitimately want different thresholds on the same model. Spam is the mirror case: a lost job offer (false positive) dwarfs one more spam email (false negative), so <span class="m">$\alpha \gg \beta$</span> and the filter should hesitate to flag.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): make a linear classifier solve XOR</summary>
+  <div>
+    <p>No line in <span class="m">$(x_1, x_2)$</span> separates XOR. Propose a feature map that fixes this, give explicit weights that classify all four points correctly, and verify one point by hand.</p>
+    <p><b>Answer.</b> Add the product feature: map <span class="m">$(x_1, x_2) \mapsto (x_1, x_2, x_1 x_2)$</span>. The new coordinate is 1 only for <span class="m">$(1,1)$</span> and 0 for the other three points, which breaks the diagonal symmetry that made XOR impossible. Explicit weights: <span class="m">$s(x) = -0.5 + x_1 + x_2 - 2\,x_1 x_2$</span>. Check all four: <span class="m">$(0,0)$</span>: <span class="m">$s = -0.5 &lt; 0$</span>, predict <span class="m">$-1$</span> ✓. <span class="m">$(1,0)$</span>: <span class="m">$s = -0.5 + 1 = 0.5 \ge 0$</span>, <span class="m">$+1$</span> ✓. <span class="m">$(0,1)$</span>: <span class="m">$s = 0.5$</span>, <span class="m">$+1$</span> ✓. <span class="m">$(1,1)$</span>: <span class="m">$s = -0.5 + 1 + 1 - 2 = -0.5 &lt; 0$</span>, <span class="m">$-1$</span> ✓. The model is still linear <em>in its features</em>; the features stopped being raw inputs. This is the whole idea behind basis functions and kernels, and a two-layer network learns such a map instead of hand-designing it, which is precisely the response to Minsky and Papert's critique.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): when does a PR curve beat a single accuracy number?</summary>
+  <div>
+    <p>Your team must choose between two fraud models. Argue when a precision-recall curve is the right comparison tool and a single accuracy number is not, and name one situation where accuracy alone is fine.</p>
+    <p><b>Answer.</b> Reach for the PR curve when three conditions stack up, and fraud has all three. First, class imbalance: fraud is rare, so accuracy is propped up by the easy negatives and can rank a useless model above a useful one, as in the section 4 worked example. Second, asymmetric costs: missed fraud and blocked legitimate purchases hurt differently, so you care about the error types separately, which is exactly what the curve's two axes report. Third, an unfixed threshold: the deployment team will tune the cutoff later, so you should compare models across all thresholds at once; one model's curve sitting above another's (as in Fig 4.2) means it wins at every operating point, a conclusion no single-threshold number can deliver. Accuracy alone is fine when classes are roughly balanced, both error types cost about the same, and the threshold is fixed, a coin-sorting machine, say, or a balanced benchmark dataset used only for a quick sanity check.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is linear classification: one linear score, one threshold, and every consequence taken seriously, boundaries and half-spaces, false positives against false negatives, precision against recall, a learning rule that repairs one mistake at a time, and a four-point dataset that humbled a field. The machinery that fixes its sharpest flaw, a hard cliff where a gradient should be, is one smooth curve away. Next lecture: logistic regression.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../linear-regression/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 4: Linear Regression</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../logistic-regression/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 6: Logistic Regression</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 5 &middot; Linear Classification</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

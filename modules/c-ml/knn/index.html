@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>k-Nearest Neighbours — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on k-Nearest Neighbours: data representation, distance, Voronoi boundaries, choosing k, and where KNN breaks.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 2 &middot; The ML Bible</div>
+  <h1>k-Nearest Neighbours</h1>
+  <p class="lede">
+    The first learning algorithm of the course, and the most honest one. It has
+    no equations to fit and no parameters to train. It just remembers everything
+    it has seen and answers every question the same way: find the most similar
+    past examples and copy their answer. That one idea forces us to invent most
+    of machine learning's vocabulary: data as vectors, distance, decision
+    boundaries, hyperparameters, validation. This lesson builds all of it
+    from zero, with an interactive figure for every concept.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: similar things, similar labels</a></li>
+    <li><a href="#sec-data">Preliminaries: turning the world into data</a></li>
+    <li><a href="#sec-1nn">Nearest neighbours (1-NN)</a></li>
+    <li><a href="#sec-knn">k-nearest neighbours</a></li>
+    <li><a href="#sec-choosek">Choosing k the right way</a></li>
+    <li><a href="#sec-pitfalls">Where KNN breaks</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> Similar things, similar labels</h2>
+
+<p>
+You already run this algorithm in your head. A friend asks what show to watch
+next, and you think of the people whose taste is most like theirs, then
+recommend what those people loved. You find an unfamiliar fruit at the market,
+and you decide it is probably sweet because it looks and smells like a mango.
+No formula, no training, just one bet:
+<strong>similar things have similar labels</strong>.
+</p>
+
+<p>
+That single bet, taken literally, is the entire algorithm we build today. Try
+it before any math. Drag the mystery point below around the scatter and watch
+which labelled example it trusts:
+</p>
+
+<div class="figure" id="fig-hook">
+  <div class="fig-mount" data-fig="hook"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the whole idea in one picture. Drag the mystery point; its nearest labelled example lights up, and the mystery point simply copies that label. No equations were involved, yet.</p>
+</div>
+
+<p>
+Everything else in this lesson is what happens when you take that picture
+seriously. What exactly is a "point"? What does "nearest" mean, precisely?
+What happens when the nearest example is wrong? And when does the whole bet
+collapse? Those four questions are sections 1, 2, 3, and 5.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. PRELIMINARIES ═══════════════════ -->
+<section id="sec-data">
+<h2><span class="secnum">1.</span> Preliminaries: turning the world into data</h2>
+
+<p>
+Before any algorithm can find "similar" examples, the world has to become
+something a computer can compare. Start with the vocabulary.
+<strong>Data</strong> is facts and statistics collected into a form that is
+efficient to move and process, and it arrives in many shapes: text, images,
+video, tables, graphs. A <strong>dataset</strong> is a structured collection
+of data tied to one body of work, one problem you are trying to solve.
+</p>
+
+<p>
+Look inside a dataset and each column, each measured attribute, is a
+<strong>feature</strong>. Features come in four types, and the type decides
+what math is legal on them. The classic example is a table of planets:
+</p>
+
+<ul>
+  <li><b>Continuous</b>: any real value in a range. A planet's mass.</li>
+  <li><b>Ordinal</b>: ordered categories where order means something but gaps do not. A planet's order from the sun.</li>
+  <li><b>Discrete</b>: countable whole numbers. How many moons.</li>
+  <li><b>Nominal</b>: named categories with no order at all. Gas giant or rocky.</li>
+</ul>
+
+<p>Prove to yourself you can tell them apart:</p>
+
+<div class="figure" id="fig-sorter">
+  <div class="fig-mount" data-fig="sorter"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the feature-type sorter. Click an attribute, then the bucket it belongs in. Instant feedback; the distinctions matter because distance math treats each type differently.</p>
+</div>
+
+<p>
+Two numbers describe a dataset's overall shape. <strong>Cardinality</strong>
+is how many sample instances it holds, the number of rows.
+<strong>Dimensionality</strong> is how many features describe each instance,
+the number of columns. When people say <strong>big data</strong>, the
+informal meaning is that cardinality and/or dimensionality is heading toward
+infinity. Netflix's classic ratings matrix is 480,189 users by 17,770 movies,
+big in both directions at once.
+</p>
+
+<p>
+Big data hides a saving grace: <b>redundancy</b>. Data can capture too little
+information (digitization approximates the world) or too much (temperature
+recorded in Celsius and Fahrenheit is one fact stored twice; near-duplicate
+users are near-duplicate rows). High-dimensional data usually varies along
+far fewer real <b>degrees of variation</b> than its raw dimensionality
+suggests: face images are huge vectors, but what actually changes between
+them is orientation, expression, lighting. Similar movies exist, and similar
+users exist, and that structure is exploitable. Later in the course,
+dimensionality reduction is the tool that surfaces it. Today, redundancy is
+the reason a nearest-neighbour bet has any hope: if nothing in your dataset
+resembled anything else, "most similar example" would be meaningless.
+</p>
+
+<h3>Representation: everything becomes a vector</h3>
+
+<p>
+A <strong>representation</strong> is a way to measure, compare, and transform
+data on a computer. The common strategy across all of machine learning is
+blunt and powerful: represent every data point as a vector in Euclidean space
+<span class="m">$\mathbb{R}^d$</span>. Once data is a vector, the whole
+arsenal of linear algebra applies, and "how similar are these two things"
+becomes "how far apart are these two vectors", a question with a formula.
+</p>
+
+<p>
+For tabular data this is natural, each row is already a list of numbers. The
+surprising case is images. An image is a grid of pixel intensities, which is
+a matrix, and a matrix can be unrolled row by row into one long vector. A
+tiny 8-by-8 digit becomes a point in <span class="m">$\mathbb{R}^{64}$</span>.
+Watch it happen:
+</p>
+
+<div class="figure" id="fig-vectorize">
+  <div class="fig-mount" data-fig="vectorize"></div>
+  <p class="fig-caption"><b>Fig 1.2,</b> image to matrix to vector. Press Unroll and the pixel grid flattens, row by row, into a single vector in <span class="m">$\mathbb{R}^{64}$</span>. Digitization is itself an approximation: resolution and bit depth were choices.</p>
+</div>
+
+<h3>Supervised learning, and the discipline of the split</h3>
+
+<p>
+This course's first setting is <strong>supervised learning</strong>: we are
+given pairs <span class="m">$(x, t)$</span> of an input and its
+<strong>label</strong> (also called the target), and the job is to learn to
+predict <span class="m">$t$</span> from <span class="m">$x$</span>. The
+target's type names the problem: a continuous <span class="m">$t$</span> is
+<strong>regression</strong>, a discrete label
+<span class="m">$t \in \{1, \dots, C\}$</span> is
+<strong>classification</strong>, and structured objects (sequences, graphs)
+come later. Tom Mitchell's 1997 definition is worth carrying around: a
+program learns from experience <span class="m">$E$</span> with respect to
+task <span class="m">$T$</span> and performance measure
+<span class="m">$P$</span> if its performance at <span class="m">$T$</span>,
+measured by <span class="m">$P$</span>, improves with
+<span class="m">$E$</span>.
+</p>
+
+<p>
+One more idea and the preliminaries are done, and it is the most important
+one in the course: <strong>generalization</strong>, performing well on new,
+unseen data drawn from the same distribution as the training data. The data
+your model will face after deployment does not exist yet, so you simulate it.
+Hold some data back. Train on one set, evaluate on the other:
+</p>
+
+$$ D_{tr} = \{(x^{(i)}, t^{(i)})\}_{i=1}^{N}, \qquad
+   D_{ts} = \{(x^{(i)}, t^{(i)})\}_{i=1}^{M} $$
+
+<p>
+Notation that recurs all term: superscripts in parentheses are example
+indices, not exponents, <span class="m">$x \in \mathbb{R}^d$</span> is the
+feature vector, and <span class="m">$t$</span> is its target. The test set
+<span class="m">$D_{ts}$</span> gets touched once, at the very end. Section 4
+returns to this rule and makes it stricter.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. NEAREST NEIGHBOURS (1-NN) ═══════════════════ -->
+<section id="sec-1nn">
+<h2><span class="secnum">2.</span> Nearest neighbours (1-NN)</h2>
+
+<p>
+Now formalize the hook. To classify a new input
+<span class="m">$\hat{x}$</span>: find the training input nearest to it, and
+copy that input's label. Done. The entire behaviour of this algorithm hinges
+on one word, <em>nearest</em>, so the real content of this section is the
+question: what does distance mean?
+</p>
+
+<h3>Euclidean distance</h3>
+
+<p>
+The default answer is the straight-line distance you know from geometry,
+generalized to <span class="m">$d$</span> dimensions:
+</p>
+
+$$ \operatorname{distance}(x^{(a)}, x^{(b)}) = \lVert x^{(a)} - x^{(b)} \rVert_2
+   = \sqrt{\sum_{j=1}^{d} \big( x^{(a)}_j - x^{(b)}_j \big)^2} $$
+
+<p>
+Subtract coordinate by coordinate, square, add, square-root. A worked example
+in <span class="m">$d = 2$</span>:
+</p>
+
+$$ \operatorname{distance}\!\left([0,1]^\top, [2,1]^\top\right)
+   = \sqrt{(2-0)^2 + (1-1)^2} = \sqrt{4} = 2 $$
+
+<p>
+And one in <span class="m">$d = 3$</span> so the pattern is clear:
+<span class="m">$\operatorname{distance}([1,2,3]^\top, [3,0,3]^\top)
+= \sqrt{4 + 4 + 0} = \sqrt{8} \approx 2.83$</span>. The formula scales to any
+<span class="m">$d$</span>, which is exactly why we bothered turning
+everything into vectors.
+</p>
+
+<h3>Distance is a choice</h3>
+
+<p>
+Euclidean is a default, not a law. Other measures answer "how far" with a
+different personality:
+</p>
+
+<ul>
+  <li><b>Manhattan</b> (<span class="m">$\ell_1$</span>): <span class="m">$\sum_j |a_j - b_j|$</span>. Distance walked along a city grid, no diagonals.</li>
+  <li><b>Chebyshev</b> (<span class="m">$\ell_\infty$</span>): <span class="m">$\max_j |a_j - b_j|$</span>. Only the single worst coordinate counts.</li>
+  <li><b>General <span class="m">$\ell_p$</span></b>: <span class="m">$\big(\sum_j |a_j - b_j|^p\big)^{1/p}$</span>, a dial that sweeps from Manhattan (<span class="m">$p=1$</span>) through Euclidean (<span class="m">$p=2$</span>) toward Chebyshev (<span class="m">$p \to \infty$</span>).</li>
+</ul>
+
+<p>
+The cleanest way to feel the difference is the <b>unit ball</b>: the set of
+all points at distance 1 from a centre. Euclidean gives a circle, Manhattan a
+diamond, Chebyshev a square. Different ball, different meaning of "near",
+different nearest neighbour:
+</p>
+
+<div class="figure" id="fig-metrics">
+  <div class="fig-mount" data-fig="metrics"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the distance-metric explorer. Drag either point; all three distances update live, and the selected metric's ball is drawn around A, passing through B, so its shape shows what that metric calls equally near. The cosine readout shows the angle between the two points seen from the origin, a different question entirely.</p>
+</div>
+
+<p>
+That cosine readout deserves its own formula, because it is not a distance at
+all. <strong>Cosine similarity</strong> measures the angle between two
+vectors and ignores their lengths:
+</p>
+
+$$ \operatorname{cossim}(a, b) = \cos(\theta)
+   = \frac{\langle a, b \rangle}{\lVert a \rVert \, \lVert b \rVert}
+   = \frac{\sum_{i=1}^{d} a_i b_i}
+          {\sqrt{\sum_{i=1}^{d} a_i^2}\,\sqrt{\sum_{i=1}^{d} b_i^2}} $$
+
+<p>
+When does the angle matter more than the gap? Shopping baskets. Consider
+three users: User 1 buys 1 egg, 1 flour, 1 sugar. User 2 buys 100 eggs, 100
+flour, 100 sugar. User 3 buys 1 egg, 1 vodka, 1 Red Bull. Who is most
+similar to User 1? By Euclidean distance it is User 3, the raw coordinate
+differences are tiny. By cosine similarity it is User 2, who points in
+exactly the same direction with a bigger magnitude: same taste, bigger
+kitchen. For purchase profiles, text, and anything where proportions are the
+signal, cosine is the right lens. Check the actual numbers:
+</p>
+
+<div class="figure" id="fig-cosine">
+  <div class="fig-mount" data-fig="cosine"></div>
+  <p class="fig-caption"><b>Fig 2.2,</b> the e-commerce example, computed. Toggle the measure and watch who counts as closest to User 1. Euclidean sees small gaps; cosine sees shared direction. The baker and the bulk baker agree on everything except quantity.</p>
+</div>
+
+<h3>The 1-NN algorithm, and what it draws</h3>
+
+<p>With distance chosen, the algorithm is two lines of math:</p>
+
+$$ n = \operatorname*{arg\,min}_{i \in \{1, \dots, N\}}
+       \operatorname{distance}\!\left(x^{(i)}, \hat{x}\right),
+   \qquad \hat{y} = t^{(n)} $$
+
+<p>
+Find the index of the nearest training example, output its label. But an
+algorithm that labels every possible input is secretly drawing a map of the
+whole input space. The boundary between regions assigned to different
+categories is a <strong>decision boundary</strong>, and each region on one
+side, mapping to a single class, is a <strong>decision region</strong>. For
+1-NN the map has a beautiful structure: the space partitions into a
+<strong>Voronoi diagram</strong>. Each training example owns a cell, the set
+of all points closer to it than to any other example, and every query inside
+that cell inherits its label.
+</p>
+
+<div class="figure" id="fig-voronoi">
+  <div class="fig-mount" data-fig="voronoi"></div>
+  <p class="fig-caption"><b>Fig 2.3,</b> 1-NN's decision map is a Voronoi diagram. Drag the training points and the cells recompute live; drop the query anywhere to see whose cell it lands in. Then press "corrupt one label" and watch a single bad point poison its entire cell.</p>
+</div>
+
+<p>
+That last button is the pitfall that motivates everything in section 3.
+Real data contains noise, mislabeled points, "class noise". Under 1-NN, one
+mislabeled training example does not cause one mistake, it owns a whole
+Voronoi cell, and every future query in that region is answered wrongly with
+full confidence. The model has no way to notice, because it never
+second-guesses its single nearest neighbour. The fix is democratic: ask
+several neighbours and average out the noise.
+</p>
+</section>
+
+<!-- ═══════════════════ 3. K-NEAREST NEIGHBOURS ═══════════════════ -->
+<section id="sec-knn">
+<h2><span class="secnum">3.</span> k-nearest neighbours</h2>
+
+<p>
+Instead of trusting one neighbour, take the <span class="m">$k$</span>
+nearest training examples and let them vote. The majority label wins:
+</p>
+
+$$ \hat{y} = \operatorname*{arg\,max}_{c \in C}
+   \sum_{i=1}^{k} \mathbb{I}\!\left(t^{(i)} = c\right) $$
+
+<p>
+Here <span class="m">$C$</span> is the set of class labels, the sum runs over
+the <span class="m">$k$</span> training examples closest to
+<span class="m">$\hat{x}$</span>, and
+<span class="m">$\mathbb{I}\{\cdot\}$</span> is the <b>indicator
+function</b>: 1 when the statement inside is true, 0 otherwise. So the sum
+just counts how many of the <span class="m">$k$</span> neighbours carry label
+<span class="m">$c$</span>, and arg max picks the biggest count.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one vote, odd and even k</div>
+  <p>Query <span class="m">$\hat{x} = (3, 1)$</span> against seven training points (the same tiny dataset the code exercise below uses). Euclidean distances, sorted:</p>
+  <p style="font-family:var(--mono);font-size:14.5px">
+    B&nbsp;(3.5, 0.5)&nbsp;&nbsp;d = 0.71<br>
+    A&nbsp;(2.0, 1.0)&nbsp;&nbsp;d = 1.00<br>
+    B&nbsp;(4.0, 1.5)&nbsp;&nbsp;d = 1.12<br>
+    A&nbsp;(1.5, 2.0)&nbsp;&nbsp;d = 1.80<br>
+    A&nbsp;(1.0, 1.0)&nbsp;&nbsp;d = 2.00<br>
+    B&nbsp;(4.5, 2.5)&nbsp;&nbsp;d = 2.12<br>
+    A&nbsp;(1.0, 3.0)&nbsp;&nbsp;d = 2.83
+  </p>
+  <p><b><span class="m">$k = 3$</span>:</b> neighbours are B, A, B. Tally: B gets 2, A gets 1. Predict <b>B</b>.</p>
+  <p><b><span class="m">$k = 4$</span>:</b> neighbours are B, A, B, A. Tally: 2 vs 2, a dead tie with no principled winner. This is exactly why practitioners prefer <b>odd</b> <span class="m">$k$</span> for two-class problems.</p>
+  <p><b><span class="m">$k = 5$</span>:</b> neighbours are B, A, B, A, A. Tally: A gets 3, B gets 2. Predict <b>A</b>. Same query, different <span class="m">$k$</span>, opposite answer, which is the whole next discussion.</p>
+</div>
+
+<h3>k is a hyperparameter, and it sets the model's personality</h3>
+
+<p>
+Nothing in the training data tells you what <span class="m">$k$</span> should
+be. You choose it before the algorithm runs, which makes it a
+<strong>hyperparameter</strong>. Contrast this with
+<strong>parameters</strong>, numbers learned from data during training. KNN
+is unusual: it has no learned parameters at all, only the hyperparameters
+<span class="m">$k$</span> and the distance metric. Choosing
+<span class="m">$k$</span> trades two failure modes against each other:
+</p>
+
+<ul>
+  <li><b>Small <span class="m">$k$</span></b> captures fine-grained patterns, but it is at the mercy of idiosyncrasies and outliers. The boundary goes jagged, wrapping around individual noisy points: <strong>overfitting</strong>.</li>
+  <li><b>Large <span class="m">$k$</span></b> averages over many examples, so predictions are stable, but real structure gets washed out along with the noise. The boundary over-smooths: <strong>underfitting</strong>.</li>
+</ul>
+
+<p>
+The best <span class="m">$k$</span> depends on the dataset, its noise level,
+the distance metric, and the sample size. Theory offers asymptotic comfort:
+as <span class="m">$n \to \infty$</span>, let
+<span class="m">$k \to \infty$</span> while
+<span class="m">$k/n \to 0$</span>, and KNN behaves well. Practice offers a
+rule of thumb: try several values, often small and odd, and below
+<span class="m">$\sqrt{n}$</span>. Now feel the trade-off yourself. This is
+the signature figure of the lesson:
+</p>
+
+<div class="figure" id="fig-playground">
+  <div class="fig-mount" data-fig="playground"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the k-NN classifier playground. Drag the query, slide <span class="m">$k$</span>, and watch the highlighted neighbours, the live vote tally, and the decision boundary. At <span class="m">$k = 1$</span> the boundary is jagged and owns every noisy point; crank <span class="m">$k$</span> and it melts smooth, eventually too smooth.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A test point sits in a region where the 3 nearest training points are two circles and one triangle, but the next 2 nearest are both triangles. What happens as <span class="m">$k$</span> goes from 3 to 5, and why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Nothing changes, the 3 closest points always dominate the vote</button>
+    <button data-k="b">The prediction flips from circle (2-1) to triangle (3-2): widening the electorate changed the majority</button>
+    <button data-k="c">k = 5 is invalid here because there are only two classes</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Every one of the <span class="m">$k$</span> neighbours gets exactly one vote in plain k-NN. The 3 closest carry no extra weight once <span class="m">$k = 5$</span>.</div>
+  <div class="quiz-fb" data-k="b">Right. At <span class="m">$k=3$</span> the tally is circle 2, triangle 1. At <span class="m">$k=5$</span> it is triangle 3, circle 2. Predictions near a class border are genuinely a function of <span class="m">$k$</span>, which you can reproduce in Fig 3.1 by parking the query between the clusters.</div>
+  <div class="quiz-fb" data-k="c">Any <span class="m">$k \le n$</span> is legal with any number of classes. Odd <span class="m">$k$</span> just avoids ties in the two-class case.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You recompute a <span class="m">$k=3$</span> decision boundary using Manhattan distance, then Chebyshev, instead of Euclidean. What changes?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Nothing: the same points are always the same neighbours</button>
+    <button data-k="b">Only the speed: all metrics give identical boundaries but cost different amounts</button>
+    <button data-k="c">The boundary's shape: each metric redefines "near" (diamond vs square vs circular neighbourhoods), so border-zone queries can get different neighbour sets and different labels</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Check Fig 2.1: hold the anchor fixed and the three metrics disagree about which of two points is closer whenever the geometry is off-axis.</div>
+  <div class="quiz-fb" data-k="b">The costs are actually similar; it is the geometry that differs. The unit balls are different shapes, so the ranking of neighbours changes.</div>
+  <div class="quiz-fb" data-k="c">Exactly. Deep inside a class region nothing changes, but near the boundary the diamond (<span class="m">$\ell_1$</span>) and square (<span class="m">$\ell_\infty$</span>) neighbourhoods pull in different neighbour sets, so the boundary bends differently, typically with more axis-aligned character.</div>
+</div>
+
+<h3>KNN for regression</h3>
+
+<p>
+Nothing about "ask the neighbours" requires a discrete label. If the targets
+are continuous numbers, replace the vote with an average, and KNN becomes a
+regression method. Three variants, in increasing sophistication:
+</p>
+
+<ul>
+  <li><b><span class="m">$k = 1$</span></b>: predict the single nearest neighbour's target. Across <span class="m">$x$</span>, the prediction is a step function, it jumps wherever the nearest neighbour changes.</li>
+  <li><b><span class="m">$k = 2$</span>, unweighted</b>: predict the plain average of the two nearest targets. Steps become plateaus, smoother but still blocky.</li>
+  <li><b><span class="m">$k = 2$</span>, distance-weighted</b>: closer neighbours should count for more, so weight each neighbour by the inverse of its distance:</li>
+</ul>
+
+$$ \hat{y}(x) = \frac{\tfrac{1}{d_1}\, y_1 + \tfrac{1}{d_2}\, y_2}
+                     {\tfrac{1}{d_1} + \tfrac{1}{d_2}} $$
+
+<p>
+where <span class="m">$d_1, d_2$</span> are the distances from
+<span class="m">$x$</span> to its two nearest points. Worked with real
+numbers: neighbours at distances <span class="m">$d_1 = 1$</span> and
+<span class="m">$d_2 = 2$</span> with targets <span class="m">$y_1 = 4$</span>
+and <span class="m">$y_2 = 1$</span> give
+<span class="m">$\hat{y} = \frac{4/1 + 1/2}{1/1 + 1/2} = \frac{4.5}{1.5} = 3$</span>,
+twice as close pulls twice as hard, so the prediction lands nearer 4 than 1.
+</p>
+
+<div class="figure" id="fig-regression">
+  <div class="fig-mount" data-fig="regression"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> k-NN regression. Slide <span class="m">$k$</span> and toggle distance weighting. At <span class="m">$k=1$</span> the predicted curve is a staircase; unweighted averaging flattens it into plateaus; inverse-distance weighting bends it into a smooth curve that leans toward whichever neighbour is closer.</p>
+</div>
+
+<details class="check">
+  <summary>Check: sketch the three regression curves, then say which is smoothest</summary>
+  <div>
+    <p>For 1-D data, describe the shape of the k-NN regression prediction for <span class="m">$k=1$</span>, <span class="m">$k=2$</span> unweighted, and <span class="m">$k=2$</span> distance-weighted. Which is smoothest and why?</p>
+    <p><b>Answer.</b> <span class="m">$k=1$</span> is a step function: constant inside each nearest-neighbour cell, jumping at cell borders. <span class="m">$k=2$</span> unweighted is still piecewise constant, but each piece is the average of two targets, so the jumps are smaller. <span class="m">$k=2$</span> distance-weighted is the smoothest: as <span class="m">$x$</span> slides between two neighbours, the weights <span class="m">$1/d_1, 1/d_2$</span> change continuously, so the prediction morphs continuously from one target toward the other instead of jumping. Verify all three shapes live in Fig 3.2.</p>
+  </div>
+</details>
+
+<h3>Write it in code, then poke it</h3>
+
+<p>
+The entire classifier fits in a dozen lines of Python. Distances to every
+training point, sort, take <span class="m">$k$</span>, count votes:
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 3.3,</b> a live <code>knn_classify</code>. Change <span class="m">$k$</span>, set the query with the sliders, and press Run; the function actually executes against the fixed training set and prints its prediction. Run <span class="m">$k=3$</span> and then <span class="m">$k=5$</span> on the default query and watch the answer flip, matching the worked vote above.</p>
+</div>
+
+<p>
+One implementation note that pays off all course long: the distance loop
+vectorizes. NumPy broadcasting computes all <span class="m">$N$</span>
+distances in one line, no Python loop, using exactly the trick every later
+model in this course leans on:
+</p>
+
+<pre class="code" data-lang="python"><code># loop: one distance at a time
+dists = []
+for i in range(N):
+    dists.append(np.sqrt(np.sum((X_train[i] - x_query) ** 2)))
+
+# broadcast: all N distances at once
+dists = np.sqrt(((X_train - x_query) ** 2).sum(axis=1))</code></pre>
+
+<details class="check">
+  <summary>Check: how would a decision tree answer the same query?</summary>
+  <div>
+    <p>KNN predicted a label for <span class="m">$\hat{x} = (3, 1)$</span> by a vote among the 3 nearest training points. A decision tree (next lecture) answers the same query by a different rule. Contrast the two prediction rules.</p>
+    <p><b>Answer.</b> KNN's rule is <em>geometric and local</em>: measure distance to every stored training point, let the closest <span class="m">$k$</span> vote. Nothing is precomputed; the training data itself is the model. A decision tree's rule is a <em>fixed sequence of single-feature threshold tests</em>, learned once: "is <span class="m">$x_1 > 2.5$</span>? then is <span class="m">$x_2 \le 1.8$</span>? then predict B". The tree never measures distance and never revisits the training points at query time, it summarized them into rules. Consequences you can already predict: the tree's boundaries are axis-aligned rectangles while KNN's follow the data's geometry, and the tree answers in a handful of comparisons while KNN pays a full scan of the dataset (section 5 makes that cost precise).</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 4. CHOOSING K ═══════════════════ -->
+<section id="sec-choosek">
+<h2><span class="secnum">4.</span> Choosing k the right way</h2>
+
+<p>
+So <span class="m">$k$</span> matters, and the data cannot tell us directly.
+Here is the tempting shortcut, and why it is a trap: pick the
+<span class="m">$k$</span> with the lowest error on the training set. Under
+<span class="m">$k = 1$</span>, every training point's nearest neighbour is
+<em>itself</em>, at distance zero. Training error: a perfect 0, always,
+regardless of how noisy the data is. By that yardstick,
+<span class="m">$k = 1$</span> "wins" every time, and you have learned
+nothing except that a model can memorize. Training error does not measure
+generalization, and generalization is the thing we actually want.
+</p>
+
+<p>
+The honest procedure needs a third dataset. Split into three:
+</p>
+
+<ul>
+  <li><b><span class="m">$D_{tr}$</span> (training)</b>: fit the model. For KNN that just means store the data.</li>
+  <li><b><span class="m">$D_{vl}$</span> (validation)</b>: make design decisions, like choosing <span class="m">$k$</span>. Try several values, keep whichever performs best here.</li>
+  <li><b><span class="m">$D_{ts}$</span> (test)</b>: touched exactly once, at the very end, to report final generalization. The proverb to memorize: <em>the test set is not a development set.</em> If you use it to make choices, its verdict on your final model is no longer honest.</li>
+</ul>
+
+<p>
+The whole procedure in one picture. Below, a real dataset was split three
+ways, and the error of k-NN was computed for every <span class="m">$k$</span>
+on all three splits. Before revealing the answer, read the curves and click
+the <span class="m">$k$</span> you would ship:
+</p>
+
+<div class="figure" id="fig-validation">
+  <div class="fig-mount" data-fig="validation"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the validation curve, with you in the loop. Training error is a flattering lie (zero at <span class="m">$k=1$</span>). Validation error dips at the sweet spot. Click your pick of <span class="m">$k$</span> on the chart; the figure checks it against the computed optimum and only then reveals the test curve.</p>
+</div>
+
+<p>The recipe, compressed: train on <span class="m">$D_{tr}$</span>, sweep <span class="m">$k$</span>, pick the best on <span class="m">$D_{vl}$</span>, report once on <span class="m">$D_{ts}$</span>. In code:</p>
+
+<pre class="code" data-lang="python"><code>best_k, best_acc = None, 0.0
+for k in [1, 3, 5, 7, 9, 11, 15, 21]:
+    acc = accuracy(knn_predict(X_tr, y_tr, X_vl, k), y_vl)
+    if acc > best_acc:
+        best_k, best_acc = k, acc
+final_report = accuracy(knn_predict(X_tr, y_tr, X_ts, best_k), y_ts)  # once.</code></pre>
+</section>
+
+<!-- ═══════════════════ 5. WHERE KNN BREAKS ═══════════════════ -->
+<section id="sec-pitfalls">
+<h2><span class="secnum">5.</span> Where KNN breaks</h2>
+
+<p>
+KNN's bet is that points close in input space have similar outputs. Three
+things attack that bet in practice: high dimensions make "close" meaningless,
+arbitrary feature scales make it lopsided, and the no-training-cost lunch
+gets paid for, with interest, at query time.
+</p>
+
+<h3>Pitfall 1: the curse of dimensionality</h3>
+
+<p>
+In high dimensions, geometry stops behaving like your 2-D intuition. The
+short version: as dimension <span class="m">$d$</span> grows, most pairs of
+points become roughly <em>equidistant</em>, so "nearest" stops carrying
+information, and distances get dominated by many possibly irrelevant
+coordinates.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Why equidistance happens, in two steps</div>
+  <p><b>Step 1: one dimension.</b> Take two independent uniform draws <span class="m">$X, Y \sim \mathrm{Uniform}[0,1]$</span>. The squared gap <span class="m">$Z = (X-Y)^2$</span> is a random variable with mean <span class="m">$\mathbb{E}[Z] = \tfrac{1}{6}$</span> and some fixed variance.</p>
+  <p><b>Step 2: add dimensions.</b> In <span class="m">$\mathbb{R}^d$</span> the squared Euclidean distance is a sum of <span class="m">$d$</span> independent copies, <span class="m">$R = \sum_{i=1}^d Z_i$</span>, so <span class="m">$\mathbb{E}[R] = d\,\mathbb{E}[Z]$</span> while <span class="m">$\operatorname{Var}[R] = d\,\operatorname{Var}[Z]$</span>. The mean grows like <span class="m">$d$</span>, the spread grows like <span class="m">$\sqrt{d}$</span>, so the <em>relative</em> spread shrinks like <span class="m">$1/\sqrt{d}$</span>. Every pairwise distance crowds toward the same value, and Markov's inequality makes it formal: the probability that <span class="m">$R$</span> sits far from its mean vanishes as <span class="m">$d \to \infty$</span>.</p>
+  <p><b>The edge-length view.</b> To capture <span class="m">$k$</span> of <span class="m">$n$</span> points inside a sub-cube of edge <span class="m">$l$</span> in the unit <span class="m">$d$</span>-cube, you need <span class="m">$l^d \approx k/n$</span>, so <span class="m">$l = (k/n)^{1/d}$</span>. With <span class="m">$k=10$</span>, <span class="m">$n=1000$</span>: <span class="m">$l = 0.01$</span> in <span class="m">$d=1$</span>, but <span class="m">$l \approx 0.63$</span> in <span class="m">$d=10$</span> and <span class="m">$l \approx 0.95$</span> in <span class="m">$d=100$</span>. Your "local" neighbourhood spans nearly the whole range of every feature. Locality is gone.</p>
+</div>
+
+<div class="figure" id="fig-curse">
+  <div class="fig-mount" data-fig="curse"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the curse, sampled live. Push the <span class="m">$d$</span> slider: the histogram of pairwise distances (real samples, recomputed) collapses toward a spike, the contrast ratio (max−min)/min falls toward zero, and the edge-length readout <span class="m">$l = (k/n)^{1/d}$</span> rushes toward 1.</p>
+</div>
+
+<p>
+The fix, previewed: reduce dimensions. High-dimensional data usually has low
+intrinsic dimensionality (section 1's degrees of variation), and
+dimensionality-reduction methods later in the course project onto it.
+</p>
+
+<details class="check">
+  <summary>Check: explain equidistance to a friend in three sentences</summary>
+  <div>
+    <p><b>Answer</b> (one honest version). Each added dimension contributes an independent random amount to the squared distance between any two points, so the total grows in proportion to <span class="m">$d$</span>. But random fluctuations only accumulate like <span class="m">$\sqrt{d}$</span>, so as a fraction of the total, the differences between pairs shrink toward nothing. When every pair of points is the same distance apart to within a hair, "the nearest one" is decided by noise, and copying its label is a coin flip. (Equivalent edge-length version: a neighbourhood holding 1% of the data needs edge <span class="m">$(0.01)^{1/d}$</span>, which is nearly 1 for large <span class="m">$d$</span>, so "local" spans the whole cube.)</p>
+  </div>
+</details>
+
+<h3>Pitfall 2: feature scale decides the vote</h3>
+
+<p>
+Euclidean distance adds squared differences as if all features spoke the same
+units. They do not. Put salary in dollars (spread: tens of thousands) next to
+age in years (spread: tens), and the salary axis contributes millions of
+times more to every squared distance. The neighbour search effectively
+ignores age, not because age is uninformative, but because of an arbitrary
+choice of units. The standard fix is to <strong>standardize</strong> every
+feature to zero mean and unit variance:
+</p>
+
+$$ \tilde{x}_j = \frac{x_j - \mu_j}{\sigma_j} $$
+
+<p>
+using each feature's mean <span class="m">$\mu_j$</span> and standard
+deviation <span class="m">$\sigma_j$</span>. Worked once: ages
+<span class="m">$[20, 30, 40, 50]$</span> have
+<span class="m">$\mu = 35$</span> and
+<span class="m">$\sigma \approx 11.18$</span>, so age 50 standardizes to
+<span class="m">$\tilde{x} = (50 - 35)/11.18 \approx 1.34$</span>: "1.34
+standard deviations above average", a unit every feature shares. Two
+cautions before you standardize on reflex: for some problems scale is
+genuinely meaningful and you would be erasing signal, and when scale
+matters, the choice of distance measure matters right along with it.
+</p>
+
+<div class="figure" id="fig-standardize">
+  <div class="fig-mount" data-fig="standardize"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the standardization demo. Left: raw units, where the large-scale feature owns the neighbour choice. Right: the same data standardized, where the axes equalize and the neighbour set changes. The readout counts how many neighbours survive the switch, and prints the real <span class="m">$\mu, \sigma$</span> used in <span class="m">$\tilde{x} = (x-\mu)/\sigma$</span>.</p>
+</div>
+
+<pre class="code" data-lang="python"><code>X_std = (X - X.mean(axis=0)) / X.std(axis=0)   # per-feature standardization</code></pre>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why is standardization critical for KNN but irrelevant for decision trees?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It is not irrelevant for trees; every model needs standardized features</button>
+    <button data-k="b">KNN mixes all features into one distance, so scales set each feature's influence; a tree thresholds one feature at a time, and any monotone rescaling just moves the threshold</button>
+    <button data-k="c">Trees only accept categorical features, so scaling does not apply</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Trees are the classic counterexample: rescale a feature and the learned split threshold rescales with it, choosing exactly the same data partition.</div>
+  <div class="quiz-fb" data-k="b">Right. Distance-based models (and, later, optimization-based ones) blend features, so units become weights. A tree asks "is <span class="m">$x_j > \tau$</span>?" one feature at a time; stretching <span class="m">$x_j$</span> stretches <span class="m">$\tau$</span> and nothing else changes.</div>
+  <div class="quiz-fb" data-k="c">Trees handle continuous features fine, they split them on thresholds. The reason is the per-feature nature of those splits.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">When do outliers hurt KNN, and when do they not?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Outliers always hurt KNN, everywhere in the input space</button>
+    <button data-k="b">Outliers never hurt KNN, the vote averages them away</button>
+    <button data-k="c">They hurt locally: an outlier corrupts predictions for queries near it (badly at small k), but queries far from it never consult it</button>
+  </div>
+  <div class="quiz-fb" data-k="a">A training point only influences queries whose neighbour set it enters. An outlier off in a corner is invisible to most of the space.</div>
+  <div class="quiz-fb" data-k="b">At <span class="m">$k=1$</span> there is no averaging at all: Fig 2.3 showed one bad point owning a whole Voronoi cell.</div>
+  <div class="quiz-fb" data-k="c">Exactly. KNN's damage from an outlier is local and shrinks as <span class="m">$k$</span> grows. (A decision tree can behave differently: a single extreme value can shift a split threshold and reroute points far from the outlier itself.)</div>
+</div>
+
+<h3>Pitfall 3: the bill arrives at query time</h3>
+
+<p>
+KNN is <strong>lazy learning</strong>: training costs nothing, because
+training <em>is</em> storing the dataset. That also makes it a
+<strong>non-parametric</strong> model, it never summarizes the data into a
+fixed set of parameters; the data itself is the model. The price appears
+when a query shows up. Count the work for one prediction:
+</p>
+
+<ul>
+  <li>One <span class="m">$D$</span>-dimensional distance: <span class="m">$O(D)$</span>.</li>
+  <li>Distances to all <span class="m">$N$</span> training points: <span class="m">$O(ND)$</span>.</li>
+  <li>Sorting to find the closest <span class="m">$k$</span>: <span class="m">$O(N \log N)$</span>.</li>
+  <li>Total, per query: <span class="m">$O(ND + N \log N)$</span>. And the entire dataset must sit in memory forever.</li>
+</ul>
+
+<div class="figure" id="fig-cost">
+  <div class="fig-mount" data-fig="cost"></div>
+  <p class="fig-caption"><b>Fig 5.3,</b> lazy learning's bill. Press Run and one query animates against the stored dataset: every distance computation ticks the counter (<span class="m">$O(ND)$</span>), then the sort (<span class="m">$O(N\log N)$</span>). Slide <span class="m">$N$</span> up and watch a single prediction get expensive.</p>
+</div>
+
+<p>
+Scale makes it visceral. KNN performs respectably on digit images given good
+preprocessing (warping for invariance) and a sensible similarity measure. But
+on "80 Million Tiny Images", an early very-large image dataset of 32-by-32
+colour images, a single naive nearest-neighbour search took on the order of
+tens of minutes from disk. (The dataset was later deprecated by its authors;
+it survives here only as a historical scale example.) A model that takes
+minutes per prediction is not a product. The escape hatch is a rich research
+area: data structures for fast, <em>approximate</em> nearest neighbours,
+trading a little accuracy for orders of magnitude of speed. You will meet
+the trade-off again in the end quiz.
+</p>
+</section>
+
+<!-- ═══════════════════ 6. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">6.</span> Summary and method card</h2>
+
+<p>
+KNN does all of its work at test time; in a sense there is no learning at
+all, which is why it is called lazy. It is non-parametric, no parameters are
+learned, yet its complexity is genuinely controlled by a hyperparameter,
+<span class="m">$k$</span>, chosen by you, on validation data, never on
+training error. Its honest weaknesses are the curse of dimensionality, its
+sensitivity to feature scaling, and a heavy memory and runtime bill at query
+time. And its core bet, similar inputs have similar labels, is the quiet
+assumption underneath every model in this course; the rest of the term is a
+sequence of increasingly sophisticated ways of making that bet pay in
+situations where raw memorization cannot.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; k-Nearest Neighbours</div>
+  <table>
+    <tr><th>Assumption</th><td>Similar inputs have similar labels: closeness in <span class="m">$\mathbb{R}^d$</span> predicts agreement in <span class="m">$t$</span>.</td></tr>
+    <tr><th>Model class</th><td>Local, non-parametric rules built from nearby stored examples. The data is the model.</td></tr>
+    <tr><th>Learning / selection</th><td>Store the data. Choose the representation, the distance metric, and <span class="m">$k$</span> via a validation split.</td></tr>
+    <tr><th>Prediction</th><td>Classification: majority vote of the <span class="m">$k$</span> nearest. Regression: (distance-weighted) average of their targets.</td></tr>
+    <tr><th>Strengths</th><td>Simple, intuitive, no training cost, effective whenever the representation and metric are meaningful.</td></tr>
+    <tr><th>Limitations</th><td>Sensitive to scaling, irrelevant dimensions, noise, and high dimensionality; expensive and storage-heavy at query time (<span class="m">$O(ND + N\log N)$</span> per query).</td></tr>
+    <tr><th>Key hyperparameters</th><td><span class="m">$k$</span> (small and odd, below <span class="m">$\sqrt{n}$</span>, tuned on validation) and the distance metric.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: similarity, this lecture, then rules
+(decision trees), then parametric functions (linear regression, where a model
+finally summarizes the data instead of searching through it at test time),
+then classification, differentiable classifiers, margins and kernels,
+ensembles, neural networks, deep models, CNNs, language models, sequence
+models, transformers. Same bet, better and better machinery.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">7.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design, not
+recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">Your KNN classifier gets 100% accuracy on the training set and 61% on the validation set. Which single change is most likely to help, and why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Decrease k toward 1 to capture more detail</button>
+    <button data-k="b">Report the training accuracy, since it is the model's true skill</button>
+    <button data-k="c">Increase k: 100% training accuracy is the k-near-1 memorization signature, and averaging over more neighbours should smooth the noise</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That moves further into memorization. At <span class="m">$k=1$</span>, training accuracy is 100% by construction and says nothing.</div>
+  <div class="quiz-fb" data-k="b">Training accuracy is the one number KNN can never be judged on: each training point is its own nearest neighbour.</div>
+  <div class="quiz-fb" data-k="c">Right. The gap between perfect training and mediocre validation accuracy is overfitting, and in KNN the smoothing knob is <span class="m">$k$</span>. Sweep it and pick on validation, as in Fig 4.1.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">You add 500 useless random features to a dataset where KNN was working well on 5 informative ones. What happens and why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Accuracy collapses: distances become dominated by the 500 noise dimensions, all points look equidistant, and "nearest" stops meaning anything</button>
+    <button data-k="b">Nothing: KNN automatically ignores uninformative features</button>
+    <button data-k="c">Accuracy improves: more features means more information</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Exactly, this is the curse of dimensionality applied. Every pairwise distance gains 500 independent noise contributions; the informative 5 dimensions become a rounding error in the metric. Fig 5.1's collapsing histogram is this picture.</div>
+  <div class="quiz-fb" data-k="b">KNN has no mechanism to weight or discard features; the metric mixes everything equally. That is precisely its fragility.</div>
+  <div class="quiz-fb" data-k="c">Only informative features add signal; these add variance to every distance and drown the signal that was there.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a distance for something that is not a vector</summary>
+  <div>
+    <p>Propose a distance or similarity measure for one non-vector data type (text documents, sets of tags, or categorical records) and justify why it captures "similar" for that data.</p>
+    <p><b>Answer</b> (one good version per type). <b>Sets of tags:</b> Jaccard similarity, <span class="m">$|A \cap B| / |A \cup B|$</span>: it rewards shared tags, normalizes by total tags so prolific taggers are not automatically "close" to everyone, and lives in <span class="m">$[0,1]$</span>. <b>Text:</b> represent documents as word-count vectors and use cosine similarity: direction captures topic proportions while ignoring document length, exactly the magnitude-vs-direction lesson of Fig 2.2. <b>Categorical records:</b> Hamming distance, count the attributes on which two records disagree, optionally weighting rare agreements more heavily than common ones. In every case the justification has the same shape: name what "similar" should mean for the data, then check the measure is large/small exactly then, and check it is insensitive to the nuisances (length, popularity, encoding) you do not want to matter.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): buy speed with accuracy</summary>
+  <div>
+    <p>Per-query KNN costs <span class="m">$O(ND + N \log N)$</span>. Propose a data structure or approximate scheme that trades accuracy for speed, and reason about the trade-off.</p>
+    <p><b>Answer</b> (one good version). Cluster the training set offline into <span class="m">$m$</span> groups (say with <span class="m">$m \approx \sqrt{N}$</span> centroids). At query time, compute distances only to the <span class="m">$m$</span> centroids, pick the closest cluster or two, and search only inside them: roughly <span class="m">$O(mD + \frac{N}{m}D)$</span> per query, a huge cut from <span class="m">$O(ND)$</span>. The price is correctness at cluster borders: the true nearest neighbour can sit just across a boundary you chose not to search, so the returned neighbours are approximate. You tune the trade with how many clusters you probe. Alternatives with the same flavour: k-d trees (exact in low <span class="m">$d$</span>, degrade in high <span class="m">$d$</span>), locality-sensitive hashing (probabilistic, tunable). The pattern to remember: precompute structure to avoid touching all <span class="m">$N$</span> points, accept a small chance of a slightly wrong neighbour.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): KNN has no training step. Invent one.</summary>
+  <div>
+    <p>Decide what you would precompute at "training time" to cut query cost, and name what it costs you.</p>
+    <p><b>Answer</b> (one good version). Spend training time on three precomputations. (1) Standardize: compute and store each feature's <span class="m">$\mu_j, \sigma_j$</span> so queries are scaled consistently, cost: almost nothing, no downside. (2) Prototype selection: keep only points near class boundaries (points whose removal changes some prediction) and drop interior points whose cells agree with all their neighbours, cost: storage drops a lot, but you bias the boundary and lose robustness to distribution shift. (3) Build a search index (k-d tree, clusters, or hash tables) over the stored points, cost: build time and memory, plus approximate answers in high dimensions. Notice what just happened: the moment KNN precomputes summaries instead of keeping raw data, it starts inching toward the parametric models of the next lectures. That is the course's actual trajectory.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is k-nearest neighbours: one honest bet, similar things have similar labels, plus everything the bet forces you to invent: vector representations, a chosen distance, decision boundaries, a hyperparameter, and the train/validation/test discipline. Next lecture keeps the labels and changes the machinery: instead of measuring similarity, we learn rules. Decision trees.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <span class="spacer"></span>
+  <a href="../decision-trees/index.html">
+    <div class="nav-kicker">Next lesson →</div>
+    <div class="nav-title">Lecture 3: Decision Trees</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 2 &middot; k-Nearest Neighbours</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-knn-a.js"></script>
+<script defer src="figures-knn-b.js"></script>
+</body>
+</html>

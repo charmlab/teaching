@@ -244,9 +244,15 @@ const MODULES = [
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
+      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–19)", type:"website", url:"modules/c-ml/index.html" },
+      { title:"★ Interactive Lesson — k-Nearest Neighbours (Lecture 2)", type:"website", url:"modules/c-ml/knn/index.html" },
+      { title:"★ Interactive Lesson — Decision Trees (Lecture 3)", type:"website", url:"modules/c-ml/decision-trees/index.html" },
+      { title:"★ Interactive Lesson — Linear Regression (Lecture 4)", type:"website", url:"modules/c-ml/linear-regression/index.html" },
+      { title:"★ Interactive Lesson — Bias, Variance & Ensembles (Lecture 7)", type:"website", url:"modules/c-ml/bias-variance-ensembles/index.html" },
+      { title:"★ Interactive Lesson — Support Vector Machines (Lecture 8)", type:"website", url:"modules/c-ml/svm/index.html" },
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   { id:"c-nn", tier:"concepts", short:"DL",
     title:"Linear to Neural Models", sub:"linear and logistic regression, neural nets, backprop, depth & scale",
@@ -255,13 +261,17 @@ const MODULES = [
     blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
     aud:["student","executive"], prereqs:["c-ml"],
     resources:[
+      { title:"★ Interactive Lesson — Linear Classification (Lecture 5)", type:"website", url:"modules/c-ml/linear-classification/index.html" },
+      { title:"★ Interactive Lesson — Logistic Regression (Lecture 6)", type:"website", url:"modules/c-ml/logistic-regression/index.html" },
+      { title:"★ Interactive Lesson — Neural Networks (Lecture 9)", type:"website", url:"modules/c-ml/neural-networks/index.html" },
+      { title:"★ Interactive Lesson — Backpropagation (Lecture 10)", type:"website", url:"modules/c-ml/backpropagation/index.html" },
       { title:"3Blue1Brown — Neural Networks", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
       { title:"StatQuest — Maximum Likelihood", type:"video", url:"https://youtu.be/XepXtl9YKwc" },
       { title:"StatQuest — Gradient Descent", type:"video", url:"https://youtu.be/sDv4f4s2SB8" },
       { title:"StatQuest — Stochastic Gradient Descent", type:"video", url:"https://youtu.be/vMh0zPT0tLI" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   // ---- Applied / Applications ----
   { id:"a-vision", tier:"applied", short:"CV",
@@ -270,8 +280,11 @@ const MODULES = [
     blurb:"CNNs and feature hierarchies, convolution / pooling / normalization, transfer learning, data augmentation, evaluation.",
     blurb_fa:"CNN‌ها و سلسله مراتب ویژگی، کانولوشن / پولینگ / نرمال‌سازی، انتقال یادگیری، بهبود داده، ارزیابی.",
     aud:["student","executive"], prereqs:["c-nn"],
-    resources:[],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    resources:[
+      { title:"★ Interactive Lesson — Convolutional Neural Networks (Lecture 11)", type:"website", url:"modules/c-ml/cnn/index.html" },
+      { title:"★ Interactive Lesson — CNNs in Practice (Lecture 12)", type:"website", url:"modules/c-ml/cnn-part-2/index.html" },
+    ],
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   { id:"a-nlp", tier:"applied", short:"LM",
     title:"Language Models", sub:"embeddings → transformers",
@@ -280,12 +293,15 @@ const MODULES = [
     blurb_fa:"مدل‌های دنباله، تعبیه‌ها، توجه، ترانسفورمرها، پیش‌آموزش و تنظیم دقیق، رمزگشایی. از n-gram تا LLM.",
     aud:["student","executive"], prereqs:["c-nn"],
     resources:[
+      { title:"★ Interactive Lesson — Language Models (Lecture 13)", type:"website", url:"modules/c-ml/language-models/index.html" },
+      { title:"★ Interactive Lesson — Sequence Models (Lecture 14)", type:"website", url:"modules/c-ml/sequence-models/index.html" },
+      { title:"★ Interactive Lesson — Attention and Transformers (Lecture 15)", type:"website", url:"modules/c-ml/attention-transformers/index.html" },
       { title:"Lena Voita — NLP Course for You", type:"website", url:"https://lena-voita.github.io/nlp_course.html#main_page_content" },
       { title:"Jay Alammar — The Illustrated Transformer", type:"website", url:"https://jalammar.github.io/illustrated-transformer/" },
       { title:"3Blue1Brown — Neural Networks (attention & transformers chapters)", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero (GPT lectures)", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   { id:"a-agents", tier:"applied", short:"Ag",
     title:"AI Agents", sub:"reasoning, tools, memory",
@@ -322,8 +338,11 @@ const MODULES = [
     blurb:"Probabilistic learning, Bayesian modeling, uncertainty quantification, and causal reasoning.",
     blurb_fa:"یادگیری احتمالی، مدل‌سازی بیزی، کمی‌سازی عدم قطعیت و استدلال علّی.",
     aud:["student"], prereqs:["c-ml"],
-    resources:[],
-    ing:{listen:"planned", play:"planned", build:"planned"} },
+    resources:[
+      { title:"★ Interactive Lesson — MLE, MAP & Bayesian Prediction (Lecture 16)", type:"website", url:"modules/c-ml/mle-map-bayesian/index.html" },
+      { title:"★ Interactive Lesson — Gaussian Bayes Models (Lecture 17)", type:"website", url:"modules/c-ml/gaussian-bayes/index.html" },
+    ],
+    ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"x-unsup", tier:"concepts", short:"Un",
     title:"Unsupervised Learning", sub:"PCA, clustering, Gaussian mixtures",
@@ -332,9 +351,12 @@ const MODULES = [
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
     aud:["student"], prereqs:["junc-f2c"],
     resources:[
+      { title:"★ Interactive Lesson — Principal Component Analysis (Lecture 18)", type:"website", url:"modules/c-ml/pca/index.html" },
+      { title:"★ Interactive Lesson — Autoencoders & VAEs (Lecture 19)", type:"website", url:"modules/c-ml/autoencoders/index.html" },
+      { title:"★ Interactive Lesson — Clustering: K-Means & GMMs (Lecture 20)", type:"website", url:"modules/c-ml/clustering/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
-    ing:{listen:"planned", play:"planned", build:"planned"} },
+    ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"x-rl", tier:"concepts", short:"RL",
     title:"Reinforcement Learning", sub:"bandits, MDPs, value functions, policy gradient",
@@ -343,9 +365,10 @@ const MODULES = [
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
     aud:["student"], prereqs:["junc-f2c"],
     resources:[
+      { title:"★ Interactive Lesson — Reinforcement Learning (Lecture 21)", type:"website", url:"modules/c-ml/reinforcement-learning/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
-    ing:{listen:"planned", play:"planned", build:"planned"} },
+    ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"s-causal", tier:"specializations", short:"Cau", planned:true,
     title:"Causal AI", sub:"interventions, counterfactuals, causal graphs",

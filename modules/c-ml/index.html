@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECE 657: Introduction to Machine Learning · The ML Bible</title>
+<meta name="description" content="Interactive lessons for ECE 657 (Intro to Machine Learning, University of Waterloo): dense prose, live-computed figures, and quizzes for every lecture.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="knn/lesson.css">
+<style>
+/* book-style table of contents */
+.chapter-label { color: var(--muted); }
+.byline {
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600;
+  color: var(--muted); margin: 18px 0 0; letter-spacing: 0.01em;
+}
+.contents-label {
+  font-family: var(--sans); font-size: 12px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+  margin: 44px 0 6px;
+}
+.chapters { margin-bottom: 20px; }
+.chapter {
+  display: flex; gap: 24px; align-items: baseline;
+  padding: 24px 2px; border-bottom: 1px solid var(--line);
+  text-decoration: none; color: inherit;
+}
+.chapter:first-of-type { border-top: 1px solid var(--line); }
+.ch-num {
+  font-family: var(--serif); font-size: 26px; line-height: 1;
+  color: var(--faint); min-width: 40px; text-align: right;
+  font-variant-numeric: tabular-nums; flex-shrink: 0;
+}
+.ch-body h2 {
+  font-size: 21.5px; margin: 0 0 7px; font-weight: 700; letter-spacing: -0.005em;
+}
+.ch-kicker {
+  font-family: var(--sans); font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 7px;
+}
+.ch-body p { font-size: 15.5px; color: #444444; margin: 0 0 8px; line-height: 1.62; }
+.ch-meta { font-family: var(--sans); font-size: 12.5px; color: var(--faint); }
+.chapter:hover .ch-body h2 { text-decoration: underline; text-underline-offset: 3px; }
+.chapter:hover .ch-num { color: var(--text); }
+@media (max-width: 560px) {
+  .chapter { gap: 14px; }
+  .ch-num { font-size: 20px; min-width: 26px; }
+}
+.course-close { margin: 40px 0 24px; padding: 24px 26px; border: 1px solid var(--line); border-radius: 12px; background: #fafafa; }
+.course-close p { font-size: 15.5px; color: #444444; line-height: 1.62; margin: 0 0 14px; }
+.feedback-btn {
+  display: inline-block; font-family: var(--sans); font-size: 13.5px; font-weight: 700;
+  color: #ffffff; background: var(--accent); text-decoration: none;
+  padding: 10px 18px; border-radius: 10px;
+}
+.feedback-btn:hover { filter: brightness(0.92); }
+</style>
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="https://teaching.amirhkarimi.com/">&larr; The AI Learning Map</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">University of Waterloo &middot; The ML Bible</div>
+  <h1>ECE 657: Introduction to Machine Learning</h1>
+  <p class="lede">
+    Interactive lessons for the course, built from the actual lecture material.
+    Each lesson teaches from first principles, intuition first, then the math,
+    then the fine detail, and every concept comes with a live figure you can
+    drag, a quiz you can fail in private, or code you can run.
+  </p>
+  <p class="byline">Written by Arjun Virk &middot; Taught by Dr. Amir-Hossein Karimi</p>
+</header>
+
+<main class="lesson-body">
+
+<div class="contents-label">Contents</div>
+
+<div class="chapters">
+
+  <a class="chapter" href="knn/index.html">
+    <div class="ch-num">1</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The first learning algorithm</div>
+      <h2>k-Nearest Neighbours</h2>
+      <p>Similar things have similar labels. One honest bet, and everything it forces you to invent: data as vectors, distance metrics, Voronoi boundaries, the k dial, validation discipline, and the three ways KNN breaks.</p>
+      <div class="ch-meta">Lecture 2 &middot; 13 interactive figures &middot; live Voronoi &middot; runnable knn_classify &middot; pick-your-k exercise &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="decision-trees/index.html">
+    <div class="ch-num">2</div>
+    <div class="ch-body">
+      <div class="ch-kicker">From similarity to rules</div>
+      <h2>Decision Trees</h2>
+      <p>Predict by asking questions. Twenty-questions classifiers, axis-aligned decision regions, entropy as measured surprise, information gain, greedy tree building, and the pruning discipline that keeps trees honest.</p>
+      <div class="ch-meta">Lecture 3 &middot; interactive tree builder &middot; entropy &amp; information-gain calculators &middot; pruning demo &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="linear-regression/index.html">
+    <div class="ch-num">3</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The first parametric model</div>
+      <h2>Linear Regression</h2>
+      <p>Model, loss, optimization: the recipe all of machine learning reuses. Fit lines by hand, derive the squared-error loss on screen, walk gradient descent line by line through real code, and meet overfitting and ridge regression.</p>
+      <div class="ch-meta">Lecture 4 &middot; 13 interactive figures &middot; 3D loss bowl &middot; line-by-line code stepper &middot; data space ↔ weight space &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="linear-classification/index.html">
+    <div class="ch-num">4</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The same recipe, discrete targets</div>
+      <h2>Linear Classification</h2>
+      <p>Separating hyperplanes, the perceptron and its learning rule, why 0-1 loss cannot be optimized directly, and the XOR wall that stalled neural networks for a decade.</p>
+      <div class="ch-meta">Lecture 5 &middot; perceptron trainer &middot; hyperplane geometry &middot; XOR limitation &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="logistic-regression/index.html">
+    <div class="ch-num">5</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The differentiable classifier</div>
+      <h2>Logistic Regression</h2>
+      <p>Put a sigmoid on a line and classification becomes smooth: probabilities instead of hard calls, cross-entropy instead of squared error, and gradient descent works again.</p>
+      <div class="ch-meta">Lecture 6 &middot; sigmoid &amp; decision boundary explorers &middot; cross-entropy loss &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="bias-variance-ensembles/index.html">
+    <div class="ch-num">6</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Generalization theory meets teamwork</div>
+      <h2>Bias, Variance &amp; Ensembles</h2>
+      <p>Where error actually comes from, and the decomposition that names it. Then the fix: average many models. Bagging, random forests, and boosting.</p>
+      <div class="ch-meta">Lecture 7 &middot; bias-variance simulator &middot; bootstrap &amp; forest demos &middot; boosting rounds &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="svm/index.html">
+    <div class="ch-num">7</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The widest street</div>
+      <h2>Support Vector Machines</h2>
+      <p>Of all separating lines, pick the one with the biggest margin. Support vectors, slack, the C dial, and the kernel trick that buys curved boundaries with linear machinery.</p>
+      <div class="ch-meta">Lecture 8 &middot; margin dragger &middot; support-vector highlighting &middot; kernel playground &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="neural-networks/index.html">
+    <div class="ch-num">8</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Stacking linear models</div>
+      <h2>Neural Networks</h2>
+      <p>Neurons, layers, and activation functions: how stacking linear models with nonlinearities in between finally cracks XOR and buys universal approximation.</p>
+      <div class="ch-meta">Lecture 9 &middot; forward-pass explorer &middot; activation gallery &middot; XOR solved live &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="backpropagation/index.html">
+    <div class="ch-num">9</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The engine of deep learning</div>
+      <h2>Backpropagation</h2>
+      <p>The chain rule, organized. Computation graphs, the forward and backward passes, and one worked example with every number real, stepped through line by line.</p>
+      <div class="ch-meta">Lecture 10 &middot; computation-graph walker &middot; stepped forward/backward pass &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="cnn/index.html">
+    <div class="ch-num">10</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Architecture for image structure</div>
+      <h2>Convolutional Neural Networks</h2>
+      <p>Why dense layers waste images, and what convolution buys: local filters, weight sharing, feature maps, pooling, and the output-size arithmetic every CNN engineer does in their head.</p>
+      <div class="ch-meta">Lecture 11 &middot; sliding-filter animator &middot; pooling demo &middot; parameter-count calculator &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="cnn-part-2/index.html">
+    <div class="ch-num">11</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Why deep vision won</div>
+      <h2>CNNs in Practice</h2>
+      <p>A great architecture alone did not win ImageNet. Data, compute, and depth had to scale together: the 1x1 convolution, dataset curation, GPUs, the march from LeNet to ResNet, and transfer learning, the workflow you will actually use.</p>
+      <div class="ch-meta">Lecture 12 &middot; architecture timeline &middot; scaling-laws playground &middot; transfer-learning workflow &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="language-models/index.html">
+    <div class="ch-num">12</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Language as prediction</div>
+      <h2>Language Models</h2>
+      <p>Given the previous words, predict the next. N-gram counting tables and the sparsity wall, tokenization, one-hot vectors to embeddings and analogy arithmetic, the neural trigram, decoding with temperature, and perplexity.</p>
+      <div class="ch-meta">Lecture 13 &middot; n-gram counting table &middot; embedding geometry &middot; neural next-word predictor &middot; decoding explorer &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="sequence-models/index.html">
+    <div class="ch-num">13</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Memory across time</div>
+      <h2>Sequence Models</h2>
+      <p>A fixed window forgets the subject mentioned ten words ago. RNNs carry a hidden state forward, backprop through time trains it, gradients vanish or explode along the way, and LSTM gates protect the memory, right up to the seq2seq bottleneck that motivates attention.</p>
+      <div class="ch-meta">Lecture 14 &middot; RNN unroller &middot; vanishing-gradient simulator &middot; LSTM gate explorer &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="attention-transformers/index.html">
+    <div class="ch-num">14</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The capstone</div>
+      <h2>Attention and Transformers</h2>
+      <p>Every word looks at every other word, in parallel. Queries, keys, and values, multi-head attention, the transformer block, BERT vs GPT masks, then the systems half: the LLM training pipeline, cost, context windows, and scaling laws.</p>
+      <div class="ch-meta">Lecture 15 &middot; QKV builder &middot; attention heatmap &middot; masking demo &middot; cost calculator &middot; ~60 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="mle-map-bayesian/index.html">
+    <div class="ch-num">15</div>
+    <div class="ch-body">
+      <div class="ch-kicker">The probabilistic turn</div>
+      <h2>MLE, MAP &amp; Bayesian Prediction</h2>
+      <p>You flip a coin 100 times and see 55 heads. What is the bias, and how sure are you? Probability vs likelihood, the log-likelihood peak, priors and posteriors, the zero-frequency trap, and keeping the whole distribution instead of one number.</p>
+      <div class="ch-meta">Lecture 16 &middot; likelihood maximizer &middot; coins-in-a-pouch predictor &middot; Beta prior updater &middot; MLE vs MAP vs Bayesian &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="gaussian-bayes/index.html">
+    <div class="ch-num">16</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Generative classification</div>
+      <h2>Gaussian Bayes Models</h2>
+      <p>Instead of drawing a boundary, model what each class's data looks like and let Bayes' rule decide. Class priors and likelihoods, MLE for Gaussians, the covariance matrix's geometry, Naive Bayes, and why the boundary comes out quadratic or linear.</p>
+      <div class="ch-meta">Lecture 17 &middot; 1-D Bayes classifier &middot; covariance ellipse editor &middot; live QDA/LDA/Naive Bayes boundaries &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="pca/index.html">
+    <div class="ch-num">17</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Fewer dimensions, most of the story</div>
+      <h2>Principal Component Analysis</h2>
+      <p>A 784-pixel digit has far fewer real degrees of freedom. Eigenvectors as the directions a matrix preserves, the covariance matrix's natural axes, variance maximization equals reconstruction minimization, scree plots, compression, denoising, and random projections.</p>
+      <div class="ch-meta">Lecture 18 &middot; draggable eigenvector demo &middot; rotate-into-principal-axes &middot; scree-plot K picker &middot; digit compression &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="autoencoders/index.html">
+    <div class="ch-num">18</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Learned compression, then generation</div>
+      <h2>Autoencoders &amp; VAEs</h2>
+      <p>PCA with the projection learned instead of fixed: nonlinear bottlenecks capture curved structure. Sparse, denoising, and convolutional variants, then the variational autoencoder, where encoding a distribution buys a latent space smooth enough to generate from.</p>
+      <div class="ch-meta">Lecture 19 &middot; encoder-bottleneck-decoder explorer &middot; latent-space probe &middot; KL trade-off dial &middot; reparameterization sampler &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="clustering/index.html">
+    <div class="ch-num">19</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Structure without labels</div>
+      <h2>Clustering: K-Means &amp; GMMs</h2>
+      <p>No labels, just a cloud of points and the suspicion that it has groups. Alternate assigning points and updating prototypes: K-means with hard assignments, soft K-means with a stiffness dial, then the generative turn, where latent variables and EM fit a mixture of Gaussians that is also a density you can sample.</p>
+      <div class="ch-meta">Lecture 20 &middot; K-means stepper &middot; elbow-method picker &middot; live EM with responsibilities &middot; K-means vs GMM &middot; ~45 min</div>
+    </div>
+  </a>
+
+  <a class="chapter" href="reinforcement-learning/index.html">
+    <div class="ch-num">20</div>
+    <div class="ch-body">
+      <div class="ch-kicker">Learning by acting</div>
+      <h2>Reinforcement Learning</h2>
+      <p>No labels and no targets, only rewards that arrive late. Bandits pose the exploration-exploitation dilemma, MDPs add state and delayed consequences, the Bellman equation turns long-term value into a one-step recursion, and Q-learning learns to act when the model of the world is unknown.</p>
+      <div class="ch-meta">Lecture 21 &middot; playable bandit &middot; value-iteration gridworld &middot; live Q-learning agent &middot; ~45 min</div>
+    </div>
+  </a>
+
+</div>
+
+<div class="course-close">
+  <div class="contents-label">After the course</div>
+  <p>
+    Made it through all twenty chapters, or even just the ones you needed?
+    Tell us what worked and what did not. It takes two minutes and shapes the
+    next iteration of the guide.
+  </p>
+  <a class="feedback-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSfQf29qnQIBTMcMnoFnpZMJkctRaSLoTO4fXbGpchcd1_sanQ/viewform" target="_blank" rel="noopener">Give course feedback &rarr;</a>
+</div>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Course lessons</div>
+</footer>
+
+</body>
+</html>

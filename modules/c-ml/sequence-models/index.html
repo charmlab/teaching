@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sequence Models — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on neural sequence models: recurrent networks, hidden state as memory, backpropagation through time, vanishing and exploding gradients, gradient clipping, LSTMs and GRUs, bidirectional and stacked cells, and the seq2seq bottleneck that motivates attention.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 14 &middot; The ML Bible</div>
+  <h1>Sequence Models</h1>
+  <p class="lede">
+    The language models we built last lecture share one embarrassing flaw:
+    they read through a fixed window, so anything that happened more than a
+    couple of words ago simply does not exist for them. This lecture builds
+    memory. A recurrent network carries a hidden state forward through time,
+    one update rule reused at every step, and that single idea unlocks
+    sequences of any length. It also creates the deepest training problem in
+    this course, gradients that vanish or explode across time, and the fix,
+    gated cells like the LSTM, is one of the great architectural ideas in
+    machine learning. Every concept here has an animation and an interactive
+    figure, and the whole story ends one step short of attention.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol start="0">
+    <li><a href="#sec-hook">The hook: the model that forgot the subject</a></li>
+    <li><a href="#sec-rnn">The RNN: a network with memory</a></li>
+    <li><a href="#sec-lm">An RNN as a language model</a></li>
+    <li><a href="#sec-bottleneck">The bottleneck: backprop through time</a></li>
+    <li><a href="#sec-gates">Gated memory: LSTMs and GRUs</a></li>
+    <li><a href="#sec-chain">Chaining cells: bidirectional, stacked, seq2seq</a></li>
+    <li><a href="#sec-attention">Why attention comes next</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: the model that forgot the subject</h2>
+
+<p>
+Start from where the language-modelling lecture left us. A language model
+factorizes the probability of a sentence with the chain rule,
+</p>
+
+$$ p(w_1, \dots, w_T) = \prod_{t=1}^{T} p(w_t \mid w_{&lt;t}), $$
+
+<p>
+and both of our working models, the counted n-gram and the neural trigram,
+made the same approximation to survive: condition on a <strong>fixed
+window</strong> of the most recent words instead of the whole history. A
+trigram sees exactly two words back. That bought us tractable tables and a
+tractable neural network, and the price was quietly enormous. Any relevant
+information that falls outside the window is simply gone.
+</p>
+
+<p>
+Feel how fast that fails. Take the lecture's sentence: "Amir went to class
+and then he returned home." To continue the sentence sensibly after "he", a
+model has to know who "he" is, and the answer, Amir, sits six words back.
+Slide the window and watch the subject fall off the edge:
+</p>
+
+<div class="figure" id="fig-window">
+  <div class="fig-mount" data-fig="window"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the fixed-window failure. The model predicts the word after "he" while seeing only the last <span class="m">$k$</span> words (orange). At the trigram setting, <span class="m">$k = 2$</span>, the subject "Amir" (purple) is invisible, and no amount of training fixes what the model literally cannot see. Only at <span class="m">$k \ge 7$</span> does the subject come back into view.</p>
+</div>
+
+<p>
+You could keep growing the window, but the language-modelling lecture already
+showed why that road ends: n-gram tables blow up exponentially in the window
+length, and even the neural trigram's input layer grows with every extra
+context word while still imposing a hard cutoff. Language does not respect
+cutoffs. The subject of a sentence, the topic of a paragraph, the name
+introduced a page ago: useful context can sit arbitrarily far back. So the
+plan for this lecture is different in kind, not degree. Instead of a wider
+snapshot, we give the model <strong>memory</strong>: a running summary that
+is carried forward and updated word by word, so that in principle nothing
+ever has to fall off the edge.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. THE RNN ═══════════════════ -->
+<section id="sec-rnn">
+<h2><span class="secnum">1.</span> The RNN: a network with memory</h2>
+
+<p>
+A <strong>recurrent neural network (RNN)</strong> reads a sequence one step
+at a time and maintains a <strong>hidden state</strong>
+<span class="m">$h_t$</span>, a vector that acts as a learned running summary
+of everything the network has read so far. At each step, the new summary is
+computed from the old summary and the new input:
+</p>
+
+$$ h_t = f(h_{t-1},\, x_t). $$
+
+<p>
+Read that equation the way you would read a habit. The network does not get
+to see the whole sequence at once; it gets the one thing it wrote down about
+the past, <span class="m">$h_{t-1}$</span>, plus the current input
+<span class="m">$x_t$</span>, and it must produce the next note-to-self
+<span class="m">$h_t$</span>. Everything the model will ever know about word
+one, by the time it reaches word fifty, has to survive inside that vector.
+</p>
+
+<p>
+The second half of the definition matters just as much: <strong>the same
+parameters are reused at every time step</strong>. One update function
+<span class="m">$f$</span>, one set of weights, applied at
+<span class="m">$t = 1$</span>, at <span class="m">$t = 2$</span>, at
+<span class="m">$t = 1000$</span>. This is <strong>weight sharing across
+time</strong>, and it should feel familiar: the CNN lecture shared one filter
+across all image positions because a pattern is worth detecting anywhere.
+Here we share one update rule across all time steps because "how to fold a
+new word into a summary" should not depend on whether the word is the third
+or the three-hundredth. Sharing buys us two things at once: the parameter
+count is independent of sequence length, so one network handles sequences of
+any length, and every position's data teaches the same weights.
+</p>
+
+<p>
+Because the network is a loop, a cell feeding its own output back into
+itself, we can also draw it <strong>unrolled</strong>: copy the cell once per
+time step and pass the hidden state along the chain. The loop and the chain
+are the same network, drawn twice. The unrolled drawing is the one to keep in
+your head, because it turns a recurrent network into an ordinary feedforward
+computation graph, which is exactly how we will train it in section 3.
+</p>
+
+<div class="figure" id="fig-unroll">
+  <div class="fig-mount" data-fig="unroll"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the signature picture of the lesson. The folded view is the network as defined: one cell, one self-loop. Press Unroll and the loop opens into a chain across time; then step through the inputs and watch <span class="m">$h_t$</span> computed live from <span class="m">$h_{t-1}$</span> and <span class="m">$x_t$</span> with a real <span class="m">$\tanh$</span> update. Every arrow between cells carries the <em>same</em> weights <span class="m">$W_h$</span>, printed once because there is only one copy.</p>
+</div>
+
+<p>
+To make "the hidden state is memory" concrete, strip the idea to its
+smallest possible example, straight from the lecture. Take a scalar hidden
+state, a scalar input, no activation function, and one shared weight
+<span class="m">$w$</span>:
+</p>
+
+$$ h_{t+1} = w \cdot x_{t+1} + w \cdot h_t. $$
+
+<p>
+Set <span class="m">$w = 1$</span> and unroll it by hand:
+<span class="m">$h_1 = x_1$</span>, then
+<span class="m">$h_2 = x_2 + h_1 = x_1 + x_2$</span>, then
+<span class="m">$h_3 = x_1 + x_2 + x_3$</span>. The hidden state is computing
+a <strong>running sum</strong> of the input. Nothing about "the first number"
+was stored explicitly anywhere; its influence simply lives on inside
+<span class="m">$h$</span>, which is the whole trick. Feed it a sequence
+yourself:
+</p>
+
+<div class="figure" id="fig-runsum">
+  <div class="fig-mount" data-fig="runsum"></div>
+  <p class="fig-caption"><b>Fig 1.2,</b> the running-summary demo. Step through a number sequence and watch <span class="m">$h_t$</span> accumulate under <span class="m">$h_{t+1} = w x_{t+1} + w h_t$</span>; at <span class="m">$w = 1$</span> the readout confirms <span class="m">$h_t$</span> equals the running sum exactly. Then nudge <span class="m">$w$</span> off 1 and notice old inputs fading (<span class="m">$w &lt; 1$</span>) or swelling (<span class="m">$w &gt; 1$</span>): remember that behaviour, section 3 is built on it.</p>
+</div>
+
+<p>
+The real cell is the same idea with a nonlinearity and learned weight
+matrices. The vanilla RNN update we will carry through this lecture is
+</p>
+
+$$ h_t = \sigma\!\left(W_h h_{t-1} + W_x x_t + b\right), $$
+
+<p>
+where <span class="m">$W_h$</span> mixes the old summary,
+<span class="m">$W_x$</span> injects the new input, and
+<span class="m">$\sigma$</span> is a squashing activation. Let us run it by
+hand once, scalar case, so the numbers are yours. Take
+<span class="m">$W_h = 0.5$</span>, <span class="m">$W_x = 1.0$</span>,
+<span class="m">$b = 0$</span>, <span class="m">$h_0 = 0$</span>, with
+<span class="m">$\sigma$</span> the logistic function, and feed
+<span class="m">$x_1 = 1.0$</span>, <span class="m">$x_2 = 0.5$</span>:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: two steps of the vanilla RNN</div>
+  <p style="font-family:var(--mono);font-size:14px">
+    z&#8321; = 0.5&middot;0 + 1.0&middot;1.0&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 1.0000&nbsp;&nbsp;&nbsp;&rarr;&nbsp;&nbsp;h&#8321; = &sigma;(1.0000) = 0.7311<br>
+    z&#8322; = 0.5&middot;0.7311 + 1.0&middot;0.5 = 0.8655&nbsp;&nbsp;&nbsp;&rarr;&nbsp;&nbsp;h&#8322; = &sigma;(0.8655) = 0.7038
+  </p>
+  <p>Notice the mechanics: <span class="m">$x_1$</span> never appears in the second line, yet it shaped <span class="m">$z_2$</span> through the <span class="m">$0.5 \cdot 0.7311$</span> term. The first input's influence arrived at step 2 only by surviving inside <span class="m">$h_1$</span>, already scaled down by <span class="m">$W_h = 0.5$</span>. File that factor away; it is about to become the villain of section 3.</p>
+</div>
+
+<p>
+In code, the update is four lines, and the loop over a sequence is two more:
+</p>
+
+<pre class="code" data-lang="python"><code>import math
+
+def sigmoid(z):
+    return 1.0 / (1.0 + math.exp(-z))
+
+def rnn_step(h, x, Wh, Wx, b):
+    z = Wh * h + Wx * x + b       # mix old summary with new input
+    return sigmoid(z)             # squash into the next summary
+
+h = 0.0                           # empty memory
+for x in [1.0, 0.5, -0.3, 0.9]:
+    h = rnn_step(h, x, Wh=0.5, Wx=1.0, b=0.0)</code></pre>
+
+<p>
+Do not just read it, run it. The version below executes for real, and the
+first two rows should reproduce the worked math above to four decimals:
+</p>
+
+<div class="figure" id="fig-rnncode">
+  <div class="fig-mount" data-fig="rnncode"></div>
+  <p class="fig-caption"><b>Fig 1.3,</b> a live <code>rnn_step</code>. Pick the weights and a sequence, press Run, and the loop above actually executes: every <span class="m">$z_t$</span> and <span class="m">$h_t$</span> in the trace is computed, not typed in. At the default setting the first two rows match the worked example. Then try <span class="m">$W_h = 0$</span> and notice the network turn amnesiac: each <span class="m">$h_t$</span> depends on <span class="m">$x_t$</span> alone.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">What does the hidden state <span class="m">$h_t$</span> represent, and why does the RNN reuse the same weights at every time step?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It stores the raw input sequence so far; weights are shared to save memory at inference time</button>
+    <button data-k="b">It is a learned running summary of everything read so far; sharing one update rule makes the parameter count independent of sequence length and lets every position train the same weights</button>
+    <button data-k="c">It is the model's prediction for the next token; weights are shared because each token has the same probability</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The hidden state is a fixed-size vector, so it cannot store the raw sequence; it compresses the past into a summary. And sharing is not a memory optimization, it is what makes one rule apply to sequences of any length.</div>
+  <div class="quiz-fb" data-k="b">Right on both counts. <span class="m">$h_t$</span> is the model's note-to-self about the past, and one shared <span class="m">$f$</span> means "how to update a summary" is learned once, from every position in every sequence, and then applies at any length. Same logic as sharing a CNN filter across image positions.</div>
+  <div class="quiz-fb" data-k="c">The prediction is computed <em>from</em> <span class="m">$h_t$</span> (next section), but the state itself is a summary of the history, not a distribution. And token probabilities are certainly not all equal.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. RNN AS A LANGUAGE MODEL ═══════════════════ -->
+<section id="sec-lm">
+<h2><span class="secnum">2.</span> An RNN as a language model</h2>
+
+<p>
+Now plug the recurrent cell into the job from last lecture. As a language
+model, an RNN computes, at every step,
+</p>
+
+$$ \text{current token} + \text{memory} \;\longrightarrow\; \text{next-token probabilities}. $$
+
+<p>
+The plumbing is exactly the pipeline we already own. Tokens go in as IDs,
+one-hot vectors, or embeddings; the cell folds each one into the hidden
+state; and a linear layer plus softmax turns <span class="m">$h_t$</span>
+into a distribution over the vocabulary, trained with cross-entropy on the
+true next token. The only new part is that the context is no longer a fixed
+window: it is whatever the hidden state managed to remember, which in
+principle reaches back to the first word.
+</p>
+
+<p>
+Training reuses the trick from last lecture, <strong>teacher
+forcing</strong>: at every step, feed the <em>true</em> previous token from
+the corpus, not whatever the model would have guessed, so each step is a
+clean supervised problem. Generation is the same loop with the wire bent
+back: sample or pick a token from the model's output distribution and feed
+<em>that</em> in as the next input. Same cell, different diet, and the
+difference matters, because during generation the model's own mistakes
+become its future context. Watch both modes on a genuinely trained network:
+</p>
+
+<div class="figure" id="fig-lmstep">
+  <div class="fig-mount" data-fig="lmstep"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the RNN language-model stepper. A small RNN is actually trained in your browser on a toy corpus when this figure loads, so every probability is real. Step through a sentence: the hidden state (heat strip) carries forward, and the bars show the softmax over the vocabulary at each step. In teacher forcing the true token (green) is fed next regardless of the model's favourite; in free generation the model's own pick (orange) is fed back, and the sentence becomes whatever it becomes.</p>
+</div>
+
+<p>
+One design question remains: what should a "token" be? Last lecture used
+words, and words come with two costs. A realistic vocabulary has tens of
+thousands of entries, so the softmax and the embedding table are large and
+training and prediction get expensive; and any word not in the vocabulary at
+training time is simply unrepresentable. <strong>Character-level</strong>
+modelling fixes both at a stroke: the vocabulary shrinks to roughly a
+hundred characters, and any word whatsoever can be spelled. The catch is the
+exchange rate. A ten-word sentence becomes fifty-odd characters, so the
+dependency between "Amir" and "he" that sat six tokens apart at word level
+now sits dozens of steps apart, and long-term memory stops being a luxury
+and becomes the whole game. Character-level RNNs live and die by how far
+their hidden state can carry information, and they struggle as sequences get
+long. Which raises the question this lecture actually turns on: how far
+<em>can</em> a vanilla RNN carry information?
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">During training, an RNN language model is fed the true previous token rather than its own prediction. Why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Because the model has no output to feed back until training has finished</button>
+    <button data-k="b">To prevent the model from ever seeing its own errors, which would corrupt the weights permanently</button>
+    <button data-k="c">Teacher forcing makes every step a clean supervised problem: the model always predicts from the real corpus context, so the loss at each position has an unambiguous target</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The model produces a distribution at every step from the very first update; we could sample from it mid-training if we wanted. We choose not to.</div>
+  <div class="quiz-fb" data-k="b">Weights are not corrupted by inputs; they change only by gradient updates. The real reason is about making the training signal clean, not about protecting the weights.</div>
+  <div class="quiz-fb" data-k="c">Right. With the true history as context, "predict the next token" is ordinary supervised learning at every position. Generation then changes the diet: the model conditions on its own outputs, which is exactly why generated text can drift in ways training text never did.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 3. THE BOTTLENECK ═══════════════════ -->
+<section id="sec-bottleneck">
+<h2><span class="secnum">3.</span> The bottleneck: backprop through time and unstable gradients</h2>
+
+<p>
+How do we train the weights of a recurrent cell? With the algorithm we
+already trust. Unroll the network across time, as in Fig 1.1, and the result
+is a plain feedforward computation graph: the same kind of graph the
+backpropagation lecture taught us to differentiate node by node. Running
+backprop on the unrolled network has its own name,
+<strong>backpropagation through time (BPTT)</strong>, but there is nothing
+new in it. Same chain rule, same local derivatives multiplied along paths,
+with one twist: because the weights are shared across time, every unrolled
+copy of the cell contributes gradient to the <em>same</em>
+<span class="m">$W_h$</span>.
+</p>
+
+<p>
+The twist is not the problem. The problem is the shape of the graph. Suppose
+the loss at a late step <span class="m">$T$</span> depends on something that
+happened at an early step <span class="m">$t$</span>, the "Amir" that
+explains the "he". The gradient connecting them must travel backward through
+every intermediate hidden state, and the chain rule makes that a
+<strong>product</strong>:
+</p>
+
+$$ \frac{\partial h_T}{\partial h_t}
+   = \frac{\partial h_T}{\partial h_{T-1}}\,
+     \frac{\partial h_{T-1}}{\partial h_{T-2}}
+     \cdots
+     \frac{\partial h_{t+1}}{\partial h_t}. $$
+
+<p>
+For the vanilla cell
+<span class="m">$h_t = \sigma(W_h h_{t-1} + W_x x_t + b)$</span>, each factor
+is a Jacobian matrix, so a long-range gradient is a product of many Jacobians
+across time. To see what repeated multiplication does, drop to the scalar
+case, where each factor is just a number:
+</p>
+
+$$ \frac{\partial h_T}{\partial h_t}
+   \approx \prod_{k=t+1}^{T} \sigma'(z_k)\, w. $$
+
+<p>
+If each backward step multiplies by roughly the same value
+<span class="m">$a$</span>, then after <span class="m">$T$</span> steps the
+gradient has been scaled by <span class="m">$a^T$</span>, and exponentials
+are merciless in both directions:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked: the two numbers that define this lecture</div>
+  <p style="font-family:var(--mono);font-size:14px">
+    |a| &lt; 1:&nbsp;&nbsp;0.9&#8309;&#8304; = 0.00515&hellip;&nbsp;&nbsp;&asymp; 0.005&nbsp;&nbsp;&nbsp;(the gradient has <b>vanished</b>)<br>
+    |a| &gt; 1:&nbsp;&nbsp;1.1&#8309;&#8304; = 117.39&hellip;&nbsp;&nbsp;&nbsp;&asymp; 117&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(the gradient has <b>exploded</b>)
+  </p>
+  <p>A per-step factor just 10% below 1 wipes out the signal across 50 steps; a factor 10% above 1 amplifies it more than a hundredfold. Nothing in between is stable except <span class="m">$a$</span> pinned exactly near 1, which ordinary training does not arrange.</p>
+</div>
+
+<p>
+These are the <strong>vanishing gradient</strong> and <strong>exploding
+gradient</strong> problems, and it is worth translating both out of calculus.
+A vanished gradient means early inputs get essentially no credit or blame
+for late predictions: the learning signal from "he" never reaches "Amir", so
+long-range dependencies are precisely the thing the network cannot learn. An
+exploded gradient means the update step becomes huge and optimization goes
+unstable, loss spiking instead of falling. Both are fatal for language,
+because language depends on distant words. And the saturating activations we
+like for squashing make vanishing worse: wherever
+<span class="m">$\sigma$</span> flattens out, <span class="m">$\sigma'(z_k)$</span>
+is close to zero, shrinking the product further. Play with the exponent
+yourself:
+</p>
+
+<div class="figure" id="fig-apow">
+  <div class="fig-mount" data-fig="apow"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the vanishing and exploding gradient simulator, the other signature figure. Slide the per-step multiplier <span class="m">$a$</span> and the depth in time <span class="m">$T$</span>; the curve is <span class="m">$a^t$</span> on a log axis, computed live, with the lecture's <span class="m">$0.9^{50}$</span> and <span class="m">$1.1^{50}$</span> landmarks one preset away. The log axis is the honest one here: it turns "exponential in <span class="m">$T$</span>" into a straight line whose slope you control with <span class="m">$a$</span>.</p>
+</div>
+
+<p>
+Now watch the same arithmetic happen inside an actual unrolled network
+rather than in the abstract. This is the computation-graph picture from the
+backpropagation lecture, stretched across time, with the error signal
+fading or blowing up as it hops from state to state:
+</p>
+
+<div class="figure" id="fig-bpttflow">
+  <div class="fig-mount" data-fig="bpttflow"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> BPTT on a real unrolled RNN. The forward pass (a genuine <span class="m">$\tanh$</span> RNN on a fixed input sequence) runs left to right; then a gradient leaves the loss at the last step and steps backward, multiplied at each hop by the true local factor <span class="m">$\sigma'(z_k)\,w$</span>, printed on the arrow. With small <span class="m">$w$</span> the bars die out within a few steps; with large <span class="m">$w$</span> they blow past the axis. The bars are on a log scale for the same reason as Fig 3.1.</p>
+</div>
+
+<h3>Gradient clipping: the practical patch</h3>
+
+<p>
+Exploding gradients have a blunt, effective, widely used fix. If the
+gradient's norm exceeds a threshold <span class="m">$\eta$</span>, rescale
+the whole vector back to that norm:
+</p>
+
+$$ \lVert g \rVert &gt; \eta \;\Rightarrow\; g \leftarrow \eta\, \frac{g}{\lVert g \rVert}. $$
+
+<p>
+This is <strong>gradient clipping</strong>, and the geometry is the point:
+the clipped gradient keeps its <em>direction</em> exactly and changes only
+its magnitude. The optimizer still moves the same way, just not
+catastrophically far. Worked once by hand: take
+<span class="m">$g = (3, 4)$</span>, so
+<span class="m">$\lVert g \rVert = 5$</span>, with threshold
+<span class="m">$\eta = 2$</span>. Then
+<span class="m">$g \leftarrow 2 \cdot (3, 4)/5 = (1.2, 1.6)$</span>, whose
+norm is exactly 2 and whose direction is unchanged. In code:
+</p>
+
+<pre class="code" data-lang="python"><code>def clip_grad(g, eta):
+    norm = math.sqrt(sum(gi * gi for gi in g))
+    if norm &gt; eta:                          # only intervene when too long
+        g = [gi * eta / norm for gi in g]   # same direction, norm = eta
+    return g</code></pre>
+
+<div class="figure" id="fig-clip">
+  <div class="fig-mount" data-fig="clip"></div>
+  <p class="fig-caption"><b>Fig 3.3,</b> the clipping demo. Drag the gradient vector; whenever it leaves the threshold circle, the clipped version (orange) is computed by the rescale above: identical direction, norm pinned to <span class="m">$\eta$</span>. Drag it back inside the circle and clipping does nothing at all. The readout confirms the angle never changes.</p>
+</div>
+
+<p>
+Be precise about what was just bought. Clipping caps how far a single update
+can move, so it tames <em>exploding</em> gradients. It does nothing for
+<em>vanishing</em> gradients: a signal that arrived at
+<span class="m">$10^{-8}$</span> is still <span class="m">$10^{-8}$</span>
+after clipping, because clipping only ever shrinks. You cannot rescue
+information that never arrived. Fixing vanishing needs a better memory
+architecture, not a better optimizer patch, and that is section 4.
+</p>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A gradient signal is multiplied by roughly <span class="m">$a = 0.95$</span> per backward step. Over <span class="m">$T = 100$</span> steps, what happens, and would gradient clipping help?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It shrinks by <span class="m">$0.95^{100} \approx 0.006$</span>, effectively vanishing; clipping does not help because it only shortens long gradients, it never lengthens short ones</button>
+    <button data-k="b">It shrinks mildly, since 0.95 is close to 1; clipping would restore it to the threshold norm</button>
+    <button data-k="c">It explodes, since 100 steps accumulate; clipping would rescale it back down</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. <span class="m">$0.95^{100} = e^{100 \ln 0.95} \approx e^{-5.13} \approx 0.006$</span>, the same collapse as <span class="m">$0.9^{50}$</span>. And clipping's rule fires only when <span class="m">$\lVert g \rVert &gt; \eta$</span>; a tiny gradient sails through untouched. Set <span class="m">$a = 0.95$</span>, <span class="m">$T = 100$</span> in Fig 3.1 and check the value.</div>
+  <div class="quiz-fb" data-k="b">"Close to 1" is no protection under a 100th power: <span class="m">$0.95^{100} \approx 0.006$</span>. And read the clip rule again: it triggers on gradients that are too <em>long</em>. It never scales anything up.</div>
+  <div class="quiz-fb" data-k="c">Exponentials with base below 1 shrink, no matter how many steps accumulate. Explosion needs <span class="m">$|a| &gt; 1$</span>. Try both bases in Fig 3.1.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding (coding)</div>
+  <p class="quiz-q">The rescale line inside <code>clip_grad</code> is blanked out: <code>g = [ ? for gi in g]</code>. Which expression is correct?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><code>min(gi, eta)</code></button>
+    <button data-k="b"><code>gi / norm</code></button>
+    <button data-k="c"><code>gi * eta / norm</code></button>
+  </div>
+  <div class="quiz-fb" data-k="a">Clamping each component separately changes the vector's <em>direction</em> (a long diagonal gradient would be bent toward the axes). Clipping must rescale the whole vector uniformly.</div>
+  <div class="quiz-fb" data-k="b">That normalizes to unit length regardless of <span class="m">$\eta$</span>, so every clipped gradient would have norm 1 instead of norm <span class="m">$\eta$</span>. Close, but the threshold has to reappear.</div>
+  <div class="quiz-fb" data-k="c">Right: <span class="m">$g \cdot \eta / \lVert g \rVert$</span> scales every component by the same factor, so the direction is untouched and the new norm is exactly <span class="m">$\eta$</span>. It is the equation from the text, one component at a time.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. GATED MEMORY ═══════════════════ -->
+<section id="sec-gates">
+<h2><span class="secnum">4.</span> Gated memory: LSTMs and GRUs</h2>
+
+<p>
+Step back and ask what the vanishing gradient is really telling us. In a
+vanilla RNN, written compactly as
+<span class="m">$h_t = \sigma(W[h_{t-1}, x_t] + b)$</span>, every piece of
+remembered information is forced through the same squash-and-mix update at
+every single step. Long-range information survives only by luck, by the
+product of fifty derivatives happening to stay near 1. The diagnosis is
+architectural, so the cure should be too. And there is a second observation
+hiding in plain sight: not every past word deserves equal treatment. Some
+inputs should be remembered for a long time (the subject of the sentence),
+some should be discarded almost immediately (a filler word), and some parts
+of memory matter for the current prediction while others do not. A good
+memory is <em>selective</em>.
+</p>
+
+<p>
+A <strong>gate</strong> is the mechanism that makes selectivity learnable: a
+value between 0 and 1, computed from the current input and state, that
+multiplies a piece of information to control how much of it passes. Gate at
+1, the information flows untouched; gate at 0, it is erased; in between, it
+is attenuated. The <strong>LSTM</strong> (long short-term memory) cell is
+built from exactly three such gates wrapped around one new object, the
+<strong>cell state</strong> <span class="m">$C_t$</span>: a protected memory
+lane, a conveyor belt that runs straight through time and lets information
+persist. The gates control all traffic on and off the belt:
+</p>
+
+<ul>
+  <li>the <strong>forget gate</strong> decides what past information to discard from the cell state,</li>
+  <li>the <strong>input gate</strong> decides what new information to store into it,</li>
+  <li>the <strong>output gate</strong> decides what part of the memory to expose through <span class="m">$h_t$</span> for the current prediction.</li>
+</ul>
+
+<p>
+The key idea is <strong>controlled memory flow</strong>. The model no longer
+learns only the input-to-output relation at each step; it also learns
+<em>when to remember and when to forget</em>. Keep the forget gate open and
+the belt carries a value across dozens of steps essentially untouched, no
+repeated squashing, which is exactly the persistence a vanilla RNN could not
+offer. Drive the gates yourself; this is worth ten minutes of play:
+</p>
+
+<div class="figure" id="fig-lstm">
+  <div class="fig-mount" data-fig="lstm"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the LSTM gate explorer. Left: one cell, live. The conveyor belt across the top carries <span class="m">$C_{t-1}$</span> through the forget gate's multiplier, picks up the input gate's contribution, and the output gate decides how much of <span class="m">$\tanh(C_t)$</span> escapes as <span class="m">$h_t$</span>; every number recomputes as you slide. Right: persistence. A value stored once decays as <span class="m">$f^{\,t}$</span> under forget gate <span class="m">$f$</span>, so at <span class="m">$f = 1$</span> it survives forever, and the presets show remembering, forgetting, and the sneaky one: memory kept but hidden (<span class="m">$o = 0$</span>).</p>
+</div>
+
+<p>
+In schematic code, one LSTM step reads like the diagram (this is for
+structure, not for running; every framework ships a tuned implementation):
+</p>
+
+<pre class="code" data-lang="python"><code>def lstm_step(h, C, x):
+    hx = concat(h, x)                     # gates read the state and the input
+    f = sigmoid(Wf @ hx + bf)             # forget gate: keep how much old memory?
+    i = sigmoid(Wi @ hx + bi)             # input gate: store how much new info?
+    C_cand = tanh(Wc @ hx + bc)           # candidate: what new info to write
+    C = f * C + i * C_cand                # the conveyor belt update
+    o = sigmoid(Wo @ hx + bo)             # output gate: expose how much memory?
+    h = o * tanh(C)                       # what the rest of the network sees
+    return h, C</code></pre>
+
+<p>
+Look at the belt line, <code>C = f * C + i * C_cand</code>. When
+<span class="m">$f \approx 1$</span> and <span class="m">$i \approx 0$</span>,
+it reduces to <span class="m">$C_t \approx C_{t-1}$</span>: information is
+copied forward, not squashed forward, and that near-identity path is what
+lets memory (and the learning signal that travels along it) survive many
+steps. The <strong>GRU</strong> (gated recurrent unit) is a simpler gated
+variant built on the same principle with fewer gates and no separate cell
+state; the idea to retain is gated, controllable memory, not the exact
+plumbing.
+</p>
+
+<p>
+Two pieces of history worth knowing, both from the lecture. First, LSTMs
+were proposed by Hochreiter and Schmidhuber in 1997 and then sat almost
+unused for about a decade before becoming central to the deep-learning era,
+powering speech recognition, machine translation, and sequence prediction;
+being right early is not the same as being adopted. (Schmidhuber is this
+lecture's scientist.) Second, the fine print: an LSTM still processes its
+input <em>one step at a time</em>. Gates fixed the memory problem, not the
+sequential one. Step 500 cannot be computed before step 499, which makes
+training slow to parallelize, and that surviving bottleneck is one of the
+reasons attention and transformers are about to matter.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In an LSTM, what do the forget, input, and output gates each control?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Forget: erases the input <span class="m">$x_t$</span>; input: scales the learning rate; output: selects the vocabulary word to emit</button>
+    <button data-k="b">Forget: how much past cell-state memory to discard; input: how much new candidate information to store; output: how much of the memory to expose through <span class="m">$h_t$</span></button>
+    <button data-k="c">All three jointly set the sequence length the cell can process before resetting</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Each gate acts on the memory pathway, not on the raw input, the optimizer, or the softmax. Map each gate to its multiplication in <code>lstm_step</code>: <code>f * C</code>, <code>i * C_cand</code>, <code>o * tanh(C)</code>.</div>
+  <div class="quiz-fb" data-k="b">Exactly, and the code says it in one line each: <code>f</code> multiplies the old belt contents, <code>i</code> scales what gets written on, and <code>o</code> decides how much of the belt the rest of the network gets to see. Discard, store, expose.</div>
+  <div class="quiz-fb" data-k="c">There is no fixed length or reset; the cell runs as long as the sequence does. The gates decide, at every step, what to keep, write, and reveal. Try the presets in Fig 4.1.</div>
+</div>
+
+<details class="check">
+  <summary>Check: memory that persists but is not exposed</summary>
+  <div>
+    <p>In Fig 4.1, set the output gate to 0 and leave the forget gate at 1. The hidden state is <span class="m">$h_t = 0$</span>, so downstream layers see nothing. Has the cell forgotten?</p>
+    <p><b>Answer.</b> No, and this is exactly why the LSTM separates <span class="m">$C_t$</span> from <span class="m">$h_t$</span>. The cell state still carries its value along the belt (<span class="m">$C_t = f \cdot C_{t-1} = C_{t-1}$</span> when <span class="m">$f = 1$</span> and nothing new is written); the output gate only controls what is <em>revealed</em> this step, <span class="m">$h_t = o \cdot \tanh(C_t) = 0 \cdot \tanh(C_t)$</span>. Reopen the gate ten steps later and the remembered value is still there to expose. Remembering and reporting are different decisions, and the LSTM lets the model learn them separately.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 5. CHAINING CELLS ═══════════════════ -->
+<section id="sec-chain">
+<h2><span class="secnum">5.</span> Chaining cells: bidirectional, stacked, seq2seq</h2>
+
+<p>
+A recurrent cell, vanilla or gated, is a building block, and blocks combine.
+Three combinations carry most of the field's classic systems.
+</p>
+
+<p>
+<strong>Bidirectional.</strong> A forward RNN can only condition on the
+past, but sometimes the disambiguating context comes <em>later</em>:
+"Though he later went home, Amir went to..." is completed more confidently
+if the model can also read what follows. A bidirectional RNN runs a second
+cell over the sequence in reverse (the flipped direction) and combines both
+hidden states, so a position's representation sees the whole sentence. The
+obvious caveat: you need the future to be available, which is fine for
+analyzing complete text and impossible for generating it left to right.
+</p>
+
+<p>
+<strong>Stacked.</strong> Cells also stack in depth: the first layer's
+hidden states become the second layer's input sequence. As with every deep
+architecture in this course, extra layers buy better feature extraction, and
+here the budget is small: usually just two or three layers, paid for in
+compute, since each layer is another full pass along the sequence.
+</p>
+
+<div class="figure" id="fig-chain">
+  <div class="fig-mount" data-fig="chain"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> what a position can see. Click any token: with a forward-only pass its representation depends on the prefix alone, tokens out of reach fade out, and the counter says so. Toggle the backward pass and the whole sentence comes into reach; toggle a second layer to stack cells in depth. One switch each, one line of what it buys.</p>
+</div>
+
+<p>
+<strong>Seq2seq.</strong> The combination that mattered most historically
+solves a problem we have quietly dodged: input and output lengths differ.
+A translation's source and target sentences do not line up token for token,
+so "predict the next token of the same stream" is not enough. The
+<strong>encoder-decoder</strong> (seq2seq) architecture splits the job: an
+<strong>encoder</strong> RNN reads the input sequence into hidden states
+<span class="m">$h_1, \dots, h_T$</span>, and a <strong>decoder</strong> RNN
+generates the output sequence, token by token, the same way our language
+model generated text. The handoff between them is the catch. In the basic
+design, the decoder receives exactly one thing: the encoder's
+<em>final</em> hidden state,
+</p>
+
+$$ h_1, \dots, h_T \;\longrightarrow\; h_T \;\longrightarrow\; \text{decoder}. $$
+
+<p>
+One fixed-size vector, asked to summarize the entire input, however long.
+This is the <strong>seq2seq bottleneck</strong>, and you should feel how
+strange it is: we built recurrent memory precisely so that context would not
+be crushed into a fixed window, and here at the architecture's crowning
+moment we crush the whole input into a fixed vector anyway. Squeeze it
+yourself:
+</p>
+
+<div class="figure" id="fig-seq2seq">
+  <div class="fig-mount" data-fig="seq2seq"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the seq2seq bottleneck demo. A real encoder RNN reads the input (hidden states computed live), and everything it produces funnels into the single vector <span class="m">$h_T$</span> that the decoder gets to work from. Slide the input length: the input grows, the bottleneck does not, and the numbers-through-the-funnel readout gets more lopsided. The preview toggle shows the escape route the next lecture takes: let the decoder look back at <em>all</em> the encoder states.</p>
+</div>
+
+<details class="check">
+  <summary>Check: why is the final state a bottleneck, and what would help?</summary>
+  <div>
+    <p>State the seq2seq bottleneck in one sentence, and suggest what the decoder would need to relieve it.</p>
+    <p><b>Answer.</b> The bottleneck: a basic seq2seq model forces the entire input sequence, no matter its length, through the single fixed-size vector <span class="m">$h_T$</span>, so a 5-word and a 50-word input get the same memory budget and long inputs are inevitably summarized lossily. What would help: give the decoder access to <em>all</em> the encoder states <span class="m">$h_1, \dots, h_T$</span>, not just the last one, and let it choose which of them matter for the token it is currently producing. That "choose which past states matter right now" mechanism is attention, and it is the subject of the next lecture. Notice the shift in philosophy: instead of preserving everything in one vector, retrieve what you need when you need it.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. WHY ATTENTION COMES NEXT ═══════════════════ -->
+<section id="sec-attention">
+<h2><span class="secnum">6.</span> Why attention comes next</h2>
+
+<p>
+Tally the ledger of this lecture. RNNs process one step at a time and carry
+information forward through a hidden state: memory beyond any fixed window,
+which is what we came for. LSTMs and GRUs add gates, so the memory becomes
+selective and can persist across long spans. But two costs never went away.
+Sequential processing is slow, because step <span class="m">$t$</span> waits
+on step <span class="m">$t-1$</span> no matter how many processors you own.
+And long-range dependencies, even gated, remain hard: information still has
+to <em>survive the journey</em> through every intermediate state, whether
+squashed by a vanilla update or ferried by a conveyor belt.
+</p>
+
+<p>
+Attention starts from a different question. Not "how do I preserve
+everything that might matter?" but "<strong>which previous tokens are
+relevant right now?</strong>" If the model, at each step, could look back
+directly at any earlier state and pull in what it needs, then nothing has to
+survive a journey at all: the dependency between "he" and "Amir" becomes one
+direct lookup instead of six fragile hops. That reframes sequence modelling
+from memory <em>preservation</em> to memory <em>retrieval</em>. A 2017 paper
+took the idea to its logical extreme, dropped the recurrence entirely, and
+announced the result in its title: "Attention Is All You Need". The
+architecture it introduced, the Transformer, replaces recurrence with
+attention and is the subject of the next lecture, and of essentially every
+large language model you have ever used.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">7.</span> Summary and method card</h2>
+
+<p>
+One sentence per act. Fixed windows lose distant context, so we gave the
+model a hidden state, a learned running summary updated by one weight-shared
+rule at every step. As a language model, the RNN turns "current token plus
+memory" into next-token probabilities, trained with teacher forcing, run
+free for generation. Training by backprop through time revealed the flaw:
+long-range gradients are products like <span class="m">$a^T$</span>, which
+vanish (<span class="m">$0.9^{50} \approx 0.005$</span>) or explode
+(<span class="m">$1.1^{50} \approx 117$</span>); clipping caps the
+explosions and cannot touch the vanishing. LSTMs answer architecturally with
+a cell state and forget, input, and output gates, learning when to remember
+and when to forget. Cells chain into bidirectional, stacked, and
+encoder-decoder designs, and the basic seq2seq handoff squeezes the whole
+input through one final state. The big idea of the lecture, stated once
+more: <strong>sequence models need mechanisms for memory</strong>.
+Recurrence stores context over time, gates make the storage selective, and
+attention, next lecture, replaces preservation with retrieval.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Neural sequence models (RNNs, LSTMs, seq2seq)</div>
+  <table>
+    <tr><th>Assumption</th><td>Language depends on context, and useful context may appear far before the current word.</td></tr>
+    <tr><th>Model class</th><td>Neural sequence models: RNNs with a hidden state updated by shared weights; gated cells (LSTMs, GRUs); encoder-decoder chains; attention and transformers next.</td></tr>
+    <tr><th>Learning / selection</th><td>Train by predicting the next token or output sequence with cross-entropy (teacher forcing); evaluate with held-out likelihood, perplexity, or downstream tasks.</td></tr>
+    <tr><th>Prediction</th><td>Fold each token into the state, <span class="m">$h_t = f(h_{t-1}, x_t)$</span>; read next-token probabilities from <span class="m">$h_t$</span> with softmax; decode step by step for generation.</td></tr>
+    <tr><th>Strengths</th><td>Captures sequential context beyond fixed n-grams; one shared rule handles any length; gates enable long, selective memory; attention will add direct access to relevant tokens and parallel architectures.</td></tr>
+    <tr><th>Limitations</th><td>RNNs are sequential (slow to parallelize) and suffer vanishing/exploding gradients; the basic seq2seq handoff bottlenecks at one vector; transformers are powerful but expensive and data-hungry.</td></tr>
+    <tr><th>Key knobs</th><td>Cell type (vanilla, LSTM, GRU), hidden size, depth (stacking), directionality, clipping threshold <span class="m">$\eta$</span>, token granularity (word vs character).</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: backpropagation gave us the training
+algorithm, CNNs showed that architecture should encode the structure of the
+data, and language modelling turned text into next-token prediction. This
+lecture built the architecture for sequences and found its limit honestly.
+Next lecture: transformers, BERT and GPT-style models, and the modern LLM
+pipeline built on top of them.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">8.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+connect, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A vanilla RNN and an LSTM both fail to learn a dependency spanning 80 tokens. You add gradient clipping to both. What improves?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both now learn the dependency: clipping stabilizes the long product of Jacobians</button>
+    <button data-k="b">The vanilla RNN improves but the LSTM does not, since LSTMs have no gradients to clip</button>
+    <button data-k="c">Training stability improves if gradients were exploding, but clipping does not restore a vanished 80-step signal in either model; only better memory (like the LSTM's belt with an open forget gate) addresses vanishing</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Clipping caps overly long gradients; it cannot amplify tiny ones. An 80-step vanished signal stays vanished. The product <span class="m">$a^{80}$</span> is the problem, and clipping never changes <span class="m">$a$</span>.</div>
+  <div class="quiz-fb" data-k="b">LSTMs are trained by the same BPTT and can absolutely explode; clipping applies to both. What clipping cannot do, for either, is fix vanishing.</div>
+  <div class="quiz-fb" data-k="c">Right. Clipping is an optimizer patch for explosions: direction kept, magnitude capped. Vanishing is an architecture problem, which is exactly why section 4 followed section 3.</div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">Halfway through generating a sentence, an RNN language model produces an unlikely word. What happens next, and why does this not occur during training?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Nothing changes: each step's distribution depends only on the current input token</button>
+    <button data-k="b">The odd word is fed back as input and folded into the hidden state, so all later predictions condition on the mistake; during training, teacher forcing feeds the true corpus token instead, so errors never enter the context</button>
+    <button data-k="c">The model backtracks and resamples, since the softmax rejects low-probability continuations</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The whole point of recurrence is that predictions do <em>not</em> depend on the current token alone: the hidden state carries the entire generated prefix, mistake included.</div>
+  <div class="quiz-fb" data-k="b">Right. Generation feeds the model's own output back in, so errors compound through the hidden state. Teacher forcing exists precisely to keep training conditioned on real text. Fig 2.1's two modes are this answer, animated.</div>
+  <div class="quiz-fb" data-k="c">Plain step-by-step generation never backtracks; it commits and continues. (Search strategies that keep alternatives, like beam search, were last lecture's decoding story.)</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a task where bidirectional wins</summary>
+  <div>
+    <p>Design a task where a bidirectional RNN clearly beats a forward-only one, and explain why the same trick is unavailable to a text <em>generator</em>.</p>
+    <p><b>Answer.</b> Any task where the label for a position depends on words that come after it, and where the full text is available up front. A clean example: tagging each word in a completed sentence as a person, place, or neither. In "Jordan sank the winning shot", the evidence that "Jordan" is a person arrives only with "sank the winning shot"; a forward-only model must commit at "Jordan" with no disambiguating context, while a bidirectional model's backward pass hands that future context to the first position. (Same structure as the lecture's "Though he later went home, Amir went to..." example.) The trick is unavailable to a generator because generation is causal: at the moment the model must choose the next word, the future half of the sequence does not exist yet, so there is nothing for a backward pass to read. Bidirectionality is for <em>analyzing</em> complete sequences, not producing them left to right.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): the character-level trade</summary>
+  <div>
+    <p>Character-level modelling shrinks the vocabulary from tens of thousands of words to about a hundred characters and can spell any word. Explain what it pays for those wins, in terms of the machinery of this lecture.</p>
+    <p><b>Answer.</b> It pays in memory span, the one resource this lecture showed to be fragile. Every word becomes several tokens, so the same sentence is several times longer as a sequence, and every dependency stretches accordingly: "Amir ... he", six words apart, might be thirty characters apart. Longer spans mean more hops for information to survive in the hidden state and, during training, more factors in the BPTT product <span class="m">$\prod \sigma'(z_k) w \approx a^T$</span>, pushing gradients further toward vanishing (Fig 3.1: compare <span class="m">$T = 6$</span> against <span class="m">$T = 30$</span> at any <span class="m">$a &lt; 1$</span>). The model also has to spend capacity learning what words <em>are</em>, since spelling regularities now live inside the sequence itself. So the trade is: a small softmax and no unseen-word problem, in exchange for making long-term memory even more essential and long sequences harder. That is why gated cells matter most exactly where character-level models operate.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): BPTT is not a new algorithm</summary>
+  <div>
+    <p>A classmate says backpropagation through time must be a fundamentally different algorithm from the backpropagation of Lecture 10, since it handles loops. Set them straight, and name the one genuinely new bookkeeping detail.</p>
+    <p><b>Answer.</b> There is no new algorithm. Unroll the RNN across time (Fig 1.1) and the loop disappears: what remains is an ordinary feedforward computation graph, exactly the object Lecture 10 differentiated. BPTT is plain backprop applied to that unrolled graph, the same chain rule, the same error signals flowing backward node by node, each multiplied by a local derivative. The genuinely new bookkeeping is weight sharing across time: the unrolled graph contains <span class="m">$T$</span> copies of the cell, but they are copies of <em>one</em> parameter set, so the gradient for <span class="m">$W_h$</span> is the <em>sum</em> of the contributions from every time step, just as a CNN filter's gradient sums over every image position it touched. The trouble BPTT runs into, long products of local derivatives shrinking or blowing up (Fig 3.2), is not a flaw in the algorithm either; it is a property of the graph's long-chain shape. Backprop faithfully computes a gradient that happens to be tiny or huge.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the sequence-model story: memory beyond the window. A hidden state carries a learned summary forward under one shared update rule; training it means backprop on the unrolled graph, where long products make gradients vanish or explode; clipping contains the explosions; gates and a cell state make memory selective enough to last; and chained cells give us bidirectional readers, stacked feature extractors, and encoder-decoder translators, whose single-vector handoff is the last bottleneck standing. The next lecture stops trying to preserve the past and starts retrieving it: attention, and the transformer.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../language-models/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 13: Language Models</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../attention-transformers/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 15: Attention and Transformers</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 14 &middot; Sequence Models</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

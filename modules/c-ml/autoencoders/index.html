@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autoencoders and Variational Autoencoders — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on autoencoders and variational autoencoders: from PCA's fixed encoder/decoder to learned, nonlinear, and deep autoencoders, sparse and denoising variants, the latent-space failure modes, and the VAE with the reparameterization trick and KL regularization.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 19 &middot; The ML Bible</div>
+  <h1>Autoencoders and Variational Autoencoders</h1>
+  <p class="lede">
+    The PCA lecture ended with a machine: an encoder that squeezes data down
+    to K numbers and a decoder that rebuilds it, both fixed by an eigenvector
+    computation. This closing lesson asks the obvious next question. What if
+    we learned the encoder and decoder instead, and let them curve? The answer
+    is the autoencoder, a network that invents its own compression. And then
+    we push one step further, to the strangest idea in the course: if the
+    compressed space is smooth enough, you can throw away the encoder, sample
+    a random point, decode it, and get data that never existed. A network
+    trained only to copy its input becomes a machine that generates. This
+    lesson builds that machine from the PCA you already know.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: learn the compression</a></li>
+    <li><a href="#sec-pca-to-ae">From PCA to autoencoders</a></li>
+    <li><a href="#sec-linear">Linear, nonlinear, deep</a></li>
+    <li><a href="#sec-variants">Uses and variants: compression, sparse, denoising</a></li>
+    <li><a href="#sec-fallshort">Why deterministic autoencoders fall short</a></li>
+    <li><a href="#sec-prob">Probabilistic autoencoders</a></li>
+    <li><a href="#sec-vae">The variational autoencoder</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: learn the compression</h2>
+
+<p>
+Start with the machine we are going to spend the whole lesson refining. Eight
+numbers go in on the left. They get squeezed through a narrow waist, K
+numbers wide, and then rebuilt on the right. The network's only job is to
+make the output match the input. That sounds like a pointless exercise,
+copying, until you notice the waist: if K is smaller than 8, the network
+cannot copy. It is forced to find a K-number summary good enough to rebuild
+from. Play with the waist:
+</p>
+
+<div class="figure" id="fig-arch">
+  <div class="fig-mount" data-fig="arch"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the encoder-bottleneck-decoder machine, this lesson's signature shape. Input <span class="m">$x$</span> flows through the encoder <span class="m">$f$</span>, narrows to the latent code <span class="m">$z$</span>, and the decoder <span class="m">$g_\theta$</span> rebuilds <span class="m">$\tilde{x}$</span>. The reconstruction error is computed live over a real 160-sample dataset (its 8&times;8 covariance is eigendecomposed in your browser), so tightening K genuinely costs error and widening K genuinely buys it back. <!-- flagged addition: the smooth-signal dataset behind this figure is synthetic and of my design; the source specifies the architecture and the bottleneck's role, not a demo dataset. --></p>
+</div>
+
+<p>
+Two things to hold onto from that toy. First, the error readout: the quality
+of a compression is measured by how well you can <em>reconstruct</em> the
+input from it, the exact criterion PCA used. Second, the shape: input tied to
+output, with a bottleneck in the middle. Everything in this lesson, including
+the generative finale, is a variation on that shape. Where we end up is worth
+stating now, so you can watch it approach: by section 6 the latent space in
+the middle will be so well organized that we can <em>sample</em> a
+<span class="m">$z$</span> from a plain Gaussian, decode it, and get a
+convincing new data point. Compression first, generation last. Here is the
+road between them.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. FROM PCA TO AUTOENCODERS ═══════════════════ -->
+<section id="sec-pca-to-ae">
+<h2><span class="secnum">1.</span> From PCA to autoencoders</h2>
+
+<p>
+First, the vocabulary this lesson runs on. Each term gets its precise
+meaning before we use it:
+</p>
+
+<dl class="deflist">
+  <dt>Autoencoder (AE)</dt>
+  <dd>A network trained to reconstruct its input through a smaller bottleneck.</dd>
+  <dt>Encoder <span class="m">$f$</span></dt>
+  <dd>Maps the input to a latent code: <span class="m">$z = f(x)$</span>.</dd>
+  <dt>Decoder <span class="m">$g_\theta$</span></dt>
+  <dd>Maps the code back to a reconstruction: <span class="m">$\tilde{x} = g_\theta(z)$</span>.</dd>
+  <dt>Bottleneck / latent</dt>
+  <dd>The low-dimensional layer in the middle that forces compression.</dd>
+  <dt>Reconstruction loss</dt>
+  <dd>How far the output is from the input; the training signal.</dd>
+  <dt>Variational autoencoder (VAE)</dt>
+  <dd>An autoencoder whose encoder outputs a <em>distribution</em> over latent codes, not a single code.</dd>
+  <dt>KL divergence</dt>
+  <dd>A regularizer pulling the latent distribution toward a standard normal.</dd>
+  <dt>Reparameterization trick</dt>
+  <dd>Writing a sampled latent as <span class="m">$\mu + \sigma \odot \epsilon$</span> so gradients can flow through the sampling step.</dd>
+</dl>
+
+<h3>PCA was already an autoencoder</h3>
+
+<p>
+Look back at what the last lecture built. Given centered data, PCA picks the
+top K eigenvectors <span class="m">$U_K$</span> of the covariance matrix and
+then runs every point through two maps:
+</p>
+
+$$ z = U_K^\top (x - \bar{x}), \qquad
+   \tilde{x} = \bar{x} + U_K z = \bar{x} + U_K U_K^\top (x - \bar{x}). $$
+
+<p>
+Read the two maps by their roles. The first one compresses: D numbers become
+K coordinates along the principal directions. The second one rebuilds: those
+K coordinates become a D-dimensional point again. Encoder, decoder. And PCA's
+guarantee, from last lecture, is that among <em>all</em> K-dimensional linear
+subspaces, this pair minimizes the squared reconstruction error, leaving
+exactly <span class="m">$\sum_{i=K+1}^{D} \lambda_i$</span> behind, the sum of
+the discarded eigenvalues.
+</p>
+
+<p>
+So PCA is an autoencoder whose encoder and decoder were <em>derived</em>, not
+learned: write down the covariance, take eigenvectors, done. That derivation
+is also a cage. The encoder must be linear. The decoder must be linear. The
+subspace must be flat. Here is the whole strategic move of this lesson: keep
+the objective, free the maps. Replace the fixed matrices with learned
+functions <span class="m">$z = f(x)$</span> and
+<span class="m">$\tilde{x} = g_\theta(z)$</span>, and train them, by
+backpropagation like any network from Lecture 10, to minimize the same
+quantity PCA minimized:
+</p>
+
+$$ \min_{f,\, g_\theta}\; \frac{1}{N}\sum_{n=1}^{N}
+   \big\lVert x^{(n)} - g_\theta\!\big(f(x^{(n)})\big) \big\rVert_2^2. $$
+
+<p>
+In code, the whole idea is a few honest lines. Nothing here runs against a
+framework; it is the shape of the thing:
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def encode(x, W_f):              # z = f(x): squeeze D numbers into K
+    return sigmoid(W_f @ x)
+
+def decode(z, W_g):              # x_tilde = g_theta(z): rebuild K back to D
+    return sigmoid(W_g @ z)
+
+def recon_loss(X, W_f, W_g):     # (1/N) * sum ||x - g(f(x))||^2
+    err = 0.0
+    for x in X:
+        x_tilde = decode(encode(x, W_f), W_g)
+        err += np.sum((x - x_tilde) ** 2)
+    return err / len(X)          # minimize this by backprop</code></pre>
+
+<h3>The bottleneck is the entire trick</h3>
+
+<p>
+One question should be nagging you. If <span class="m">$f$</span> and
+<span class="m">$g_\theta$</span> are flexible networks, why would they not
+just learn the identity function and copy <span class="m">$x$</span> straight
+through with zero loss? Because the architecture makes copying impossible:
+the code <span class="m">$z$</span> lives in fewer dimensions than
+<span class="m">$x$</span>. You cannot store 8 independent numbers in 2. The
+bottleneck is what turns "copy your input" from a triviality into a
+compression problem, and every variant in this lesson keeps some version of
+that constraint. Squeezing through the waist is the point; the reconstruction
+is just how we check what survived the squeeze.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">An autoencoder's encoder and decoder are deep, flexible networks. What stops the pair from learning the useless identity map <span class="m">$\tilde{x} = x$</span>?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Careful early stopping: we halt training before it can memorize</button>
+    <button data-k="b">The sigmoid activations: nonlinear functions cannot represent the identity</button>
+    <button data-k="c">The bottleneck: <span class="m">$z$</span> has fewer dimensions than <span class="m">$x$</span>, so the information cannot all fit through and the network must choose what to keep</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Early stopping fights overfitting, but even a fully trained autoencoder cannot copy through a bottleneck. The defence is structural, not procedural.</div>
+  <div class="quiz-fb" data-k="b">Nonlinear networks approximate the identity easily on the data region if the widths allow it. The obstruction is not the activation, it is the width.</div>
+  <div class="quiz-fb" data-k="c">Right. With <span class="m">$K &lt; D$</span> the map factors through a K-dimensional space, and no function can carry D independent dimensions through K of them. The network is forced to compress, which is the job we actually wanted done.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. LINEAR, NONLINEAR, DEEP ═══════════════════ -->
+<section id="sec-linear">
+<h2><span class="secnum">2.</span> Linear, nonlinear, deep</h2>
+
+<h3>The linear autoencoder rediscovers PCA</h3>
+
+<p>
+Strip the idea to its simplest version to see what learning buys, and what it
+does not. A <strong>linear autoencoder</strong> uses plain matrices with no
+activations: <span class="m">$z = W_f x$</span>,
+<span class="m">$\tilde{x} = W_g z$</span>, giving the objective
+</p>
+
+$$ \min_{W_f,\, W_g}\; \frac{1}{N} \sum_{n=1}^{N}
+   \big\lVert x^{(n)} - W_g W_f\, x^{(n)} \big\rVert_2^2. $$
+
+<p>
+What does gradient descent find here? Something beautiful: at a global
+optimum, a K-dimensional linear autoencoder on mean-centered data
+reconstructs through exactly the PCA projection,
+</p>
+
+$$ W_g W_f = U_K U_K^\top. $$
+
+<p>
+The network, knowing nothing about eigenvectors, converges to the same
+subspace the covariance eigendecomposition hands you in closed form. That is
+the sanity check that the learned framework is standing on solid ground: when
+the model class matches PCA's, the optimum matches PCA's answer.
+</p>
+
+<p>
+But there is a wrinkle worth internalizing, because it foreshadows how
+learned representations behave in general. The <em>product</em> is pinned
+down; the <em>factors</em> are not. For any invertible
+<span class="m">$A \in \mathbb{R}^{K \times K}$</span>, the pair
+<span class="m">$W_f = A U_K^\top$</span> and
+<span class="m">$W_g = U_K A^{-1}$</span> gives
+</p>
+
+$$ W_g W_f = U_K A^{-1} A\, U_K^\top = U_K U_K^\top, $$
+
+<p>
+the same projection, the same loss. The factorization is <strong>not
+unique</strong>: infinitely many encoder/decoder pairs are equally optimal,
+and the latent coordinates they produce differ by an arbitrary invertible
+map. PCA's coordinates were special (orthonormal directions, sorted by
+variance); a linear autoencoder's coordinates are that subspace in some
+scrambled basis. Learned codes are useful, not canonical.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: four points, one optimal projection</div>
+  <p>Take the centered dataset <span class="m">$\{(2,2), (-2,-2), (1,-1), (-1,1)\}$</span>. Its covariance matrix (1/N convention) is</p>
+  $$ C = \frac{1}{4}\sum_n x^{(n)} x^{(n)\top}
+     = \begin{bmatrix} 2.5 & 1.5 \\ 1.5 & 2.5 \end{bmatrix},
+     \qquad \lambda_1 = 4,\; \lambda_2 = 1,\qquad
+     u_1 = \tfrac{1}{\sqrt{2}}\begin{bmatrix}1\\1\end{bmatrix}. $$
+  <p>With K = 1 the optimal product is</p>
+  $$ U_1 U_1^\top = \begin{bmatrix} 0.5 & 0.5 \\ 0.5 & 0.5 \end{bmatrix}. $$
+  <p>Check it: <span class="m">$(2,2)$</span> projects to <span class="m">$(2,2)$</span>, error 0. <span class="m">$(1,-1)$</span> projects to <span class="m">$(0,0)$</span>, squared error 2. Average over the four points: <span class="m">$(0 + 0 + 2 + 2)/4 = 1 = \lambda_2$</span>, exactly the discarded eigenvalue, as the PCA error formula promised.</p>
+  <p>Non-uniqueness, concretely: <span class="m">$W_f = [0.707, 0.707]$</span> with <span class="m">$W_g = [0.707, 0.707]^\top$</span> is optimal. So is <span class="m">$W_f = [1.414, 1.414]$</span> with <span class="m">$W_g = [0.354, 0.354]^\top$</span> (that is <span class="m">$A = 2$</span>). Multiply either pair: the same matrix of 0.5s. The code doubles, the decoder halves, the reconstruction never notices.</p>
+</div>
+
+<div class="figure" id="fig-linearpca">
+  <div class="fig-mount" data-fig="linearpca"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> gradient descent on a real linear autoencoder, running in your browser. The orange subspace starts at a random init and rotates onto the dashed green PCA direction as you train; the matrix panel shows <span class="m">$W_g W_f$</span> converging entry by entry to <span class="m">$U_1 U_1^\top$</span>, and the loss converging to <span class="m">$\lambda_2$</span>. Then slide the refactor <span class="m">$A$</span>: both factors change, the product does not move. Non-uniqueness, live.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A trained linear autoencoder with bottleneck K reaches its global optimum on centered data. What did it learn, and is the answer unique?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It learns <span class="m">$W_f = U_K^\top$</span> and <span class="m">$W_g = U_K$</span> exactly; both factors are unique</button>
+    <button data-k="b">The product <span class="m">$W_g W_f$</span> equals the PCA projection <span class="m">$U_K U_K^\top$</span>, but the factors are free: any invertible <span class="m">$A$</span> gives an equally optimal <span class="m">$W_f = AU_K^\top$</span>, <span class="m">$W_g = U_K A^{-1}$</span></button>
+    <button data-k="c">It learns a different, better subspace than PCA, because gradient descent explores more options</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That pair is <em>one</em> optimum, but nothing in the loss prefers it. The loss only sees the product, so anything that leaves <span class="m">$W_gW_f$</span> unchanged is equally good, which is exactly what the <span class="m">$A$</span> slider in Fig 1.1 exploits.</div>
+  <div class="quiz-fb" data-k="b">Right. The subspace and the projection are pinned; the coordinate system inside the bottleneck is not. That is why two training runs give different-looking codes for the same data, and why learned latent coordinates are generally less interpretable than PCA's.</div>
+  <div class="quiz-fb" data-k="c">There is no better linear subspace to find: PCA is provably optimal among them. A linear autoencoder can at best tie it, which is precisely what makes the equivalence a useful sanity check.</div>
+</div>
+
+<h3>Nonlinear: the payoff for learning</h3>
+
+<p>
+If a linear autoencoder can only ever tie PCA, why learn at all? Because the
+moment we add activations, the tie breaks. A <strong>nonlinear
+autoencoder</strong> passes each layer through a squashing function:
+</p>
+
+$$ z = f(x) = \sigma(W_f x), \qquad \tilde{x} = g_\theta(z) = \sigma(W_g z), $$
+
+<p>
+with <span class="m">$\sigma$</span> a sigmoid, tanh, or ReLU, the same
+nonlinearities that let MLPs escape linear decision boundaries in Lecture 9.
+The geometric consequence is the headline of this section. PCA learns the
+best flat K-dimensional <em>subspace</em>. A nonlinear autoencoder learns a
+curved K-dimensional <em>manifold</em>: a bent, data-shaped surface. If your
+data hugs a curve, a flat model pays for every bend, and a curved model
+follows it. Watch the errors:
+</p>
+
+<div class="figure" id="fig-manifold">
+  <div class="fig-mount" data-fig="manifold"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> flat subspace against curved manifold, both with K = 1 and both errors computed live. As you bend the data, PCA's best line (recomputed each frame from the actual covariance) is forced to cut across the arc, while the curved model (a circle fitted by least squares, standing in for a nonlinear autoencoder's learned manifold) keeps hugging it. Same latent dimension, wildly different error, and the ratio readout keeps score. <!-- flagged addition: the curved "autoencoder" here is an analytically fitted circle rather than a trained MLP, so the manifold-vs-subspace geometry is exact and reproducible; the source's claim being illustrated (curved K-dim manifold vs flat K-dim subspace) is unchanged. --></p>
+</div>
+
+<p>
+What does nonlinearity cost? PCA had a closed-form global solution and
+orthogonal, variance-sorted, interpretable coordinates. The nonlinear
+problem is non-convex: no closed form, no guarantee gradient descent finds
+the global optimum, and the latent coordinates that emerge are whatever the
+optimizer wandered into, generally less interpretable. That is the standing
+trade of this lesson: <strong>expressiveness up, guarantees and
+interpretability down.</strong> You saw the first symptom already in the
+linear case, where even the best-behaved autoencoder scrambles its
+coordinates by an arbitrary <span class="m">$A$</span>.
+</p>
+
+<h3>Deep: stack the squeeze</h3>
+
+<p>
+Nothing says the encoder must be one layer. A <strong>deep
+autoencoder</strong> composes several:
+</p>
+
+$$ z = f^{L}\!\big(\cdots f^{2}(f^{1}(x))\big), \qquad
+   \tilde{x} = g_{\theta_1}\!\big(g_{\theta_2}(\cdots g_{\theta_L}(z))\big), $$
+
+<p>
+each encoder layer squeezing further, each decoder layer undoing one stage of
+the squeeze. Why stack? For the same reason CNNs stacked in Lecture 11:
+layers buy abstraction. Early layers capture low-level regularities, later
+layers capture structures of structures, and the innermost code describes
+the input at the most abstract level the network found. The mechanics of
+training are pure Lecture 10: it is one network with a funny shape, and
+backpropagation neither knows nor cares that the target equals the input.
+</p>
+
+<details class="check">
+  <summary>Check: when would you actually prefer PCA to a deep autoencoder?</summary>
+  <div>
+    <p>A deep nonlinear autoencoder is strictly more expressive than PCA. Why would a sane practitioner still reach for PCA first?</p>
+    <p><b>Answer.</b> Expressiveness is not free. PCA gives a convex, closed-form, deterministic answer in one eigendecomposition: no learning rate, no initialization luck, no non-convex landscape, and coordinates you can read (direction of most variance, second most, and so on, each with a variance number attached). If the data is near a flat subspace, PCA ties the autoencoder at a fraction of the cost, and Fig 2.1's low-bend regime shows exactly that: the curved model's advantage only appears when the manifold actually bends. The autoencoder earns its complexity when the structure is genuinely nonlinear, when you have the data and compute to train it, and when you need the latent for downstream tasks more than you need to explain it. A good habit: run PCA first, look at the reconstruction error curve, and let the gap between PCA and a small autoencoder tell you whether the manifold is curved enough to bother.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. VARIANTS ═══════════════════ -->
+<section id="sec-variants">
+<h2><span class="secnum">3.</span> Uses and variants: compression, sparse, denoising</h2>
+
+<p>
+Once you can train a network to reconstruct, several practical machines fall
+out of the same template. Each variant keeps the encoder-bottleneck-decoder
+shape and changes one thing: what is constrained, or what is corrupted.
+</p>
+
+<h3>Compression</h3>
+
+<p>
+The straightest use: compress the representation while losing as little
+information as possible, and test the compression by how well the input
+reconstructs, which is the loss we already train on. This applies wherever
+the data has structure to exploit: images, video, speech. For images and
+video specifically, a <strong>convolutional autoencoder</strong> swaps the
+dense layers for convolutions on the way down and the mirror operation on
+the way up, adapting the architecture to the data exactly as Lecture 11's
+CNNs did for classification. And note, once more, what prevents the network
+from cheating its way to perfect reconstruction: the bottleneck. The
+identity function is not available; a summary must be.
+</p>
+
+<h3>Sparse autoencoders</h3>
+
+<p>
+A <strong>sparse autoencoder</strong> constrains the latent
+<em>activations</em> rather than shrinking the layer: it encourages most
+coordinates of each code <span class="m">$z^{(n)} = f(x^{(n)})$</span> to be
+zero. Read that carefully, because the target of the constraint is the
+defining detail: the penalty acts on the activations
+<span class="m">$z^{(n)}$</span>, per input, not on the weights. A wide
+latent layer where only a few units fire per input is a different kind of
+bottleneck, a budget on how much of the code any single input may use, and
+it pushes each latent coordinate to specialize:
+</p>
+
+<div class="figure" id="fig-sparse">
+  <div class="fig-mount" data-fig="sparse"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> sparsity acting on a real code. The signal below is built from two of eight decoder atoms; with no penalty, the solved code spreads across several coordinates, and as you raise &lambda; the optimizer (40 iterations of a soft-thresholding solver, run live per frame) pushes coordinates to exactly zero until only the two true atoms survive. Push further and reconstruction visibly degrades. <!-- flagged addition: the bump-atom dictionary and the ISTA solver are my construction for a live, exact demo of "constrain the activations, not the weights"; the sparse-AE concept and its activation-targeting are per the source. --></p>
+</div>
+
+<h3>Denoising autoencoders</h3>
+
+<p>
+A <strong>denoising autoencoder</strong> flips the direction of the problem.
+Instead of protecting a clean input from a bottleneck, it receives a
+corrupted input <span class="m">$\tilde{x}$</span>, a noisy version of some
+clean <span class="m">$x$</span> it never sees, and must output the clean
+<span class="m">$x$</span>. Training needs pairs of noisy and clean data,
+and here is the practical trick: when no such pairs exist, <em>simulate the
+corruption yourself</em>. Take clean training data, add noise to it, feed
+the noisy version in, and penalize distance to the clean original. The
+network learns to invert the corruption process. And there is a precise
+statement of what the ideal denoiser computes: under squared loss, the
+optimal prediction is the conditional expectation
+<span class="m">$\mathbb{E}[x \mid \tilde{x}]$</span>, the average of all
+clean signals that could have produced this corruption.
+</p>
+
+<div class="figure" id="fig-denoise">
+  <div class="fig-mount" data-fig="denoise"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> denoising as projection back onto the clean family. The clean signal (dashed grey) lives in a 2-parameter family; you corrupt it with the noise slider (red), and the denoiser maps the corruption back to the nearest family member (orange), computed live by least squares. The readouts compare the corruption's error against the denoised output's error: most of the noise is simply gone, because noise has no room to survive in a 2-parameter code. <!-- flagged addition: the sinusoid family is a synthetic stand-in dataset; the denoising setup, the simulate-the-corruption training recipe, and the E[x | x-tilde] statement are per the source. --></p>
+</div>
+
+<details class="check">
+  <summary>Check: why does the denoiser output E[x | x&#771;], and what does that imply?</summary>
+  <div>
+    <p>The claim: under squared loss, the best possible denoiser outputs <span class="m">$\mathbb{E}[x \mid \tilde{x}]$</span>. Where does that come from, and when is it a weakness?</p>
+    <p><b>Answer.</b> Fix a corrupted observation <span class="m">$\tilde{x}$</span> and ask which single output <span class="m">$a$</span> minimizes the expected squared error <span class="m">$\mathbb{E}[\lVert x - a\rVert^2 \mid \tilde{x}]$</span> over the clean signals that could have produced it. Expanding the square and setting the derivative to zero gives <span class="m">$a = \mathbb{E}[x \mid \tilde{x}]$</span>: the conditional mean. That is why denoising works at all, and also where its characteristic artifact comes from: when several distinct clean signals are all plausible explanations, the optimal answer is their <em>average</em>, which can be a blur that looks like none of them. Averages of sharp things are smooth things. Keep that failure in your pocket: the same "collapse many possibilities to one point" problem returns in section 4 as a core criticism of deterministic autoencoders, and distributions, not points, will be the fix.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 4. WHY DETERMINISTIC AEs FALL SHORT ═══════════════════ -->
+<section id="sec-fallshort">
+<h2><span class="secnum">4.</span> Why deterministic autoencoders fall short</h2>
+
+<p>
+Everything so far maps each input to a <em>single</em> latent point:
+<span class="m">$z = f(x)$</span>, one arrow, one destination. That design
+choice looks innocent and causes three distinct problems, and it pays to
+name all three precisely, because the VAE is engineered to answer each one.
+</p>
+
+<ol>
+  <li>
+    <strong>Proximity mismatch.</strong> Nothing in the reconstruction loss
+    makes the latent map respect distances: two inputs can be close,
+    <span class="m">$\lVert x^{(1)} - x^{(2)} \rVert$</span> small, while
+    their codes <span class="m">$\lVert f(x^{(1)}) - f(x^{(2)}) \rVert$</span>
+    end up far apart, and vice versa. The latent geometry is an accident of
+    training, so "nearby in latent space" does not reliably mean "similar".
+  </li>
+  <li>
+    <strong>No uncertainty.</strong> Some inputs are genuinely ambiguous:
+    several quite different reconstructions would each be plausible. A
+    deterministic autoencoder cannot say so. It collapses every possibility
+    to the one point <span class="m">$\tilde{x} = g_\theta(f(x))$</span>,
+    the same collapse-to-average failure the denoising check just showed.
+  </li>
+  <li>
+    <strong>A disjointed latent space.</strong> The encoder only ever places
+    codes where training data lands, so codes clump into islands with voids
+    between them. Sample a latent point from any simple distribution and it
+    almost surely falls in a void, off the data manifold, and the decoder,
+    which never trained there, produces garbage.
+  </li>
+</ol>
+
+<p>
+The third failure is the one that kills the dream from the hook. We wanted to
+sample codes and decode them into new data. Try it yourself; the void is
+clickable:
+</p>
+
+<div class="figure" id="fig-gaps">
+  <div class="fig-mount" data-fig="gaps"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the disjointed latent space, live. The scatter shows the 2-D codes a deterministic autoencoder assigns to three families of synthetic glyphs; drag the probe (or use the arrow keys) and every position decodes on the right in real time. Inside a cluster the decode is a clean glyph; in the gaps the decoder splices families into shapes no training input ever had, and the blend-weight bars show exactly why. <!-- flagged addition: the glyph families and the proximity-blend decoder are a constructed toy standing in for a trained decoder, so the geometry and every decode are exactly computable; the three failure modes illustrated are per the source. --></p>
+</div>
+
+<p>
+The fix, previewed in one sentence so you can hold it while the machinery
+arrives: a <strong>VAE makes every point wider</strong>. Instead of a single
+latent vector, each input maps to a whole <em>distribution</em> over latent
+vectors. Wide, overlapping codes give the decoder room to generalize between
+training points, and, if we also herd all those distributions toward one
+agreed shape, they fill the voids, giving us a latent space we can finally
+sample from.
+</p>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Name the three failure modes of a deterministic autoencoder's latent space, and the single design change a VAE makes to address them.</p>
+  <div class="quiz-opts">
+    <button data-k="a">Proximity mismatch, no uncertainty, and a disjointed latent space full of gaps; the VAE encodes each input as a distribution rather than a point</button>
+    <button data-k="b">Overfitting, underfitting, and vanishing gradients; the VAE fixes them with a deeper decoder</button>
+    <button data-k="c">Slow training, large models, and poor compression; the VAE fixes them with a smaller bottleneck</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. And the mapping from problem to fix is direct: wide overlapping codes force nearby latents to decode similarly (proximity), a distribution expresses ambiguity (uncertainty), and blobs plus the coming KL pull fill the voids (disjointedness).</div>
+  <div class="quiz-fb" data-k="b">Those are generic deep-learning ailments, not the latent-space failures at issue. The problems here persist even if training goes perfectly: they are properties of point-encoding itself.</div>
+  <div class="quiz-fb" data-k="c">A deterministic autoencoder can already compress well; Fig 4.1's codes reconstruct their own inputs fine. The failures appear <em>between</em> the codes, exactly where compression never looks and generation must.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. PROBABILISTIC AUTOENCODERS ═══════════════════ -->
+<section id="sec-prob">
+<h2><span class="secnum">5.</span> Probabilistic autoencoders</h2>
+
+<p>
+To encode a distribution, first make the encoder and decoder speak
+probability. A <strong>probabilistic autoencoder</strong> turns both maps
+into conditional distributions:
+</p>
+
+$$ f:\; p(z \mid x;\, W_f), \qquad g_\theta:\; p(\tilde{x} \mid z;\, W_g). $$
+
+<p>
+Mechanically the networks barely change. The layers compute exactly as
+before; what changes is how we <em>read the outputs</em>. The
+post-activation values are no longer the code itself, they are the
+<em>parameters</em> of a distribution over codes. Two standard readings,
+matching the two activation families you know:
+</p>
+
+<ul>
+  <li><strong>Sigmoidal activations</strong>: each output lies in <span class="m">$(0,1)$</span> and is read as the parameter of a Bernoulli conditional, for binary-valued <span class="m">$z$</span> and <span class="m">$\tilde{x}$</span>: the unit outputs the probability that its bit is on.</li>
+  <li><strong>Linear (identity) activations</strong>: outputs are unconstrained reals, read as the parameters of a Gaussian conditional, for real-valued <span class="m">$z$</span> and <span class="m">$\tilde{x}$</span>: means (and variances) of normal distributions.</li>
+</ul>
+
+<p>
+The Gaussian reading is the one the VAE runs on: the encoder emits a mean
+vector <span class="m">$\mu$</span> and a spread vector
+<span class="m">$\sigma$</span>, and together they define
+<span class="m">$q(z) = \mathcal{N}(\mu, \operatorname{diag}(\sigma^2))$</span>,
+a little Gaussian blob in latent space, one per input. This is "make each
+point wider" made literal, and it is worth seeing before any loss function:
+</p>
+
+<div class="figure" id="fig-pointdist">
+  <div class="fig-mount" data-fig="pointdist"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> point encoder versus distribution encoder on the same data. Toggle to distributions and every code becomes a Gaussian <span class="m">$\mathcal{N}(\mu, \sigma^2 I)$</span>; widen &sigma; and the blobs overlap and tile the space between clusters. The coverage readout is computed from the actual mixture density on a grid, and the average KL to <span class="m">$\mathcal{N}(0, I)$</span> is computed from the closed form introduced in section 6.</p>
+</div>
+
+<p>
+Blobs alone are half the answer. Wide codes give the decoder room to
+generalize, but nothing yet forces the blobs to sit anywhere sensible: they
+could drift apart and recreate the same voids, just fuzzier. The missing
+ingredient is a rule about <em>where</em> the blobs must collectively live.
+That rule is the VAE's second loss term, and it is where we go now.
+</p>
+</section>
+
+<!-- ═══════════════════ 6. THE VAE ═══════════════════ -->
+<section id="sec-vae">
+<h2><span class="secnum">6.</span> The variational autoencoder</h2>
+
+<p>
+A <strong>variational autoencoder</strong> (Kingma and Welling; Max Welling
+is this lecture's scientist, a central figure in variational inference and
+deep learning) puts the pieces together.
+<!-- flagged addition: the source names Max Welling as the lecture's scientist and
+     co-author of the VAE; naming Kingma as the other co-author is added context. --> The encoder outputs a distribution
+<span class="m">$q(z)$</span> meant to approximate the true posterior
+<span class="m">$p(z \mid x)$</span>, and the whole model trains end to end
+by balancing two objectives at once:
+</p>
+
+<ul>
+  <li><strong>Reconstruction loss</strong>: decode a latent drawn from <span class="m">$q$</span> and keep the output close to the input. This is the old objective; it keeps the code informative.</li>
+  <li><strong>Regularization loss (KL divergence)</strong>: keep each <span class="m">$q(z)$</span> close to the standard normal <span class="m">$\mathcal{N}(0, I)$</span>. This is the new one; it keeps the latent space smooth, centred, and gap-free.</li>
+</ul>
+
+<h3>Why the KL term? Because of how we want to generate</h3>
+
+<p>
+The KL term looks arbitrary until you start from the goal. To
+<strong>generate</strong>, we treat the decoder as a generative model: draw
+<span class="m">$z \sim p(z)$</span> from some simple prior, then draw
+<span class="m">$x \sim p(x \mid z;\, W_g)$</span>. Notice what we cannot
+use: <span class="m">$p(z \mid x)$</span>. Generating from the posterior
+would require feeding in a real <span class="m">$x$</span>, and the output
+would be a lightly remixed copy of that <span class="m">$x$</span>, which is
+not generation, and is a privacy problem besides if the training data is
+sensitive. We need a <span class="m">$z$</span> that is
+<em>unconditioned</em> on any real input.
+</p>
+
+<p>
+So here is the trick, and it is the conceptual heart of the VAE. During
+training, pull every encoder distribution
+<span class="m">$p(z \mid x;\, W_f)$</span> toward one fixed target,
+<span class="m">$\mathcal{N}(z;\, 0, I)$</span>. If training succeeds, the
+codes of the whole dataset collectively fill a standard Gaussian ball, and
+then we are entitled to declare <span class="m">$p(z) = \mathcal{N}(0, I)$</span>
+and sample from it, with no encoder and no <span class="m">$x$</span> in
+sight. Every sample lands where <em>some</em> training input's blob lives,
+so the decoder is never asked to decode a void. The model ties the two
+stages together through the marginal likelihood, which integrates over the
+latent:
+</p>
+
+$$ p(x^{(n)};\, W_f, W_g) \;=\; \int_z\, p(x^{(n)} \mid z;\, W_g)\;
+   p(z \mid x^{(n)};\, W_f)\; dz. $$
+
+<p>
+For the diagonal Gaussians a VAE uses, the KL penalty has a clean closed
+form per latent dimension:
+<!-- flagged addition: the source names the KL regularizer toward N(0, I) but does not
+     print this standard closed form; it is included (and used by the figures and the
+     code below) because it is how the term is actually computed. -->
+</p>
+
+$$ \mathrm{KL}\big(\mathcal{N}(\mu, \operatorname{diag}(\sigma^2)) \,\big\|\, \mathcal{N}(0, I)\big)
+   = \tfrac{1}{2}\sum_{k=1}^{K}\big(\mu_k^2 + \sigma_k^2 - 1 - \ln \sigma_k^2\big), $$
+
+<p>
+which is zero exactly when <span class="m">$\mu = 0$</span> and
+<span class="m">$\sigma = 1$</span>, and grows as codes drift from the
+origin (<span class="m">$\mu_k^2$</span>) or as blobs get overconfident
+(<span class="m">$\sigma_k \to 0$</span> blows up
+<span class="m">$-\ln \sigma_k^2$</span>). Now feel the two losses fight.
+Reconstruction wants blobs far apart and narrow, each input keeping its own
+private, precise code. The KL wants every blob centred on the origin with
+unit width, all inputs sharing one big Gaussian. Training is the
+negotiation, and the balance point decides what kind of machine you get:
+</p>
+
+<div class="figure" id="fig-kltrade">
+  <div class="fig-mount" data-fig="kltrade"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the reconstruction-KL negotiation on the glyph world, with every number computed live: the average closed-form KL, the pixel-space reconstruction error of decoding the code means <span class="m">$\mu$</span>, and the fraction of 220 fresh <span class="m">$\mathcal{N}(0, I)$</span> samples that decode onto the data manifold. At low &beta; reconstructions are crisp and generations are garbage; at high &beta; every prior sample decodes plausibly and reconstructions blur as families overlap. The dashed rings are the target prior. <!-- flagged addition: the beta slider morphs a constructed latent layout between the deterministic and prior-matched regimes rather than retraining a network per frame; the trade-off it exposes (KL weight vs generation quality vs reconstruction accuracy, per assignment Q5.4/Q5.5) is the source's. --></p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Your classmate says: "the KL term is just a regularizer to stop overfitting, like weight decay." What is the better story?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Correct as stated: KL and weight decay play the same role</button>
+    <button data-k="b">The KL term is what makes the VAE generative at all: it herds every <span class="m">$q(z \mid x)$</span> toward <span class="m">$\mathcal{N}(0, I)$</span>, so that after training the prior really is where codes live and sampling <span class="m">$z \sim \mathcal{N}(0, I)$</span> yields decodable latents; the cost is blurrier reconstructions</button>
+    <button data-k="c">The KL term speeds up convergence by keeping gradients small early in training</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Weight decay shrinks parameters; the KL shapes the <em>latent distribution itself</em>, toward a specific target chosen because we intend to sample from it later. Drop weight decay and a classifier still classifies; drop the KL and a VAE stops being a generator, which Fig 6.1's low-&beta; end shows directly.</div>
+  <div class="quiz-fb" data-k="b">Right, and say the trade-off out loud: more KL weight buys a smoother, prior-matched, sampleable latent (better generation) at the price of reconstruction accuracy, and less buys the reverse. A VAE without the KL term is just a noisy deterministic autoencoder: a compressor, not a generator.</div>
+  <div class="quiz-fb" data-k="c">The KL term typically <em>fights</em> the reconstruction gradient rather than smoothing it. Its purpose is structural, aligning the latent with the prior you will sample from, not an optimization convenience.</div>
+</div>
+
+<h3>The reparameterization trick</h3>
+
+<p>
+One engineering obstacle remains, and it sits right in the middle of the
+forward pass. Training needs backpropagation from the reconstruction loss
+back to the encoder's outputs <span class="m">$\mu$</span> and
+<span class="m">$\sigma$</span>. But between them and the decoder there is a
+<em>sampling</em> step, draw <span class="m">$z$</span> from
+<span class="m">$\mathcal{N}(\mu, \sigma^2)$</span>, and a random draw is
+not a differentiable function: there is no gradient of "roll the dice"
+with respect to the dice's parameters. The fix is a change of variables so
+tidy it feels like a card trick. Write the sample as
+</p>
+
+$$ \tilde{z} = \mu + \sigma \odot \epsilon, \qquad \epsilon \sim \mathcal{N}(0, 1). $$
+
+<p>
+Same distribution, different plumbing: scale a standard Gaussian by
+<span class="m">$\sigma$</span>, shift it by <span class="m">$\mu$</span>.
+All the randomness now lives in <span class="m">$\epsilon$</span>, an input
+that no parameter influences, and given <span class="m">$\epsilon$</span>
+the latent is plain arithmetic in <span class="m">$\mu$</span> and
+<span class="m">$\sigma$</span>: differentiable, backprop-friendly. The
+gradient flows through the deterministic path and simply does not need one
+through the noise. At test time, generation reuses the same pipe: sample
+<span class="m">$\epsilon$</span>, decode.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one reparameterized sample and its KL</div>
+  <p>Say the encoder returns <span class="m">$\mu = [0.5, -1.0]$</span> and <span class="m">$\sigma = [0.8, 0.3]$</span>, and we draw <span class="m">$\epsilon = [1.2, -0.5]$</span>. The sample is elementwise:</p>
+  $$ \tilde{z} = \mu + \sigma \odot \epsilon
+     = \begin{bmatrix} 0.5 + 0.8 \times 1.2 \\ -1.0 + 0.3 \times (-0.5) \end{bmatrix}
+     = \begin{bmatrix} 1.46 \\ -1.15 \end{bmatrix}. $$
+  <p>And this input's KL penalty, from the closed form, dimension by dimension:</p>
+  $$ \mathrm{KL} = \tfrac{1}{2}\big(0.5^2 + 0.8^2 - 1 - \ln 0.8^2\big)
+                 + \tfrac{1}{2}\big(1.0^2 + 0.3^2 - 1 - \ln 0.3^2\big)
+                 = 0.168 + 1.249 = 1.417 \text{ nats}. $$
+  <p>Read the two terms: dimension 1 sits near the prior and pays little; dimension 2, with its far mean and narrow spread, pays nine times more. The gradient of this number through <span class="m">$\mu$</span> and <span class="m">$\sigma$</span> is what nudges every blob toward the origin, and it exists precisely because <span class="m">$\tilde{z}$</span> was written as arithmetic rather than as a dice roll.</p>
+</div>
+
+<div class="figure" id="fig-reparam">
+  <div class="fig-mount" data-fig="reparam"></div>
+  <p class="fig-caption"><b>Fig 6.2,</b> the reparameterization trick as geometry. The purple point is <span class="m">$\mu$</span>, the orange ellipses are the 1&sigma; and 2&sigma; contours of <span class="m">$q$</span>, the ghost cloud is 260 real reparameterized draws, and the green arrow is <span class="m">$\sigma \odot \epsilon$</span> carrying you to the red sample <span class="m">$z$</span>. Slide &epsilon; with fixed <span class="m">$\mu, \sigma$</span>: the sample orbits the blob. Slide <span class="m">$\mu$</span> or <span class="m">$\sigma$</span> with fixed &epsilon;: the same noise lands somewhere new, which is exactly the dependence the gradient differentiates. The KL readout updates from the closed form.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why write <span class="m">$z = \mu + \sigma \odot \epsilon$</span> instead of just sampling <span class="m">$z \sim \mathcal{N}(\mu, \sigma^2)$</span> directly inside the network?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The two produce different distributions, and the reparameterized one generates better samples</button>
+    <button data-k="b">Sampling directly is slower, and the trick is a performance optimization</button>
+    <button data-k="c">The distributions are identical, but a direct sampling step has no gradient with respect to <span class="m">$\mu$</span> and <span class="m">$\sigma$</span>; moving the randomness into <span class="m">$\epsilon$</span> makes <span class="m">$z$</span> a deterministic, differentiable function of the encoder's outputs, so backpropagation can train them</button>
+  </div>
+  <div class="quiz-fb" data-k="a">They are the same distribution: scaling a standard normal by &sigma; and shifting by &mu; is the definition of <span class="m">$\mathcal{N}(\mu, \sigma^2)$</span>. The trick changes the computational graph, not the statistics.</div>
+  <div class="quiz-fb" data-k="b">The cost of the two is essentially identical, one Gaussian draw either way. What differs is differentiability, not speed.</div>
+  <div class="quiz-fb" data-k="c">Right. "Roll the dice with parameters &mu;, &sigma;" is a dead end for backprop; "roll a fixed dice, then scale and shift the outcome" gives the same z with a clean gradient path through the scale and the shift. That one line is what makes end-to-end VAE training possible.</div>
+</div>
+
+<h3>The code</h3>
+
+<p>
+The two ideas compress into two small functions. This is the schematic
+NumPy version (a real implementation on images would use convolutional
+encoder layers producing <span class="m">$\mu$</span> and
+<span class="m">$\sigma$</span>, and transposed convolutions in the decoder;
+the loss is the same):
+</p>
+
+<pre class="code" data-lang="python"><code>def reparameterize(mu, sigma):
+    # eps ~ N(0, 1): all the randomness, isolated from the parameters
+    eps = np.random.randn(*np.shape(mu))
+    return mu + sigma * eps          # z: plain arithmetic in mu and sigma
+
+def vae_loss(x, x_hat, mu, sigma):
+    # 1) reconstruction: keep the output close to the input (MSE; BCE also common)
+    recon = np.mean((x - x_hat) ** 2)
+    # 2) regularization: KL( N(mu, diag(sigma^2)) || N(0, I) ), closed form
+    kl = 0.5 * np.sum(mu**2 + sigma**2 - 1 - np.log(sigma**2))
+    return recon + kl                # train end-to-end on the sum</code></pre>
+
+<p>
+Do not just read it. The version below executes the same arithmetic on
+whatever <span class="m">$\mu$</span> and <span class="m">$\sigma$</span>
+you dial in:
+</p>
+
+<div class="figure" id="fig-vaecode">
+  <div class="fig-mount" data-fig="vaecode"></div>
+  <p class="fig-caption"><b>Fig 6.3,</b> a live <code>reparameterize</code> and <code>vae_loss</code>. Press Run: five genuine Box-Muller draws of &epsilon; pass through <span class="m">$z = \mu + \sigma\epsilon$</span> with the printed arithmetic, and the KL term is computed from the closed form. Set &mu; = 0.5, &sigma; = 0.8 to reproduce the worked example's first dimension (KL = 0.168); set &mu; = 0, &sigma; = 1 and watch the KL hit exactly zero.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding: complete the code</div>
+  <p class="quiz-q">A teammate's <code>vae_loss</code> reads <code>kl = 0.5 * np.sum(mu**2 + sigma**2 - 1 - ???)</code>. Which completion is correct, and what does that term do?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><code>np.log(sigma**2)</code>: it rewards keeping &sigma; near 1 and blows up as &sigma; &rarr; 0, punishing overconfident, collapsed blobs</button>
+    <button data-k="b"><code>np.log(mu**2)</code>: it penalizes means far from the origin</button>
+    <button data-k="c"><code>sigma</code>: any decreasing function of &sigma; works the same way</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. With it, the per-dimension term <span class="m">$\tfrac{1}{2}(\mu^2 + \sigma^2 - 1 - \ln\sigma^2)$</span> is exactly zero at &mu; = 0, &sigma; = 1 and positive everywhere else. The <span class="m">$-\ln\sigma^2$</span> piece is the anti-collapse force: without it, the loss would happily shrink every blob to a point and quietly reinvent the deterministic autoencoder, gaps and all.</div>
+  <div class="quiz-fb" data-k="b">The mean penalty is already there, the <code>mu**2</code> term. The missing piece must involve &sigma;, and it must diverge as &sigma; &rarr; 0 to keep blobs from collapsing; log of the variance is what the closed form actually derives.</div>
+  <div class="quiz-fb" data-k="c">The exact form matters: the closed-form KL is <span class="m">$\tfrac{1}{2}(\mu^2 + \sigma^2 - 1 - \ln\sigma^2)$</span>, not a hand-picked penalty. Get it wrong and the minimum is no longer at &sigma; = 1, so trained blobs would not match the prior you intend to sample from.</div>
+</div>
+
+<h3>Generation: the payoff</h3>
+
+<p>
+Now collect the winnings. Train the VAE, then unplug the encoder entirely.
+What remains is: sample <span class="m">$\epsilon$</span>, decode. Because
+the KL term spent all of training herding codes into
+<span class="m">$\mathcal{N}(0, I)$</span>, a fresh Gaussian draw is
+indistinguishable from a real input's code, and the decoder turns it into a
+convincing new sample. The same smoothness buys interpolation: the straight
+line between two codes stays on the manifold, so it decodes into a gradual
+morph rather than the spliced garbage of Fig 4.1.
+</p>
+
+<div class="figure" id="fig-generate">
+  <div class="fig-mount" data-fig="generate"></div>
+  <p class="fig-caption"><b>Fig 6.4,</b> the generative finale on the smoothed (high-&beta;) latent. Left: slide along the straight latent line between a disc code and a cross code; every intermediate decode is computed live and the morph is gradual. Right: each press of Generate draws nine fresh <span class="m">$z \sim \mathcal{N}(0, I)$</span> by Box-Muller and decodes them; green borders mark samples that landed on the data manifold. The encoder is nowhere in this figure. That is the point.</p>
+</div>
+
+<details class="check">
+  <summary>Check: why not generate from p(z | x)? It is right there.</summary>
+  <div>
+    <p>The trained encoder gives a perfectly good distribution <span class="m">$p(z \mid x)$</span>. Why insist on sampling from the unconditional <span class="m">$p(z) = \mathcal{N}(0, I)$</span> instead?</p>
+    <p><b>Answer.</b> Because of what the conditioning does. To sample <span class="m">$p(z \mid x)$</span> you must supply an <span class="m">$x$</span>, a real data point, and the code you draw sits inside that input's little blob. Decode it and you get that input back with minor variation: a paraphrase of a training example, not a new sample. That defeats the purpose (we wanted data that did not exist) and it leaks: if the training data is sensitive, "generate" would emit lightly disguised copies of real records, which is a privacy problem the source flags explicitly. Generation needs a <span class="m">$z$</span> unconditioned on any real input. The entire KL apparatus exists to make that possible: it trains <span class="m">$p(z \mid x;\, W_f)$</span> toward the fixed <span class="m">$\mathcal{N}(0, I)$</span> for every <span class="m">$x$</span>, so that after training, the unconditional prior is a faithful description of where codes live, and sampling it requires no input at all.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">7.</span> Summary and method card</h2>
+
+<p>
+One objective carried the whole lesson: every method here judges its
+representation by reconstruction,
+<span class="m">$\min \sum_i \lVert x^{(i)} - \tilde{x}^{(i)} \rVert^2$</span>
+with <span class="m">$\tilde{x}^{(i)} = g_\theta(f(x^{(i)}))$</span>. What
+changed, step by step, was who <span class="m">$f$</span> and
+<span class="m">$g_\theta$</span> are allowed to be:
+</p>
+
+<div class="method-card">
+  <div class="method-title">The family, side by side</div>
+  <table>
+    <tr><th>PCA</th><td>Encoder <span class="m">$U_{1:K}^\top$</span>, decoder <span class="m">$U_{1:K}$</span>: a fixed orthogonal projection from an eigendecomposition. Closed form, convex, interpretable; flat subspaces only.</td></tr>
+    <tr><th>Linear AE</th><td>Encoder <span class="m">$W_f x$</span>, decoder <span class="m">$W_g z$</span>, both learned, no activations. At its optimum, recovers the PCA subspace: <span class="m">$W_g W_f = U_K U_K^\top$</span>, with a non-unique factorization.</td></tr>
+    <tr><th>Nonlinear AE</th><td>Encoder <span class="m">$f(x)$</span>, decoder <span class="m">$g_\theta(z)$</span>, MLPs with activations. Learns curved K-dimensional manifolds PCA cannot; non-convex, less interpretable, still a point encoder.</td></tr>
+    <tr><th>VAE</th><td>Encoder <span class="m">$q(z \mid x) = \mathcal{N}(\mu, \operatorname{diag}(\sigma^2))$</span>, decoder <span class="m">$p_\theta(x \mid z)$</span>. Trained on the ELBO: reconstruction plus KL to <span class="m">$\mathcal{N}(0, I)$</span>, sampled via <span class="m">$\mu + \sigma \odot \epsilon$</span>. A smooth, sampleable latent: a generative model.</td></tr>
+  </table>
+</div>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Autoencoders &amp; VAEs</div>
+  <table>
+    <tr><th>Assumption</th><td>Data lie near a low-dimensional, possibly curved manifold, and a good code is one you can reconstruct from. For generation: the latent should additionally be smooth and sampleable.</td></tr>
+    <tr><th>Model class</th><td>Learned encoder/decoder networks through a bottleneck; deterministic (AE, with sparse/denoising/convolutional variants) or distributional (VAE).</td></tr>
+    <tr><th>Learning / selection</th><td>Minimize reconstruction loss by backpropagation; for VAEs add the KL term toward <span class="m">$\mathcal{N}(0, I)$</span> and use the reparameterization trick <span class="m">$\tilde{z} = \mu + \sigma \odot \epsilon$</span> to differentiate through the sampling step.</td></tr>
+    <tr><th>Prediction</th><td>Compress: <span class="m">$z = f(x)$</span>. Reconstruct: <span class="m">$\tilde{x} = g_\theta(z)$</span>. Generate (VAE): <span class="m">$z \sim \mathcal{N}(0, I)$</span>, then decode.</td></tr>
+    <tr><th>Strengths</th><td>Nonlinear autoencoders capture curved structure PCA cannot; VAEs give a smooth, sampleable latent space and can generate new data; variants handle denoising and sparse coding with the same template.</td></tr>
+    <tr><th>Limitations</th><td>Non-convex training with no closed-form optimum; codes less interpretable than PCA's; VAEs face a reconstruction-vs-regularization trade-off (too much KL blurs reconstructions, too little breaks generation).</td></tr>
+    <tr><th>Next step</th><td>Broader generative modeling: GANs and diffusion models build directly on this decode-from-noise idea.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: this lesson closes the
+dimensionality-reduction thread that PCA opened, and it closes it by
+changing what dimensionality reduction is <em>for</em>. PCA compressed to
+summarize. The autoencoder learned the compression. The VAE made the
+compressed space itself into an object worth owning: a smooth, complete map
+of the data manifold, where every coordinate decodes to something real.
+Once you have that, generation stops being magic; it is a table lookup in a
+space built for the purpose. The generative models beyond this course,
+GANs, diffusion, all inherit that move.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">8.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to decide and
+justify, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">In one sentence each: what do the encoder, the bottleneck, and the decoder contribute to an autoencoder?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The encoder classifies the input, the bottleneck stores the label, the decoder checks it</button>
+    <button data-k="b">The encoder removes noise, the bottleneck compresses the weights, the decoder regularizes</button>
+    <button data-k="c">The encoder maps the input to a low-dimensional code, the bottleneck forces that code to be smaller than the input so copying is impossible, and the decoder rebuilds the input from the code so reconstruction error can judge what the code kept</button>
+  </div>
+  <div class="quiz-fb" data-k="a">There are no labels anywhere in this lesson: the autoencoder's target is its own input. That self-supervision is what makes the method usable on unlabelled data.</div>
+  <div class="quiz-fb" data-k="b">Denoising is one variant, not the core; and the bottleneck constrains the activations' dimensionality, not the weights. Think compression first.</div>
+  <div class="quiz-fb" data-k="c">Right. Squeeze, forbid copying, rebuild, measure. Every variant in the lesson edits one clause of that sentence.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">A VAE and a deterministic autoencoder have identical architectures except for the latent layer. What two changes turn the AE into the VAE, and what does each buy?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The encoder outputs <span class="m">$(\mu, \sigma)$</span> defining a Gaussian per input rather than a single code (buying overlap, uncertainty, and coverage), and the loss adds a KL term toward <span class="m">$\mathcal{N}(0, I)$</span> (buying a latent you can legitimately sample from)</button>
+    <button data-k="b">The latent gets more dimensions, and the loss switches from MSE to cross-entropy</button>
+    <button data-k="c">The decoder becomes stochastic, and the encoder is discarded after the first epoch</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right, and the division of labour is worth restating: the distribution answers proximity mismatch and missing uncertainty, the KL answers the disjoint latent. Both are needed; blobs without KL drift apart, KL without blobs has nothing to herd.</div>
+  <div class="quiz-fb" data-k="b">Neither the latent width nor the reconstruction flavour (MSE vs BCE) is the distinction; both appear in both models. The distinction is distribution-per-input plus prior-matching.</div>
+  <div class="quiz-fb" data-k="c">The encoder is essential throughout training (it produces &mu; and &sigma;); it is only at <em>generation</em> time that you can leave it unplugged.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): choosing between PCA and a nonlinear autoencoder</summary>
+  <div>
+    <p>You have a new sensor dataset, 200 dimensions, modest sample count, and a manager who wants "the dimensionality reduced". Argue when you would reach for a nonlinear autoencoder over PCA, and what you would check first.</p>
+    <p><b>Answer.</b> Check the shape of the problem before choosing the tool. First run PCA, because it is nearly free: one eigendecomposition, no tuning, and its reconstruction-error curve <span class="m">$\sum_{i&gt;K}\lambda_i$</span> tells you how much structure is linear. If a small K already reconstructs well, stop; PCA wins on every other axis (convexity, determinism, interpretable variance-ranked coordinates, robustness at small sample sizes). Reach for the nonlinear autoencoder when the evidence says the manifold curves: PCA needs a suspiciously large K, or the residuals show systematic structure, or domain knowledge says the degrees of freedom are things like angles and phases, which trace curves, not lines (Fig 2.1 is the cartoon of this). Then be honest about the costs you are accepting: non-convex training that needs data and tuning, codes with no canonical meaning (the factorization is not even unique in the linear case), and a validation-set reconstruction comparison against the PCA baseline to prove the added machinery earned its keep. The autoencoder is the upgrade you buy when the data demands it, not the default.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): a colleague's shortcut generator</summary>
+  <div>
+    <p>A colleague trains a standard (deterministic) autoencoder on customer records, then proposes generating synthetic customers by sampling random latent vectors and decoding them, "like a VAE but simpler". Predict what happens, and explain what the VAE's extra machinery would have bought.</p>
+    <p><b>Answer.</b> Predict garbage, for the exact reason Fig 4.1 makes clickable. A deterministic encoder places codes only where training data lands, so the latent space is islands and voids; a random sampling distribution knows nothing about the islands, so most draws land in voids where the decoder never trained, and decode to blends and splices that match no real customer. Occasionally a draw lands near an island and looks plausible, which makes the failure worse: the output quality is a lottery. There is also no principled sampling distribution to use: with no prior enforced during training, the code cloud has arbitrary location, scale, and shape, so even fitting a Gaussian to the codes afterward leaves the voids inside the cloud untouched. The VAE's machinery answers each piece: encode distributions, not points, so codes claim neighbourhoods and overlap; add the KL term so all that probability mass is herded into <span class="m">$\mathcal{N}(0, I)$</span>, making the sampling distribution and the code distribution the same object by construction; and train the decoder on reparameterized samples <span class="m">$\mu + \sigma\odot\epsilon$</span>, so it has literally practised decoding the kind of z the prior will produce. One caution transfers back: on sensitive records, sampling near a specific training code can still paraphrase a real customer, so the privacy argument for avoiding <span class="m">$p(z \mid x)$</span>-style generation applies to any generator trained on personal data.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): the GMM as a different route to generation</summary>
+  <div>
+    <p>Assignment work in this course also fits Gaussian Mixture Models. A GMM can generate new points and can score any point's log-likelihood. Contrast the GMM route with the VAE route: how does each generate, and what does the GMM's log-likelihood buy that a plain VAE decode does not?</p>
+    <p><b>Answer.</b> Both are generative models, but they put the model in different places. A GMM models the data density directly in input space: <span class="m">$p(x) = \sum_k \pi_k\, \mathcal{N}(x; \mu_k, \Sigma_k)$</span>. Generation is two dice rolls: pick a component by its weight, then draw from that Gaussian. No encoder, no decoder, no latent geometry to engineer; the price is that a mixture of full-dimensional Gaussians struggles when the data hugs a thin curved manifold in a high-dimensional space, exactly the regime autoencoders were built for. The VAE instead models a simple density in <em>latent</em> space and learns a decoder to carry it onto the manifold: sample <span class="m">$z \sim \mathcal{N}(0, I)$</span>, decode. The extra thing the GMM hands you for free is an explicit, computable <span class="m">$\log p(x)$</span> for any query point, which makes it a natural anomaly detector: a record whose log-likelihood sits far below the training distribution's typical values is flagged as not-from-this-distribution. A vanilla VAE gives no such single number cheaply (its likelihood is the intractable integral over z from section 6; reconstruction error is a usable but cruder proxy). Rule of thumb: want density and anomaly scores on moderate-dimensional data, GMM; want realistic samples and a structured latent for high-dimensional, manifold-shaped data, VAE.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That closes the thread. PCA compressed with fixed linear maps and left us one question: what if the maps could learn? The autoencoder answered it, the bottleneck kept the answer honest, sparse and denoising variants put the template to work, and then the latent space's gaps exposed the limit of encoding points at all. Encoding distributions and pinning them to a prior turned the compressor into a generator: sample noise, decode data. The dot product that started this course measured similarity between what exists; the decoder that ends it manufactures things that never did. Compression, pushed far enough, became imagination.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../pca/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 18: Principal Component Analysis</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../clustering/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 20: Clustering, K-Means &amp; GMMs</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 19 &middot; Autoencoders &amp; VAEs</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

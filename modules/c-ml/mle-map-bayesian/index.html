@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLE, MAP &amp; Bayesian Prediction — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on learning probabilistic models: probability versus likelihood, maximum likelihood estimation, priors and posteriors, MAP, conjugacy, and fully Bayesian prediction.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<style>
+/* Lesson-specific additions for Lecture 16 only. lesson.css is the shared
+   file, copied verbatim; these few classes live here so it stays untouched. */
+.num-input {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  width: 64px; padding: 4px 8px; border: 1.5px solid var(--line);
+  border-radius: 6px; background: #fff; color: var(--text);
+}
+.num-input:focus-visible { outline: 2.5px solid var(--accent); outline-offset: 1px; }
+.flip-strip {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  min-height: 34px; margin: 10px 0;
+}
+.flip-chip {
+  font-family: var(--mono); font-size: 13px; font-weight: 800;
+  width: 28px; height: 28px; line-height: 26px; text-align: center;
+  border-radius: 50%; border: 1.5px solid var(--line); background: #fff;
+}
+.flip-chip.h { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.flip-chip.t { border-color: var(--purple); color: var(--purple); background: var(--purple-soft); }
+table.mtx td.pouch-win { outline: 2.5px solid var(--green); outline-offset: -2.5px; font-weight: 800; }
+.legend-row {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: center;
+  font-family: var(--sans); font-size: 12.5px; font-weight: 600; margin-top: 8px;
+}
+.legend-row .lg { display: flex; align-items: center; gap: 6px; }
+.legend-row .sw { width: 14px; height: 3.5px; border-radius: 2px; display: inline-block; }
+</style>
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 16 &middot; The ML Bible</div>
+  <h1>MLE, MAP &amp; Bayesian Prediction</h1>
+  <p class="lede">
+    Flip a coin 100 times and count 55 heads. What is the coin's probability
+    of heads? Every instinct says 0.55, and every instinct is doing maximum
+    likelihood without knowing it. But a second question hides inside the
+    first: how sure are you? A single number cannot answer it. This lesson
+    opens the probabilistic block of the course by building the machinery that
+    can: likelihoods, priors, posteriors, and prediction. We start from one
+    best-guess number, add a prior to get a better-behaved number, and end by
+    refusing to pick a number at all, keeping the entire distribution over
+    parameters and averaging predictions over everything the data has not
+    ruled out. That last move is Bayesian prediction, and it is what saves
+    your model when the data is thin.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: one coin, two questions</a></li>
+    <li><a href="#sec-problik">Probability vs likelihood</a></li>
+    <li><a href="#sec-mle">Maximum likelihood estimation</a></li>
+    <li><a href="#sec-predict">From estimation to prediction</a></li>
+    <li><a href="#sec-map">Priors, posteriors, and MAP</a></li>
+    <li><a href="#sec-bayes">Fully Bayesian prediction</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: one coin, two questions</h2>
+
+<p>
+The transformer capstone closed the neural arc of the course. This lecture
+changes register entirely: no architectures, no gradients on parade, just a
+coin and a question. The question sounds trivial and is not. You flip a coin
+100 times and see 55 heads. Let <span class="m">$\theta$</span> be the
+probability the coin lands heads. What is <span class="m">$\theta$</span>?
+</p>
+
+<p>
+Say 0.55 and you are in good company. But now answer the second question:
+how confident are you? Would you bet at 0.55 after 100 flips? After 10
+flips with 5.5 heads' worth of evidence? Clearly the two situations feel
+different, yet the single number 0.55 is identical in both. Something is
+missing from the answer, and the missing thing is the subject of this
+lecture. The big idea: treat the data
+<span class="m">$D$</span> as generated by a probabilistic model with unknown
+parameters <span class="m">$\theta$</span>, learn
+<span class="m">$\theta$</span> from <span class="m">$D$</span>, then predict
+future observations. We will do that three ways, in increasing order of
+honesty about uncertainty:
+</p>
+
+<ul>
+  <li><strong>Maximum likelihood (MLE)</strong>: pick the single <span class="m">$\theta$</span> that best fits the data. One point, no uncertainty.</li>
+  <li><strong>Maximum a posteriori (MAP)</strong>: pick the single most probable <span class="m">$\theta$</span> given the data <em>and</em> a prior belief. Still one point, but a better-behaved one.</li>
+  <li><strong>Fully Bayesian</strong>: refuse to pick. Keep the whole distribution over <span class="m">$\theta$</span> and average predictions over it.</li>
+</ul>
+
+<p>
+Here is the destination before any derivation. The curve below is a genuine
+posterior distribution over <span class="m">$\theta$</span> for the 55-heads
+data, computed live. The three answers above are three different ways of
+reading the same curve:
+</p>
+
+<div class="figure" id="fig-hook3">
+  <div class="fig-mount" data-fig="hook3"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> where this lesson ends up: the full posterior belief over <span class="m">$\theta$</span> after 55 heads in 100 flips, with the three estimators marked. MLE reads off the likelihood peak, MAP reads off the posterior mode, and the Bayesian predictive reads off the posterior mean. Press the button to flip 100 more tosses from a hidden true coin and watch the curve narrow: more data means less uncertainty, and the three answers squeeze together. Every curve and number is computed, not drawn.</p>
+</div>
+
+<p>
+Notice what the distribution gives you that 0.55 alone never could: width.
+After 100 flips the curve is already fairly tight; after 500 it is a spike.
+The width <em>is</em> the answer to "how sure are you?". The rest of the
+lesson builds this picture from first principles, and the first brick is a
+distinction most people have never been forced to make.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. PROBABILITY VS LIKELIHOOD ═══════════════════ -->
+<section id="sec-problik">
+<h2><span class="secnum">1.</span> Probability vs likelihood</h2>
+
+<p>
+One formula, two readings. For a coin flipped <span class="m">$n$</span>
+times, the Binomial distribution gives the chance of seeing exactly
+<span class="m">$k$</span> heads:
+</p>
+
+$$ p(D = \{n, k\} \mid \theta) = \binom{n}{k}\, \theta^k (1 - \theta)^{n-k}. $$
+
+<p>
+Everything depends on which symbol you treat as the variable and which you
+hold fixed.
+</p>
+
+<p>
+<strong>Probability</strong> fixes the parameter and varies the data. Set
+<span class="m">$\theta = 0.5$</span> and ask: what is the chance of 55
+heads under a fair coin? That is
+<span class="m">$p(D \mid \theta = 0.5)$</span>, a number you get by
+plugging into the formula, and summing it over all possible outcomes
+<span class="m">$k = 0, \dots, n$</span> gives exactly 1, as a distribution
+over data must.
+</p>
+
+<p>
+<strong>Likelihood</strong> fixes the data and varies the parameter. The
+flips already happened: <span class="m">$N_H$</span> heads and
+<span class="m">$N_T$</span> tails are frozen facts. Now read the same
+formula as a function of <span class="m">$\theta$</span>:
+</p>
+
+$$ L(\theta; D) = p(D \mid \theta), $$
+
+<p>
+a curve over <span class="m">$[0, 1]$</span> that scores every candidate
+coin by how well it explains what you saw. Same symbols, opposite roles. And
+one warning before the figure: a likelihood is <em>not</em> a probability
+distribution over <span class="m">$\theta$</span>. Nothing forces its area
+to be 1, and in general it is not. It is a scoring function, full stop.
+Turning it into an honest distribution over
+<span class="m">$\theta$</span> is precisely what Bayes' rule will do for us
+in section 4.
+</p>
+
+<div class="figure" id="fig-problik">
+  <div class="fig-mount" data-fig="problik"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> one Binomial formula, two readings. In the probability view, <span class="m">$\theta$</span> is fixed by the slider and the bars show <span class="m">$p(k \text{ heads} \mid \theta)$</span> over all outcomes; the bars sum to 1 (printed, not asserted). In the likelihood view, the data <span class="m">$(N_H, N_T)$</span> is fixed by the inputs and the curve shows <span class="m">$L(\theta; D)$</span> over every candidate <span class="m">$\theta$</span>; its area is not 1 and the readout says so. Toggle between them until the switch feels mechanical: same formula, different variable held fixed.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A colleague computes <span class="m">$L(\theta = 0.55; D) = 0.048$</span> for the 55-heads data and says "so there is a 4.8% chance the coin's parameter is 0.55". What is wrong?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Nothing: likelihood is the probability of the parameter</button>
+    <button data-k="b">The likelihood is <span class="m">$p(D \mid \theta)$</span>, the probability of the <em>data</em> under that parameter, read as a function of <span class="m">$\theta$</span>; it is not a distribution over <span class="m">$\theta$</span> and its values do not sum or integrate to 1</button>
+    <button data-k="c">The number is simply computed wrong; likelihoods are always larger than probabilities</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That reading needs a distribution over <span class="m">$\theta$</span>, which the likelihood alone is not. Getting an honest <span class="m">$p(\theta \mid D)$</span> requires a prior and Bayes' rule, which is exactly where this lesson is headed.</div>
+  <div class="quiz-fb" data-k="b">Right. 0.048 is the chance of seeing exactly this data if <span class="m">$\theta$</span> were 0.55. Comparing that value across candidate <span class="m">$\theta$</span>'s is meaningful, which is what MLE exploits; reading any single value as "the probability of <span class="m">$\theta$</span>" is not.</div>
+  <div class="quiz-fb" data-k="c">Likelihood values are probabilities of data, so they sit in <span class="m">$[0,1]$</span> here; nothing about the arithmetic is wrong. The error is in the interpretation, not the number.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. MLE ═══════════════════ -->
+<section id="sec-mle">
+<h2><span class="secnum">2.</span> Maximum likelihood estimation</h2>
+
+<h3>The principle, and the log trick</h3>
+
+<p>
+If the likelihood scores every candidate <span class="m">$\theta$</span> by
+how well it explains the data, an obvious learning rule follows: a good
+<span class="m">$\theta$</span> is one that assigns high probability to the
+<span class="m">$D$</span> we actually observed, so pick the maximizer.
+That rule is <strong>maximum likelihood estimation</strong>. For
+<span class="m">$N = N_H + N_T$</span> independent, identically distributed
+coin tosses:
+</p>
+
+$$ L(\theta; D) = \binom{N}{N_H} \theta^{N_H}(1 - \theta)^{N_T}
+   \;\propto\; \theta^{N_H}(1 - \theta)^{N_T}. $$
+
+<p>
+The binomial coefficient does not involve
+<span class="m">$\theta$</span>, so the maximizer ignores it, which is why
+the proportionality is all we keep. In practice nobody maximizes this
+product directly. We maximize its logarithm, the
+<strong>log-likelihood</strong>, for two reasons that will follow you
+through the rest of ML: the log pairs beautifully with the exponentials
+that live inside most distributions, and it turns products over data points
+into sums, which are kinder to both calculus and floating point. Since the
+log is strictly increasing, the maximizer does not move:
+</p>
+
+$$ \ell(\theta) = N_H \log\theta + N_T \log(1 - \theta). $$
+
+<p>
+Try it numerically before any calculus. For
+<span class="m">$N_H = 55, N_T = 45$</span>, evaluate
+<span class="m">$\ell$</span> at a few candidates:
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: scanning the log-likelihood at N_H = 55, N_T = 45</div>
+  <p style="font-family:var(--mono);font-size:14px">
+    &ell;(0.40) = 55 log 0.40 + 45 log 0.60 = &minus;73.38<br>
+    &ell;(0.50) = 55 log 0.50 + 45 log 0.50 = &minus;69.31<br>
+    &ell;(0.55) = 55 log 0.55 + 45 log 0.45 = <b>&minus;68.81</b><br>
+    &ell;(0.60) = 55 log 0.60 + 45 log 0.40 = &minus;69.33<br>
+    &ell;(0.70) = 55 log 0.70 + 45 log 0.30 = &minus;73.80
+  </p>
+  <p>The values are negative (logs of numbers below 1 always are), and bigger is better. The scan peaks at 0.55, exactly the intuitive answer, and the curve falls away on both sides. Drag the same numbers around in the figure below.</p>
+</div>
+
+<p>
+The scan suggests the peak; calculus confirms it. Set the derivative of
+<span class="m">$\ell$</span> to zero:
+</p>
+
+$$ \frac{d\ell}{d\theta} = \frac{N_H}{\theta} - \frac{N_T}{1 - \theta} = 0
+   \;\Rightarrow\; \hat{\theta}_{ML} = \frac{N_H}{N_H + N_T}. $$
+
+<p>
+The maximum likelihood estimate is the empirical fraction of heads. Your
+instinct in the hook was a theorem all along. Feel the geometry of it here:
+the peak of the curve is not a decoration, it is where the derivative
+crosses zero:
+</p>
+
+<div class="figure" id="fig-maximizer">
+  <div class="fig-mount" data-fig="maximizer"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the likelihood maximizer. Drag the orange <span class="m">$\theta$</span> handle along the log-likelihood curve <span class="m">$\ell(\theta) = N_H\log\theta + N_T\log(1-\theta)$</span> (arrow keys work too) and watch <span class="m">$\ell(\theta)$</span> update; the green marker sits at the analytic peak <span class="m">$N_H/(N_H+N_T)$</span>. Edit <span class="m">$N_H$</span> and <span class="m">$N_T$</span>: more flips at the same ratio keep the peak still but sharpen the curve around it, which is the "how sure are you?" question becoming visible. The defaults reproduce the 55/45 example.</p>
+</div>
+
+<h3>The code</h3>
+
+<p>
+Both the scan and the closed form are a few honest lines:
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def log_likelihood(theta, nh, nt):
+    return nh * np.log(theta) + nt * np.log(1 - theta)
+
+def mle_bernoulli(nh, nt):
+    return nh / (nh + nt)
+
+thetas = np.array([0.40, 0.50, 0.55, 0.60, 0.70])
+print(log_likelihood(thetas, 55, 45))
+# [-73.38 -69.31 -68.81 -69.33 -73.80]
+print(mle_bernoulli(55, 45))   # 0.55</code></pre>
+
+<h3>Gaussian MLE: the same recipe on real-valued data</h3>
+
+<p>
+Coins are Bernoulli; measurements are Gaussian. Suppose we record daily high
+temperatures in Waterloo for ten May days and want a model of "a typical May
+day". The Gaussian family
+</p>
+
+$$ \mathcal{N}(x; \mu, \sigma) = \frac{1}{\sqrt{2\pi}\,\sigma}
+   \exp\!\left(-\frac{(x - \mu)^2}{2\sigma^2}\right) $$
+
+<p>
+has two parameters, and maximum likelihood handles them with the identical
+recipe: write the log-likelihood of the i.i.d. data, take derivatives with
+respect to <span class="m">$\mu$</span> and <span class="m">$\sigma$</span>,
+set them to zero. The exponential melts under the log (this is the pairing
+the log trick promised) and the closed forms drop out:
+</p>
+
+$$ \hat{\mu}_{ML} = \frac{1}{N}\sum_{i=1}^{N} x^{(i)}, \qquad
+   \hat{\sigma}_{ML} = \sqrt{\frac{1}{N}\sum_{i=1}^{N} \big(x^{(i)} - \hat{\mu}_{ML}\big)^2}. $$
+
+<p>
+The best-fitting Gaussian has the sample mean as its centre and the sample
+standard deviation as its width. Two formulas you have used your whole life
+turn out to be maximum likelihood estimates.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the May temperatures</div>
+  <!-- flagged addition: the source names the Waterloo-May-temperature example
+       but gives no data values; these ten temperatures are chosen by us so the
+       arithmetic lands on clean numbers. The formulas and method are verbatim. -->
+  <p>Data (°C): 11, 14, 17, 13, 18, 16, 12, 15, 19, 15.</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &mu;&#770; = (11+14+17+13+18+16+12+15+19+15) / 10 = 150 / 10 = 15.0<br>
+    deviations&sup2; = 16, 1, 4, 4, 9, 1, 9, 0, 16, 0&nbsp;&nbsp;&rarr;&nbsp;&nbsp;sum = 60<br>
+    &sigma;&#770; = &radic;(60 / 10) = &radic;6 &asymp; 2.449
+  </p>
+  <p>So the MLE model of a May day is <span class="m">$\mathcal{N}(x;\, 15,\, 2.449)$</span>. The figure below lets you fight the formula: drag the bell away from these values and watch the log-likelihood drop.</p>
+</div>
+
+<div class="figure" id="fig-gaussfit">
+  <div class="fig-mount" data-fig="gaussfit"></div>
+  <p class="fig-caption"><b>Fig 2.2,</b> maximizing a likelihood is fitting a curve to points. The dots are the ten temperatures; drag horizontally to move <span class="m">$\mu$</span> and vertically to widen or narrow <span class="m">$\sigma$</span> (sliders work too). The readout shows the live log-likelihood of the data under your bell, and the dashed green curve is the MLE fit <span class="m">$\hat\mu = 15$</span>, <span class="m">$\hat\sigma \approx 2.449$</span>. No hand position beats it, and the Snap button proves the point.</p>
+</div>
+
+<h3>The general recipe, and when calculus fails</h3>
+
+<p>
+Step back and see the pattern, because it is the whole method. One: assume a
+model family <span class="m">$p(D \mid \theta)$</span>. Two: write the
+log-likelihood <span class="m">$\ell(\theta; D)$</span> of the observed
+data. Three: optimize, analytically if you can, numerically if you cannot.
+Bernoulli and Gaussian are the friendly cases with closed forms. Other
+families are not so kind: the Gamma distribution, whose density involves
+the gamma function <span class="m">$\Gamma(\cdot)$</span>, has no closed-form
+maximizer, and setting derivatives to zero leaves you with equations no
+amount of algebra untangles. The cure is the tool you already own:
+<strong>gradient ascent</strong> on the log-likelihood, the mirror image of
+the gradient descent from the optimization lectures. Ascent maximizes an
+objective, descent minimizes a loss; same machinery, opposite sign. Nothing
+about probabilistic modeling exempts it from numerical optimization, and
+nothing about numerical optimization needs to change.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Now generalize the coin to a die. A six-sided die follows a Categorical distribution with parameters <span class="m">$\theta_1, \dots, \theta_6$</span> summing to 1, and the MLE (derived the same way, with a constraint) is <span class="m">$\hat\theta_k^{ML} = n_k / N$</span>, the fraction of rolls landing on face <span class="m">$k$</span>. You roll three times and see <span class="m">$D = \{2, 4, 4\}$</span>. What is the MLE?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$\hat\theta_k = 1/6$</span> for every face: three rolls cannot overturn fairness</button>
+    <button data-k="b"><span class="m">$\hat\theta_2 = 1/3$</span>, <span class="m">$\hat\theta_4 = 2/3$</span>, and the other four faces get a small remainder to stay legal</button>
+    <button data-k="c"><span class="m">$\hat\theta_2 = 1/3$</span>, <span class="m">$\hat\theta_4 = 2/3$</span>, and <span class="m">$\hat\theta_1 = \hat\theta_3 = \hat\theta_5 = \hat\theta_6 = 0$</span>, exactly</button>
+  </div>
+  <div class="quiz-fb" data-k="a">MLE has no concept of "cannot overturn": it maximizes fit to the observed data only, and the observed data contains no ones, threes, fives, or sixes. Fairness would be a prior belief, and MLE carries no prior.</div>
+  <div class="quiz-fb" data-k="b">There is no remainder to distribute: <span class="m">$1/3 + 2/3 = 1$</span> already. The unseen faces get exactly zero, and that "exactly" is about to become a serious problem.</div>
+  <div class="quiz-fb" data-k="c">Right. <span class="m">$n_2 = 1, n_4 = 2, N = 3$</span> gives <span class="m">$1/3$</span> and <span class="m">$2/3$</span>, and every unseen face gets probability exactly 0. The model now claims rolling a six is <em>impossible</em>. Hold that thought for section 3.</div>
+</div>
+
+<details class="check">
+  <summary>Check: why is maximizing the log the same as maximizing the likelihood?</summary>
+  <div>
+    <p>We swapped <span class="m">$L(\theta)$</span> for <span class="m">$\ell(\theta) = \log L(\theta)$</span> without ceremony. Why is that legal, and why is it smart?</p>
+    <p><b>Answer.</b> Legal: the log is strictly increasing, so <span class="m">$L(\theta_1) &gt; L(\theta_2)$</span> exactly when <span class="m">$\log L(\theta_1) &gt; \log L(\theta_2)$</span>. Order is preserved, so the argmax is preserved; the peak's height changes but its location cannot. Smart, twice over. Analytically, i.i.d. likelihoods are products of one term per data point, and the derivative of a 100-factor product is a nightmare, while the derivative of a 100-term sum is a sum of derivatives; the log converts one into the other, and it also unwraps the exponentials inside Gaussians and friends. Numerically, a product of 100 probabilities each around 0.5 is roughly <span class="m">$10^{-30}$</span>, small enough to underflow toward zero in floating point, while its log is a comfortable <span class="m">$-69$</span>. Every serious implementation works in log space for both reasons.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. FROM ESTIMATION TO PREDICTION ═══════════════════ -->
+<section id="sec-predict">
+<h2><span class="secnum">3.</span> From estimation to prediction</h2>
+
+<h3>Coins in a pouch</h3>
+
+<p>
+Estimation is rarely the end goal. We estimate parameters so we can
+<em>predict</em>, and prediction is where the running example of this
+lecture lives. A pouch holds four types of coins. For each type
+<span class="m">$k$</span> we have historical flip data
+<span class="m">$D_k = (N_{H,k}, N_{T,k})$</span>, and we know how common
+each type is in the pouch: the <em>type frequencies</em>
+<span class="m">$\pi_k = p(C = k)$</span>, which are priors over the type of
+a drawn coin. Now someone draws a coin without showing us which type it is,
+flips it ten times, and reports
+<span class="m">$D_{\text{new}} = (9, 1)$</span>: nine heads, one tail.
+Which type is it?
+</p>
+
+<p>
+This is a Bayes' rule question. We want the type with the highest
+probability given the new evidence:
+</p>
+
+$$ \hat{C}_{\text{new}} = \arg\max_k \; p(C = k \mid D_{\text{new}})
+   = \arg\max_k \; p(D_{\text{new}} \mid C = k)\; p(C = k), $$
+
+<p>
+where the denominator of Bayes' rule, the evidence
+<span class="m">$p(D_{\text{new}})$</span>, is the same constant for every
+<span class="m">$k$</span>, so the argmax ignores it. Each candidate type
+therefore gets a score with two factors: how common the type is, and how
+well it explains the new flips. The catch is that
+<span class="m">$p(D_{\text{new}} \mid C = k)$</span> depends on the type's
+unknown bias <span class="m">$\theta_k$</span>. The simplest fix is the
+<strong>plug-in</strong> move: estimate
+<span class="m">$\hat\theta_k^{ML}$</span> from the historical data and plug
+it in as if it were the truth:
+</p>
+
+$$ s_k = \underbrace{p(C = k)}_{\text{type prior}} \cdot
+   \underbrace{p(D_{\text{new}} \mid \hat{\theta}_k^{ML},\, C = k)}_{\text{fit to the new flips}},
+   \qquad \hat{C}_{\text{new}} = \arg\max_k s_k. $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one plug-in score</div>
+  <!-- flagged addition: the source specifies the pouch setup, D_new = (9,1), and
+       the winners (MLE picks coin 3; MAP and Bayesian pick coin 2) but not the
+       table's counts and frequencies; the values here and in Fig 3.1 are chosen
+       by us so that the source's winner flip genuinely occurs, and every score
+       is computed live from them. -->
+  <p>Take coin 2, with history <span class="m">$(N_H, N_T) = (80, 20)$</span> and frequency <span class="m">$\pi_2 = 0.20$</span>. Its MLE bias is <span class="m">$\hat\theta_2 = 80/100 = 0.8$</span>, and the new data is 9 heads in 10 flips:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    p(D_new | &theta;&#770;&#8322;) = C(10,9) &middot; 0.8&#8313; &middot; 0.2&sup1; = 10 &middot; 0.1342 &middot; 0.2 = 0.2684<br>
+    s&#8322; = &pi;&#8322; &middot; 0.2684 = 0.20 &middot; 0.2684 = 0.0537
+  </p>
+  <p>Do the same for all four types and compare. Coin 3, a rare type whose short history (9 heads, 1 tail) gives it MLE bias 0.9, scores <span class="m">$0.15 \times 0.3874 = 0.0581$</span> and wins the argmax: the MLE plug-in picks coin 3. Keep an eye on that thin 10-flip history; it is doing a lot of unearned talking.</p>
+</div>
+
+<div class="figure" id="fig-pouch">
+  <div class="fig-mount" data-fig="pouch"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the coins-in-a-pouch predictor, this lesson's running centrepiece. Every count and frequency is editable; the table computes each type's estimate <span class="m">$\hat\theta_k$</span>, its fit <span class="m">$p(D_{\text{new}} \mid \hat\theta_k)$</span> to the observed <span class="m">$(9,1)$</span>, and the score <span class="m">$s_k = \pi_k\, p(D_{\text{new}} \mid \hat\theta_k)$</span>, highlighting the argmax winner. The MLE / MAP toggle previews section 4: switch the estimator and the winner flips from coin 3 to coin 2, because MAP tempers coin 3's overconfident 10-flip history. The third mode, fully Bayesian, belongs to section 5; come back to it after the predictive integral and confirm it also picks coin 2.</p>
+</div>
+
+<h3>The zero-frequency problem</h3>
+
+<p>
+The pouch hints that thin data misleads MLE. Here is the failure in its
+purest form. Flip a coin twice, see heads both times, and estimate:
+</p>
+
+$$ \hat{\theta}_{ML} = \frac{2}{2} = 1. $$
+
+<p>
+The model now asserts <span class="m">$p(T) = 0$</span>: tails is not
+unlikely, it is <em>impossible</em>. Every future computation that
+multiplies by <span class="m">$p(T)$</span> gets zeroed out by two coin
+flips' worth of evidence. This is the <strong>zero-frequency problem</strong>
+(the die quiz in section 2 was the same disease: unseen faces got exact
+zeros), and it is not a corner case. In language modeling, most words never
+appear in a small corpus; in the pouch, a short history is one lucky streak
+away from an absolute claim. MLE has no mechanism to say "I have only seen
+two flips, let me hedge". The mechanism it lacks is a prior, and priors are
+the next section:
+</p>
+
+<div class="figure" id="fig-zerofreq">
+  <div class="fig-mount" data-fig="zerofreq"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> the zero-frequency trap, live. Flip the virtual coin (its hidden true bias is 0.7, so heads streaks are common) and watch <span class="m">$\hat\theta_{ML}$</span> and the estimated <span class="m">$p(T) = 1 - \hat\theta$</span> after every flip. While the record is all heads, MLE pins <span class="m">$p(T)$</span> to exactly 0. Switch on the Beta(2,2) prior and the estimate steps back from the cliff: <span class="m">$p(T)$</span> stays positive on the same data, and the two estimates converge as flips accumulate.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In the pouch, suppose coin 3's history had been 10 heads and 0 tails. What happens to its MLE plug-in score for <span class="m">$D_{\text{new}} = (9, 1)$</span>?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It rises: a 10-for-10 history is even stronger evidence of a heads-heavy coin</button>
+    <button data-k="b">It collapses to exactly zero: <span class="m">$\hat\theta_3 = 1$</span> makes the one observed tail impossible, so <span class="m">$p(D_{\text{new}} \mid \hat\theta_3) = 0$</span></button>
+    <button data-k="c">It is unchanged: the prior <span class="m">$\pi_3$</span> protects the score</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Intuitively yes, a heads-heavy history should help a heads-heavy prediction. But push the MLE to the boundary and the model stops hedging entirely: <span class="m">$\theta = 1$</span> assigns probability zero to any dataset containing a single tail.</div>
+  <div class="quiz-fb" data-k="b">Right. <span class="m">$1^9 \times 0^1 = 0$</span>, so the score is <span class="m">$\pi_3 \times 0 = 0$</span> no matter how large <span class="m">$\pi_3$</span> is. One observed tail annihilates the type completely. Try it in Fig 3.1: set coin 3's tails count to 0 and watch its score die. This is the zero-frequency problem wearing its prediction costume.</div>
+  <div class="quiz-fb" data-k="c">The type prior multiplies the fit term; it cannot rescue a fit of exactly zero. <span class="m">$\pi_3 \times 0 = 0$</span>. The fix has to happen inside the estimate of <span class="m">$\theta_3$</span> itself.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. PRIORS, POSTERIORS, MAP ═══════════════════ -->
+<section id="sec-map">
+<h2><span class="secnum">4.</span> Priors, posteriors, and MAP</h2>
+
+<h3>Beliefs before and after data</h3>
+
+<p>
+The zero-frequency failures share a root cause: MLE listens only to the
+data, and thin data speaks with unearned confidence. The Bayesian repair is
+to make the missing ingredient explicit. A <strong>prior</strong>
+<span class="m">$p(\theta)$</span> is your belief about the parameter
+<em>before</em> seeing data; combine it with the likelihood through Bayes'
+rule and you get the <strong>posterior</strong>
+<span class="m">$p(\theta \mid D)$</span>, your belief <em>after</em>. The
+point estimate is replaced by a distribution that starts at the prior and
+gets reshaped by evidence.
+</p>
+
+<p>
+What should a prior over a coin's bias look like? A uniform prior on
+<span class="m">$[0, 1]$</span> says "no idea", which is honest but
+inflexible: you cannot express "probably near fair" or "heads-heavy coins
+are common". The standard choice is the <strong>Beta distribution</strong>:
+</p>
+
+$$ p(\theta; a, b) = \frac{\Gamma(a + b)}{\Gamma(a)\,\Gamma(b)}\,
+   \theta^{a-1}(1 - \theta)^{b-1}, \qquad \mathrm{Beta}(1,1) = \mathcal{U}[0,1]. $$
+
+<p>
+The two shape parameters <span class="m">$a, b$</span> act like phantom
+flips: <span class="m">$\mathrm{Beta}(2,2)$</span> gently favours fairness,
+<span class="m">$\mathrm{Beta}(5,1)$</span> leans heads-heavy, and the
+distribution grows more peaked as <span class="m">$a, b$</span> grow, the
+shape of increasing conviction. <span class="m">$\mathrm{Beta}(1,1)$</span>
+recovers the uniform, so the flexible choice contains the ignorant one as a
+special case.
+</p>
+
+<h3>Conjugacy: the algebra does the work</h3>
+
+<p>
+Why Beta specifically? Look at its functional form next to the Bernoulli
+likelihood: <span class="m">$\theta^{a-1}(1-\theta)^{b-1}$</span> against
+<span class="m">$\theta^{N_H}(1-\theta)^{N_T}$</span>. Same shape, powers of
+<span class="m">$\theta$</span> and <span class="m">$1-\theta$</span>. A
+prior whose form matches the likelihood this way is called a
+<strong>conjugate prior</strong>, and conjugacy means the posterior stays in
+the family. Multiply and watch the exponents simply add:
+</p>
+
+$$ p(\theta \mid D) \;\propto\; p(\theta; a, b)\, p(D \mid \theta)
+   = \theta^{N_H + a - 1}(1 - \theta)^{N_T + b - 1}
+   \;\Rightarrow\; \theta \mid D \sim \mathrm{Beta}(N_H + a,\; N_T + b). $$
+
+<p>
+No integral was harmed. The posterior is another Beta whose parameters are
+"prior pseudo-counts plus real counts", which makes the phantom-flips
+reading exact: a <span class="m">$\mathrm{Beta}(a, b)$</span> prior behaves
+precisely as if you had already seen <span class="m">$a - 1$</span> heads and
+<span class="m">$b - 1$</span> tails before the experiment began. Updating
+on data is bookkeeping. See the algebra as shapes:
+</p>
+
+<div class="figure" id="fig-conjugacy">
+  <div class="fig-mount" data-fig="conjugacy"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> conjugate means the posterior stays in the family. The purple curve is the Beta prior, the grey curve is the Bernoulli likelihood (normalized for display so the shapes are comparable), and the orange curve is their product, renormalized: the posterior. It is exactly <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span>, with parameters printed live. Slide the prior and edit the counts and watch a Beta times a Bernoulli remain a Beta, every time.</p>
+</div>
+
+<p>
+And the balance of power is exactly what you would hope. With little data,
+the prior's pseudo-counts dominate and the posterior hugs the prior. With a
+lot of data, <span class="m">$N_H$</span> and <span class="m">$N_T$</span>
+swamp <span class="m">$a$</span> and <span class="m">$b$</span>, the
+likelihood dominates, and the posterior converges to a spike at the MLE.
+Priors are training wheels: load-bearing at the start, irrelevant at scale.
+</p>
+
+<div class="figure" id="fig-betaupdate">
+  <div class="fig-mount" data-fig="betaupdate"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> the prior-to-posterior updater, the signature figure of this lesson. Choose a prior with the <span class="m">$a, b$</span> sliders, then stream in flips from a hidden coin with true bias 0.7 (single flips or bursts of 10 and 100). The posterior <span class="m">$\mathrm{Beta}(N_H + a,\, N_T + b)$</span> re-renders live, with the MLE (green), the MAP mode (orange), and the posterior-predictive mean (purple) marked on the same axis so the three estimators stay visually distinct. Watch the prior wash out: by a few hundred flips, every reasonable prior lands the posterior in the same place, and the three markers converge toward the true bias.</p>
+</div>
+
+<h3>MAP: the most probable parameter</h3>
+
+<p>
+Once you have a posterior, the least imaginative way to use it is to take
+its peak. <strong>Maximum a posteriori</strong> estimation picks the
+parameter that maximizes the posterior, and taking logs splits the
+objective into two named parts:
+</p>
+
+$$ \hat{\theta}_{MAP} = \arg\max_\theta\, p(\theta \mid D)
+   = \arg\max_\theta \big[\log p(\theta) + \log p(D \mid \theta)\big]. $$
+
+<p>
+Read it as MLE plus a regularizer: the log-likelihood pulls toward the
+data, the log-prior pulls toward prior belief, and the argmax balances the
+two. You have met this structure before. In the logistic-regression lecture
+we showed that L2 regularization is exactly a Gaussian prior on the weights
+wearing a loss function's clothes, and the regularized objective is MAP
+estimation. That throwaway remark is this section, now with the full
+machinery under it. For the coin with a Beta prior, the posterior is a Beta,
+and the mode of a Beta has a closed form:
+</p>
+
+$$ \hat{\theta}_{MAP} = \frac{N_H + a - 1}{N_H + N_T + a + b - 2}. $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: MAP vs MLE, small data and large</div>
+  <p>Use the fairness-leaning prior <span class="m">$\mathrm{Beta}(2, 2)$</span> throughout.</p>
+  <p><b>Two flips, both heads</b> <span class="m">$(N_H = 2, N_T = 0)$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &theta;&#770;_ML&nbsp; = 2/2 = 1&nbsp;&nbsp;&nbsp;&nbsp;(tails declared impossible)<br>
+    &theta;&#770;_MAP = (2 + 2 &minus; 1) / (2 + 0 + 2 + 2 &minus; 2) = 3/4 = 0.75
+  </p>
+  <p><b>A hundred flips</b> <span class="m">$(N_H = 55, N_T = 45)$</span>:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &theta;&#770;_ML&nbsp; = 55/100 = 0.55<br>
+    &theta;&#770;_MAP = (55 + 2 &minus; 1) / (100 + 2 + 2 &minus; 2) = 56/102 &asymp; 0.549
+  </p>
+  <p>Small data: the prior hauls a reckless estimate from 1.0 back to 0.75. Large data: the prior nudges the third decimal place and otherwise stays out of the way. That is the behaviour you want from a regularizer, and here it is emerging from probability theory rather than being bolted on.</p>
+</div>
+
+<p>
+Two properties earn MAP its keep. First, with
+<span class="m">$a, b &gt; 1$</span> the estimate can never reach 0 or 1, so
+unseen events keep nonzero probability and the zero-frequency trap cannot
+spring, which you saw directly in Fig 3.2. Second, as
+<span class="m">$N$</span> grows the counts dominate the pseudo-counts and
+MAP converges to MLE, so you pay for the safety only when data is scarce.
+And it changes real decisions: rerun the pouch with MAP plug-in estimates
+<span class="m">$\hat\theta_k^{MAP}$</span> in place of the MLEs, and the
+winner flips from coin 3 to coin 2. Coin 3's seductive 0.9 was a 10-flip
+mirage; the prior deflates it to <span class="m">$10/12 \approx 0.833$</span>,
+while coin 2's 100-flip history barely moves
+(<span class="m">$81/102 \approx 0.794$</span>). Flip the toggle in Fig 3.1
+and watch the argmax change hands.
+</p>
+
+<pre class="code" data-lang="python"><code>def map_bernoulli(nh, nt, a, b):
+    return (nh + a - 1) / (nh + nt + a + b - 2)
+
+print(map_bernoulli(2, 0, 2, 2))     # 0.75    (MLE said 1.0)
+print(map_bernoulli(55, 45, 2, 2))   # 0.5490  (MLE said 0.55)</code></pre>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Back to the die with <span class="m">$D = \{2, 4, 4\}$</span>. The multi-outcome conjugate of the Beta is the <strong>Dirichlet</strong>: a symmetric Dirichlet prior with <span class="m">$\alpha_k = 2$</span> for all six faces gives posterior <span class="m">$\mathrm{Dir}(\alpha_1 + n_1, \dots, \alpha_6 + n_6)$</span> and MAP <span class="m">$\hat\theta_k^{MAP} = \frac{\alpha_k + n_k - 1}{\sum_j (\alpha_j + n_j) - K}$</span>. Compute it.</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$\hat\theta_4 = 3/9$</span>, <span class="m">$\hat\theta_2 = 2/9$</span>, each unseen face <span class="m">$1/9$</span></button>
+    <button data-k="b"><span class="m">$\hat\theta_4 = 2/3$</span>, <span class="m">$\hat\theta_2 = 1/3$</span>, unseen faces 0: the prior cancels out of the ratio</button>
+    <button data-k="c"><span class="m">$\hat\theta_k = 1/6$</span> for all faces: with only three rolls the prior wins outright</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. The denominator is <span class="m">$\sum_j(\alpha_j + n_j) - K = (12 + 3) - 6 = 9$</span>, and the numerators <span class="m">$\alpha_k + n_k - 1$</span> are 3 for face 4, 2 for face 2, and 1 for each unseen face. Check: <span class="m">$(3 + 2 + 1 \cdot 4)/9 = 1$</span>. Every unseen face keeps probability <span class="m">$1/9$</span>: no more impossible sixes.</div>
+  <div class="quiz-fb" data-k="b">That is the MLE again. The Dirichlet pseudo-counts do not cancel: each face starts with <span class="m">$\alpha_k - 1 = 1$</span> phantom observations, which is precisely what keeps the unseen faces alive.</div>
+  <div class="quiz-fb" data-k="c">The prior tempers the data, it does not erase it. Face 4 was rolled twice in three tries and its MAP estimate <span class="m">$3/9$</span> duly exceeds the uniform <span class="m">$1/6$</span>. With <span class="m">$N = 3$</span> the prior is influential, not dictatorial.</div>
+</div>
+
+<details class="check">
+  <summary>Check: what exactly do a and b buy over the uniform prior?</summary>
+  <div>
+    <p>The uniform prior is <span class="m">$\mathrm{Beta}(1,1)$</span>, so the Beta family contains it. What do other settings of <span class="m">$a, b$</span> express, and what happens to MAP at <span class="m">$a = b = 1$</span>?</p>
+    <p><b>Answer.</b> The pair <span class="m">$(a, b)$</span> encodes both a location and a strength. Location: the prior leans toward <span class="m">$\theta$</span> values near <span class="m">$a/(a+b)$</span>, so <span class="m">$\mathrm{Beta}(5,1)$</span> expects a heads-heavy coin and <span class="m">$\mathrm{Beta}(2,2)$</span> expects rough fairness. Strength: the total <span class="m">$a + b$</span> plays the role of a pseudo-sample size, and larger totals make the prior harder for data to move; <span class="m">$\mathrm{Beta}(20,20)$</span> and <span class="m">$\mathrm{Beta}(2,2)$</span> share a centre but not a stubbornness, which is why Beta grows more peaked as <span class="m">$a, b$</span> grow. At <span class="m">$a = b = 1$</span> the MAP formula collapses to <span class="m">$N_H / (N_H + N_T)$</span>: a uniform prior contributes zero pseudo-counts, so MAP under it is exactly MLE. The zero-frequency protection specifically needs <span class="m">$a, b &gt; 1$</span>, phantom evidence for both outcomes.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 5. FULLY BAYESIAN ═══════════════════ -->
+<section id="sec-bayes">
+<h2><span class="secnum">5.</span> Fully Bayesian prediction</h2>
+
+<h3>Stop throwing the posterior away</h3>
+
+<p>
+Step back and notice what MAP did with the beautiful object we built. We
+constructed an entire posterior distribution, a full accounting of which
+parameters are plausible and how much, and then summarized it by one point
+and discarded the rest. MLE and MAP differ in <em>which</em> point they
+keep, but they share the deeper decision to keep only one. The
+<strong>fully Bayesian</strong> approach declines. Keep the whole thing,
+</p>
+
+$$ p(\theta \mid D) = \frac{L(\theta; D)\, p(\theta)}{p(D)}, $$
+
+<p>
+and when asked to predict, average the prediction over every
+<span class="m">$\theta$</span>, weighted by how much the posterior believes
+in it. The result is the <strong>posterior predictive</strong> distribution:
+the distribution of new data with the parameter uncertainty integrated out
+rather than ignored. For a single future toss of our coin, the integral
+comes out in closed form (conjugacy again), and it is worth staring at:
+</p>
+
+$$ p(x_{\text{new}} = H \mid D)
+   = \int_0^1 \theta \; p(\theta \mid D)\, d\theta
+   = \frac{N_H + a}{N_H + N_T + a + b}. $$
+
+<p>
+That is the <em>mean</em> of the posterior
+<span class="m">$\mathrm{Beta}(N_H + a, N_T + b)$</span>, not its mode. The
+best single-toss prediction and the most probable parameter are different
+numbers, because averaging over an asymmetric distribution does not land on
+its peak. For <span class="m">$N_H = 2, N_T = 0$</span> with the
+<span class="m">$\mathrm{Beta}(2,2)$</span> prior, the predictive is
+<span class="m">$4/6 \approx 0.667$</span> while MAP says 0.75 and MLE says
+1.0: three estimators, three answers, spread exactly in order of how much
+uncertainty each one respects. For <span class="m">$N_H = 55, N_T = 45$</span>
+the three collapse to 0.548, 0.549, and 0.55: with real data behind you,
+the disagreement evaporates.
+</p>
+
+<div class="figure" id="fig-threeway">
+  <div class="fig-mount" data-fig="threeway"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> MLE vs MAP vs Bayesian, side by side and live. Set the sample size, the heads ratio, and the prior; the panel computes <span class="m">$\hat\theta_{ML}$</span>, <span class="m">$\hat\theta_{MAP}$</span>, and the posterior predictive <span class="m">$p(x_{\text{new}} = H \mid D)$</span>, plots all three on the posterior, and tracks them as <span class="m">$N$</span> grows at a fixed heads ratio. Small <span class="m">$N$</span>: the three disagree, and the gaps are the uncertainty MLE pretends not to have. Large <span class="m">$N$</span>: the posterior sharpens and the three estimators converge to the same value.</p>
+</div>
+
+<h3>Predicting a whole dataset, and the pouch's final verdict</h3>
+
+<p>
+For one toss the predictive was a tidy ratio. For several future tosses the
+same integral produces ratios of the Beta function
+<span class="m">$B(\cdot, \cdot)$</span> (the normalizer from the Beta
+density). In the pouch, give each coin type its own posterior from history
+<span class="m">$D_k$</span> under a <span class="m">$\theta_k \sim \mathrm{Beta}(2,2)$</span>
+prior; the probability that type <span class="m">$k$</span> would produce
+the new data <span class="m">$(9, 1)$</span> is then
+</p>
+
+$$ p(D_{\text{new}} \mid D_k, C = k)
+   = \binom{10}{9}\frac{B(2 + N_{H,k} + 9,\; 2 + N_{T,k} + 1)}{B(2 + N_{H,k},\; 2 + N_{T,k})}, $$
+
+<p>
+a genuine average of <span class="m">$p(D_{\text{new}} \mid \theta_k)$</span>
+over the entire posterior for <span class="m">$\theta_k$</span>, no plug-in
+anywhere. Multiply by <span class="m">$\pi_k$</span>, take the argmax, and
+the fully Bayesian pouch also picks coin 2, agreeing with MAP and
+disagreeing with MLE, and for the more principled reason: coin 3's short
+history leaves its posterior wide, and integrating over that width
+dilutes its score, exactly the caution a 10-flip record deserves. So the
+final scoreboard of the running example:
+</p>
+
+<ul>
+  <li><strong>MLE</strong>: represent each <span class="m">$\theta_k$</span> by <span class="m">$\hat\theta_k^{ML}$</span>; predict with the plug-in <span class="m">$p(D_{\text{new}} \mid \hat\theta_k^{ML})$</span>. Picks coin 3.</li>
+  <li><strong>MAP</strong>: represent each <span class="m">$\theta_k$</span> by <span class="m">$\hat\theta_k^{MAP}$</span>; plug-in prediction again. Picks coin 2.</li>
+  <li><strong>Fully Bayesian</strong>: keep <span class="m">$p(\theta_k \mid D_k)$</span> whole; predict by integrating <span class="m">$\int p(D_{\text{new}} \mid \theta_k)\, p(\theta_k \mid D_k)\, d\theta_k$</span>. Picks coin 2.</li>
+</ul>
+
+<p>
+One sentence each, worth memorizing: MLE selects the best fit to the data;
+MAP selects the most probable parameter; Bayesian inference retains all
+plausible parameters. The price climbs with the principle: MLE and MAP are
+cheap plug-in methods, while Bayesian prediction is more complete but may
+require integrals that, outside conjugate families like Beta-Bernoulli,
+have no closed form and demand costly numerical approximation. Conjugacy is
+the happy case where the integral is free; the wider Bayesian world runs on
+approximating it.
+</p>
+
+<h3>Run the whole pipeline</h3>
+
+<pre class="code" data-lang="python"><code>def posterior_predictive(nh, nt, a, b):
+    return (nh + a) / (nh + nt + a + b)
+
+# the full Beta update, end to end
+def beta_update(nh, nt, a, b):
+    post_a, post_b = nh + a, nt + b          # conjugate update
+    mle  = nh / (nh + nt)
+    mode = (post_a - 1) / (post_a + post_b - 2)
+    mean = post_a / (post_a + post_b)
+    return post_a, post_b, mle, mode, mean
+
+print(beta_update(2, 0, 2, 2))    # (4, 2, 1.0, 0.75, 0.667)
+print(beta_update(55, 45, 2, 2))  # (57, 47, 0.55, 0.549, 0.548)</code></pre>
+
+<div class="figure" id="fig-betacode">
+  <div class="fig-mount" data-fig="betacode"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the Beta update as a rerunnable exercise. Set any counts and any prior, press Run, and the <code>beta_update</code> pipeline above executes for real: posterior parameters, MLE, MAP mode, and predictive mean, printed from live computation. Rerun it with the small-data and large-data presets and confirm the worked examples digit for digit; then find a prior strong enough to drag the 55/45 posterior visibly away from 0.55, and note how many pseudo-flips that takes.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Finish the die story. With the symmetric Dirichlet prior (<span class="m">$\alpha_k = 2$</span>) and <span class="m">$D = \{2, 4, 4\}$</span>, the Dirichlet-Categorical posterior predictive is <span class="m">$p(x_{\text{new}} = k \mid D) = \frac{n_k + \alpha_k}{N + \sum_j \alpha_j}$</span>. What is the predicted probability of rolling a 4, and of rolling a 6?</p>
+  <div class="quiz-opts">
+    <button data-k="a"><span class="m">$p(4) = 3/9$</span>, <span class="m">$p(6) = 1/9$</span>: same as the MAP estimates</button>
+    <button data-k="b"><span class="m">$p(4) = 2/3$</span>, <span class="m">$p(6) = 0$</span>: prediction should use the best fit</button>
+    <button data-k="c"><span class="m">$p(4) = 4/15$</span>, <span class="m">$p(6) = 2/15$</span>: counts plus pseudo-counts over <span class="m">$N + \sum_j \alpha_j = 15$</span></button>
+  </div>
+  <div class="quiz-fb" data-k="a">Those are the posterior modes. The predictive is the posterior <em>mean</em>: numerator <span class="m">$n_k + \alpha_k$</span> without the <span class="m">$-1$</span>, denominator without the <span class="m">$-K$</span>. Mode and mean of a Dirichlet differ just as they did for the Beta.</div>
+  <div class="quiz-fb" data-k="b">That is the MLE plug-in, zeros and all, and it wagers that a six is impossible after three rolls. The whole point of averaging over the posterior is to decline that bet.</div>
+  <div class="quiz-fb" data-k="c">Right. <span class="m">$p(4) = (2+2)/15 = 4/15 \approx 0.267$</span> and <span class="m">$p(6) = (0+2)/15 = 2/15 \approx 0.133$</span>, and the six probabilities sum to <span class="m">$15/15 = 1$</span>. Note the ordering across the three methods for face 4: MLE 0.667, MAP 0.333, predictive 0.267, increasingly humble as more uncertainty is respected. This mean-not-mode smoothing is exactly what a Bayes classifier wants from its class-conditional estimates, a point the Naive Bayes lecture will cash in.</div>
+</div>
+
+<details class="check">
+  <summary>Check: why is the posterior predictive more robust than MLE or MAP when N is small?</summary>
+  <div>
+    <p>All three estimators are formulas over the same counts. Where does the robustness actually come from?</p>
+    <p><b>Answer.</b> From refusing to bet everything on one parameter value. With small <span class="m">$N$</span> the posterior is wide: many values of <span class="m">$\theta$</span> explain the data almost equally well. MLE and MAP both collapse that spread to a single point, so any error in the point becomes an error in every subsequent prediction, and MLE's point can even sit on the boundary (probability exactly 0 or 1), the most brittle place possible. The posterior predictive instead averages the prediction over the whole posterior, so plausible-but-not-maximal parameters get their proportional say, extreme claims get diluted by the surrounding mass, and no unseen event is ever assigned zero. The Beta-Bernoulli formulas make the contrast concrete at <span class="m">$(N_H, N_T) = (2, 0)$</span> with <span class="m">$a = b = 2$</span>: MLE 1.0, MAP 0.75, predictive 0.667, and only the predictive is the actual expected outcome of the next toss under everything you believe. As <span class="m">$N$</span> grows the posterior narrows and all three converge, so robustness is bought exactly when it is needed and costs nothing when it is not.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">6.</span> Summary and method card</h2>
+
+<p>
+One story, told three times with increasing honesty. The likelihood reads
+the model formula backwards, scoring parameters by the data instead of data
+by the parameters. MLE takes the peak of that score and inherits its
+brashness: perfect on big data, reckless on small, and capable of declaring
+possible events impossible. A prior fixes the recklessness by making prior
+belief explicit, conjugacy makes the fix free (Beta pseudo-counts plus real
+counts, exponents adding), and MAP takes the peak of the resulting
+posterior: MLE plus a principled regularizer, the same object our L2
+penalty secretly was. The fully Bayesian move is to stop taking peaks
+altogether: keep the posterior, integrate predictions over it, and let the
+width of your uncertainty flow into the humility of your forecasts. This
+framing, probabilistic models with priors and posteriors as the backbone of
+machine learning, is the programme championed by researchers like Michael
+I. Jordan and Zoubin Ghahramani, and it powers far more than coins:
+the moment a model outputs a probability, someone chose an estimator for
+its parameters, and everything in this lecture applies.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Learning Probabilistic Models</div>
+  <table>
+    <tr><th>Assumption</th><td>The data <span class="m">$D$</span> come from a probabilistic model <span class="m">$p(D \mid \theta)$</span> with unknown parameters; prior knowledge enters through <span class="m">$p(\theta)$</span>.</td></tr>
+    <tr><th>Model class</th><td>Likelihood, posterior, and posterior-predictive distributions; conjugate pairs (Beta-Bernoulli, Dirichlet-Categorical, Gaussian) where updates are closed-form.</td></tr>
+    <tr><th>Learning / selection</th><td>MLE <span class="m">$\arg\max_\theta p(D \mid \theta)$</span>; MAP <span class="m">$\arg\max_\theta p(D \mid \theta)\, p(\theta)$</span>; Bayesian prediction integrates over <span class="m">$p(\theta \mid D)$</span>.</td></tr>
+    <tr><th>Prediction</th><td>Plug-in <span class="m">$p(x_{\text{new}} \mid \hat\theta)$</span> for MLE and MAP; posterior predictive <span class="m">$\int p(x_{\text{new}} \mid \theta)\, p(\theta \mid D)\, d\theta$</span> for fully Bayesian.</td></tr>
+    <tr><th>Strengths</th><td>Principled and interpretable; priors mitigate sparse-data failures like zero frequencies; Bayesian prediction propagates parameter uncertainty into forecasts.</td></tr>
+    <tr><th>Limitations</th><td>MLE can overfit small samples; MAP still keeps only one parameter value; full Bayesian inference may require costly integration outside conjugate families.</td></tr>
+    <tr><th>Next step</th><td>Generative classification: Gaussian discriminant analysis and Naive Bayes, which run exactly this machinery per class.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: the pouch was a preview of the next
+two lectures. Scoring each class by "prior times fit", with the fit's
+parameters estimated by the methods above, is generative classification.
+Replace coin types with classes and coin flips with feature vectors, make
+the fit a Gaussian, and you have Gaussian discriminant analysis; make the
+features conditionally independent and you have Naive Bayes, where the
+zero-frequency problem and its Dirichlet cure return as headline acts.
+</p>
+</section>
+
+<!-- ═══════════════════ 7. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">7.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then four transfer questions that ask you to decide and
+justify, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">What is the difference between <span class="m">$p(D \mid \theta = 0.5)$</span> read as a probability and <span class="m">$L(\theta; D)$</span> read as a likelihood, given that both come from the same Binomial formula?</p>
+  <div class="quiz-opts">
+    <button data-k="a">They are different formulas: the likelihood adds a prior term</button>
+    <button data-k="b">Probability fixes the parameter and varies the data, and sums to 1 over outcomes; likelihood fixes the observed data and varies the parameter, and is a scoring function over <span class="m">$\theta$</span> with no obligation to integrate to 1</button>
+    <button data-k="c">Probability applies to discrete data and likelihood to continuous data</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Same formula, no extra term. Priors enter with MAP, two sections after the likelihood is defined. The distinction is entirely about which symbol is the variable.</div>
+  <div class="quiz-fb" data-k="b">Right. One object, two readings, and the reading determines what "sums to 1" means. Fig 1.1's toggle is this answer in picture form.</div>
+  <div class="quiz-fb" data-k="c">Both readings exist for both kinds of data: a Gaussian likelihood (Fig 2.2) is the continuous case of the same fix-the-data reading.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">A rare disease test has been run on 3 patients from a new population, all negative. Your model needs <span class="m">$p(\text{positive})$</span> for this population. Rank the three estimators (with a Beta(2,2) prior for the Bayesian ones) by the value they output.</p>
+  <div class="quiz-opts">
+    <button data-k="a">All three output 0: three negatives is three negatives</button>
+    <button data-k="b">MLE outputs 0, and MAP and the predictive output the same positive number, since both use the posterior</button>
+    <button data-k="c">MLE outputs <span class="m">$0/3 = 0$</span>; MAP outputs <span class="m">$(0+2-1)/(3+4-2) = 1/5$</span>; the predictive outputs <span class="m">$(0+2)/(3+4) = 2/7$</span>; only MLE forbids a positive outright</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Only MLE is that absolute. Any prior with <span class="m">$a, b &gt; 1$</span> keeps unseen outcomes alive, which is the entire reason to use one here.</div>
+  <div class="quiz-fb" data-k="b">MAP and the predictive both use the posterior but read different summaries of it: the mode has a <span class="m">$-1$</span> and <span class="m">$-2$</span> in it, the mean does not, and with <span class="m">$N = 3$</span> the difference is far from negligible.</div>
+  <div class="quiz-fb" data-k="c">Right, and the ordering 0 &lt; 1/5 &lt; 2/7 mirrors the coin's 1.0 / 0.75 / 0.667 pattern from the other side: the more uncertainty an estimator respects, the further it stays from the data's extreme. On 3 data points, that distance is your safety margin.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): L2 regularization is a Gaussian MAP prior, prove the correspondence</summary>
+  <div>
+    <p>In the logistic-regression lecture we minimized <span class="m">$J_{CE}(w) + \lambda \lVert w \rVert_2^2$</span> and called the penalty "a prior wearing a loss function's clothes". Using this lecture's MAP machinery, make that sentence precise: what is the prior, where does <span class="m">$\lambda$</span> come from, and what is the MLE analogue?</p>
+    <p><b>Answer.</b> Start from this lecture's MAP objective, <span class="m">$\arg\max_w [\log p(D \mid w) + \log p(w)]$</span>, and choose a Gaussian prior on the weights, <span class="m">$p(w) \propto \exp(-\lambda \lVert w \rVert_2^2)$</span>, a bell centred at zero that considers small weights more plausible than large ones. Take the negative log to turn maximization into minimization: the likelihood term <span class="m">$-\log p(D \mid w)$</span> is exactly the cross-entropy loss (that was the likelihood story of the logistic-regression lecture), and the prior term becomes <span class="m">$-\log p(w) = \lambda \lVert w \rVert_2^2$</span> plus a constant the argmin ignores. So the regularized objective <em>is</em> MAP estimation, term for term. The strength <span class="m">$\lambda$</span> is the prior's inverse width: a large <span class="m">$\lambda$</span> is a narrow, opinionated Gaussian that fights the data hard, a small <span class="m">$\lambda$</span> is a broad, permissive one, and <span class="m">$\lambda \to 0$</span> flattens the prior toward uniform, at which point MAP collapses to MLE, which is exactly unregularized training. The coin made this same trade visible in miniature: pseudo-counts are to <span class="m">$\theta$</span> what <span class="m">$\lambda$</span> is to <span class="m">$w$</span>, and "regularization" and "prior" are one concept with two wardrobes.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): when is a plug-in estimate fine, and when do you need the posterior?</summary>
+  <div>
+    <p>You are shipping two systems. A: a click-through-rate model for a high-traffic ad slot with millions of impressions per day. B: a triage model for a new hospital ward with a few dozen labelled cases, where predictions feed a cost-sensitive decision about escalation. For each, plug-in (MLE or MAP) or full posterior predictive, and why?</p>
+    <p><b>Answer.</b> A: plug-in, and MLE at that. With millions of observations the posterior is a spike, the three estimators agree to several decimals (the convergence you watched in Fig 5.1), and integrating over a spike buys nothing while costing compute on every request. This is the regime where MLE's simplicity is a pure win. B: the posterior, and not optional. With dozens of cases the posterior over the relevant rates is wide, a plug-in point hides that width, and the decision downstream is cost-sensitive: escalating too rarely and too often have very different prices, so the decision needs <span class="m">$p(\text{event})$</span> with the parameter uncertainty included, which is precisely the posterior predictive, and ideally the full posterior so different cost thresholds can be applied honestly. Note the general rule hiding in the pair: the value of Bayesian machinery scales with the ratio of decision stakes to data volume. Big data, cheap decisions: plug in. Small data, expensive decisions: integrate. And if you must ship a point estimate in regime B, MAP with a sensible prior is the minimum acceptable hedge, for the same reason coin 2 beat coin 3.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): design a prior and defend its numbers</summary>
+  <div>
+    <p>You are modelling the probability that a brand-new email service's messages are opened. Industry experience says open rates cluster around 20 to 30 percent, and you will have only a handful of sends before the first report is due. Design a Beta prior: choose <span class="m">$a$</span> and <span class="m">$b$</span>, justify both the location and the strength, and say what you would change if the service were instead a minor variant of an existing one with months of data.</p>
+    <p><b>Answer.</b> Location first: the prior mean is <span class="m">$a/(a+b)$</span>, and industry experience centres near 0.25, so we want <span class="m">$a/(a+b) \approx 0.25$</span>, a 1-to-3 ratio of <span class="m">$a$</span> to <span class="m">$b$</span>. Strength second: <span class="m">$a + b$</span> acts as a pseudo-sample size, and our belief is worth something but not much, since a new service may genuinely differ; something like 8 pseudo-observations is a reasonable weight against "a handful of sends". That gives <span class="m">$\mathrm{Beta}(2, 6)$</span>: mean 0.25, both parameters above 1 so no zero-frequency cliffs at either end, and weak enough that 30 real sends dominate it. Check the behaviour at the edges: with 5 sends and 0 opens, the predictive is <span class="m">$(0+2)/(5+8) \approx 0.15$</span>, appropriately pessimistic but not zero; with 5 sends and 5 opens it is <span class="m">$7/13 \approx 0.54$</span>, excited but far from 1.0. For the minor variant of a mature service, raise the strength, not just the precision of the location: months of data on a near-identical product justify something like <span class="m">$\mathrm{Beta}(25, 75)$</span> (mean 0.25, pseudo-sample 100), which will hold the estimate near 0.25 until a comparable volume of new evidence accumulates, exactly the stubbornness that history has earned.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 6 (coding): complete the Dirichlet update</summary>
+  <div>
+    <p>Fill in the three missing lines so the function returns the posterior pseudo-counts, the MAP estimate, and the posterior predictive for a Categorical model with a Dirichlet prior. <code>counts</code> is a length-<span class="m">$K$</span> array of observed outcome counts and <code>alpha</code> a length-<span class="m">$K$</span> array of prior parameters.</p>
+    <pre class="code" data-lang="python"><code>import numpy as np
+
+def dirichlet_update(counts, alpha):
+    post = ...                                   # (1) posterior parameters
+    K, N = len(counts), counts.sum()
+    theta_map = ...                              # (2) posterior mode
+    pred = ...                                   # (3) posterior predictive
+    return post, theta_map, pred</code></pre>
+    <p><b>Answer.</b> The conjugate update is addition, the mode subtracts one per outcome, and the predictive is the normalized posterior counts:</p>
+    <pre class="code" data-lang="python"><code>    post = counts + alpha                        # Dir(alpha + n)
+    theta_map = (post - 1) / (post.sum() - K)    # (alpha_k + n_k - 1) / (sum - K)
+    pred = post / post.sum()                     # (n_k + alpha_k) / (N + sum alpha)</code></pre>
+    <p>Sanity checks worth running: with <code>counts = np.array([0,1,0,2,0,0])</code> and <code>alpha = np.full(6, 2)</code> (the die from the quizzes), <code>theta_map</code> is <span class="m">$[1,2,1,3,1,1]/9$</span> and <code>pred</code> is <span class="m">$[2,3,2,4,2,2]/15$</span>, both matching the hand computations; both vectors sum to 1; and with <code>alpha = np.ones(K)</code> (uniform prior) <code>theta_map</code> reduces to <code>counts / N</code>, the MLE, the same collapse the Beta showed at <span class="m">$a = b = 1$</span>. The Beta version is this code at <span class="m">$K = 2$</span>: <code>counts = [nh, nt]</code>, <code>alpha = [a, b]</code>.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is the probabilistic turn. One formula read backwards gave us the likelihood; its peak gave us MLE and the honest confession that 0.55 was a theorem, not a guess. Thin data exposed the peak's recklessness, priors repaired it, conjugacy made the repair free, and MAP reconnected the whole story to the regularization we had been doing all along. Then the real move: keep the distribution, integrate the prediction, and let uncertainty flow through to the forecast instead of being amputated at the parameter. Next lecture the coin types become classes, the flips become feature vectors, and this exact machinery, priors times fits, starts classifying: Gaussian Bayes models first, Naive Bayes right behind.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../attention-transformers/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 15: Attention and Transformers</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../gaussian-bayes/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 17: Gaussian Bayes Models</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; Lecture 16 &middot; MLE, MAP &amp; Bayesian Prediction</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

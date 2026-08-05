@@ -24,3 +24,4 @@ modules/*/assets/*.toc
 modules/*/assets/*.synctex.gz
 
 .DS_Store
+.vercel

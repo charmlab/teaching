@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logistic Regression — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on logistic regression: the four tries, the sigmoid, probabilistic outputs, cross-entropy, gradient descent, regularization, and softmax.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 6 &middot; The ML Bible</div>
+  <h1>Logistic Regression</h1>
+  <p class="lede">
+    Last lecture we built classifiers that draw a line and make a call. This
+    lecture the call gets a confidence. Logistic regression keeps the linear
+    score, squashes it through a sigmoid into a probability, and trains with a
+    loss that actually punishes confident mistakes. Getting there takes four
+    honest attempts, and the three failures teach more than the success. Every
+    step has an interactive figure, every equation gets real numbers, and by
+    the end you will have trained the model yourself, by hand and in code.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: a verdict is not a confidence</a></li>
+    <li><a href="#sec-tries">Four tries at a trainable classifier</a></li>
+    <li><a href="#sec-sigmoid">The sigmoid</a></li>
+    <li><a href="#sec-prob">The probabilistic interpretation</a></li>
+    <li><a href="#sec-training">Training: likelihood, cross-entropy, gradient descent</a></li>
+    <li><a href="#sec-reg">Regularization</a></li>
+    <li><a href="#sec-softmax">Softmax: more than two classes</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> A verdict is not a confidence</h2>
+
+<p>
+The classifiers of last lecture end in a threshold. Compute a linear score,
+check its sign, announce a class. That machine has two problems, and they are
+the two problems this whole lecture exists to fix.
+</p>
+
+<p>
+First, it cannot tell you how sure it is. A patient whose score is 0.01 and a
+patient whose score is 47 get the same output: positive. One of those calls
+is a coin flip and the other is near certainty, and the model has no way to
+say which is which. Real decisions need that difference. A spam filter that
+is 51% sure should behave differently from one that is 99.9% sure.
+</p>
+
+<p>
+Second, it is hard to train. The threshold is a step function: flat, then a
+jump, then flat again. Move the weights a little and the output usually does
+not change at all, so the loss does not change either, so the gradient is
+zero, so gradient descent, the one optimizer we trust, has nothing to work
+with. Feel both problems before any math:
+</p>
+
+<div class="figure" id="fig-hook">
+  <div class="fig-mount" data-fig="hook"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the problem in one picture. Drag the query along the axis: the hard threshold gives the same blunt verdict whether the query sits on the boundary or a mile from it. Toggle the probabilistic view and the model finally says how sure it is.</p>
+</div>
+
+<p>
+What we want is a model that outputs a <strong>probability</strong>: a number
+in <span class="m">$[0, 1]$</span> that means "this is my degree of belief
+that the class is 1". The central idea of the lecture, and it is worth
+saying once in plain words: frame classification as learning probabilities,
+then decide from them. The model that does this is logistic regression, and
+the cleanest way to understand it is to watch it get invented, one failed
+attempt at a time.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. FOUR TRIES ═══════════════════ -->
+<section id="sec-tries">
+<h2><span class="secnum">1.</span> Four tries at a trainable classifier</h2>
+
+<p>
+Set up the problem. Inputs <span class="m">$x$</span>, binary targets
+<span class="m">$t \in \{0, 1\}$</span>, and the linear score we already
+trust from the last two lectures:
+<span class="m">$z = w^\top x$</span> (with the bias absorbed into
+<span class="m">$w$</span> by the usual constant feature). That score has a
+name I will use from now on: <strong>logit</strong>. The logit is the raw
+linear score before anything is done to it. The question of the lecture is
+what to do with it, and the answer takes four tries.
+</p>
+
+<h3>Try #1: the hard threshold</h3>
+
+$$ z = w^\top x, \qquad y = \mathbb{I}[z \ge 0], \qquad
+   L_{0\text{-}1} = \mathbb{I}[y \neq t] $$
+
+<p>
+Predict class 1 when the logit is non-negative, and count a loss of 1 for
+every mistake. The zero/one loss is exactly what we care about, the number of
+errors, and it is exactly what we cannot optimize. As a function of the
+weights it is flat with jumps: nudging <span class="m">$w$</span> almost
+never flips a prediction, so the loss sits still, and where it does flip, the
+loss jumps discontinuously. The gradient is zero almost everywhere and
+undefined at the jumps. It kills gradients. Smooth optimization is dead on
+arrival.
+</p>
+
+<h3>Try #2: least squares on the score</h3>
+
+$$ z = w^\top x, \qquad L_{\text{sq}} = \tfrac{1}{2}(z - t)^2 $$
+
+<p>
+Borrow last lecture's machinery: regress the score directly onto the binary
+targets with squared loss, then threshold <span class="m">$z$</span> to
+decide. Now everything is differentiable and we can train. But we are
+optimizing the wrong thing. Squared loss wants
+<span class="m">$z$</span> to <em>equal</em> the target, not to be on the
+right side of it. A point that is "too correct", a class-1 example whose
+score is 5 instead of 1, still incurs loss, so the fit drags the line back
+toward the pack. One outlier deep in its own correct territory can tilt the
+whole boundary the wrong way and sacrifice points that were fine.
+</p>
+
+<h3>Try #3: sigmoid plus squared loss</h3>
+
+$$ z = w^\top x, \qquad y = \sigma(z), \qquad
+   L_{\text{sq}} = \tfrac{1}{2}(y - t)^2 $$
+
+<p>
+Fix Try #2's complaint by bounding the output. The
+<strong>sigmoid</strong> <span class="m">$\sigma$</span> (section 2 gives it
+the full treatment) squashes any real score into <span class="m">$[0,1]$</span>,
+so "too correct" stops being penalized: once <span class="m">$y$</span> is
+near the target it cannot overshoot it. Smooth, bounded, trains the bounded
+output directly. And yet it fails, more quietly this time. Chain rule on the
+loss:
+</p>
+
+$$ \frac{\partial L_{\text{sq}}}{\partial w} = (y - t)\,
+   \underbrace{y(1 - y)}_{\text{can be tiny}}\, x $$
+
+<p>
+That middle factor <span class="m">$y(1-y)$</span> is the sigmoid's slope,
+and it collapses toward zero whenever <span class="m">$y$</span> is near 0 or
+1. Here is the disaster: a <strong>confident mistake</strong>, say
+<span class="m">$y \approx 1$</span> when <span class="m">$t = 0$</span>,
+is precisely where we need the loudest correction, and it is precisely where
+<span class="m">$y(1-y) \approx 0$</span> mutes the gradient. The loss
+<strong>saturates</strong>. The model is maximally wrong and the learning
+signal is almost nothing.
+</p>
+
+<h3>Try #4: sigmoid plus cross-entropy</h3>
+
+<p>
+Keep the model, <span class="m">$y = \sigma(z)$</span>, and change the loss.
+The <strong>cross-entropy loss</strong> (also called the log loss) is
+</p>
+
+$$ L_{CE}(y, t) = -t \log y - (1 - t)\log(1 - y) $$
+
+<p>
+Read it one case at a time. If <span class="m">$t = 1$</span>, the loss is
+<span class="m">$-\log y$</span>: near zero when <span class="m">$y$</span>
+is near 1, and blowing up toward infinity as
+<span class="m">$y \to 0$</span>. If <span class="m">$t = 0$</span>, the loss
+is <span class="m">$-\log(1-y)$</span>: quiet while
+<span class="m">$y \approx 0$</span>, explosive as
+<span class="m">$y \to 1$</span>. Cross-entropy reacts sharply to confident
+mistakes, exactly where squared loss went numb. That asymmetry fixes the
+learning signal, and section 4 shows it does so with almost suspicious
+elegance. This combination, a linear logit, a sigmoid, and cross-entropy, is
+<strong>logistic regression</strong>.
+</p>
+
+<p>
+Now watch all four attempts run on the same data. This is the signature
+figure of the lesson. Work the tries in order, then grab the ringed outlier
+and drag it: Try #2 misbehaves, Try #4 holds.
+</p>
+
+<div class="figure" id="fig-tries">
+  <div class="fig-mount" data-fig="tries"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the four tries on one 1-D dataset. Left: the data, the model's output curve, and the decision boundary, all refit live. Right: the loss as a function of where the boundary sits, which is the terrain gradient descent has to walk. Try #1 is a staircase with zero slope, Try #3 flattens into plateaus far from the answer, Try #4 keeps a slope everywhere. Drag the ringed outlier right and watch Try #2 give away good points while Try #4 does not move.</p>
+</div>
+
+<p>
+One more view of the same story, with the model stripped away. Fix a single
+example with <span class="m">$t = 1$</span> and plot each candidate loss as a
+function of the logit <span class="m">$z$</span>. What should a good curve
+look like? High on the left (wrong and confident), sliding down to near zero
+on the right (right and confident), with a slope that never vanishes on the
+wrong side:
+</p>
+
+<div class="figure" id="fig-losscompare">
+  <div class="fig-mount" data-fig="losscompare"></div>
+  <p class="fig-caption"><b>Fig 1.2,</b> the four losses for a <span class="m">$t = 1$</span> example, as functions of the score <span class="m">$z$</span>. Slide the probe. Zero/one is flat everywhere it is defined. Squared-on-score dips at <span class="m">$z = 1$</span> and then rises again, punishing confidence. Sigmoid+squared flattens at both ends, including the disastrous left end. Cross-entropy stays steep exactly where the mistake is confident.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: cross-entropy's asymmetry, real numbers</div>
+  <p><b>Confident and correct.</b> <span class="m">$t = 1$</span>, model says <span class="m">$y = 0.98$</span>:</p>
+  $$ L_{CE} = -\log(0.98) \approx 0.020 $$
+  <p><b>Confident and wrong.</b> <span class="m">$t = 1$</span>, model says <span class="m">$y = 0.02$</span>:</p>
+  $$ L_{CE} = -\log(0.02) \approx 3.912 $$
+  <p>Same confidence, opposite verdicts, and the wrong one costs about <b>194 times</b> more. Compare Try #3 on the same confident mistake: squared loss gives <span class="m">$\tfrac12(0.02 - 1)^2 = 0.480$</span>, a bounded, polite penalty, and its gradient carries the factor <span class="m">$y(1-y) = 0.02 \times 0.98 \approx 0.0196$</span>, so the correction is whispered. Cross-entropy shouts.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why exactly does the zero/one loss of Try #1 have no useful gradient?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Because it is too expensive to compute for large datasets</button>
+    <button data-k="b">As a function of the weights it is piecewise flat with jumps: small weight changes almost never flip a prediction, so the derivative is zero almost everywhere and undefined at the jumps</button>
+    <button data-k="c">Because it can only be used with two classes</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Cost is not the issue; counting errors is cheap. The problem is what the loss surface looks like to an optimizer.</div>
+  <div class="quiz-fb" data-k="b">Right. Gradient descent reads local slope, and the zero/one loss offers slope nowhere: flat plateaus separated by cliffs. Fig 1.1's right panel under Try #1 is that staircase, drawn from the real data.</div>
+  <div class="quiz-fb" data-k="c">It generalizes to any number of classes fine. The failure is geometric: no slope anywhere an optimizer could stand.</div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Try #3 (sigmoid + squared loss) sees a training point with <span class="m">$t = 0$</span> that it currently predicts <span class="m">$y = 0.99$</span>. What does its gradient do, and why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It is huge, because the prediction error $y - t = 0.99$ is nearly maximal</button>
+    <button data-k="b">It is exactly zero, because squared loss ignores misclassified points</button>
+    <button data-k="c">It is nearly zero: the gradient carries the sigmoid-slope factor $y(1-y) \approx 0.0099$, which mutes the large error, so the confident mistake produces almost no learning signal</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That is what <em>should</em> happen, and it is what cross-entropy arranges. But Try #3's gradient is <span class="m">$(y-t)\,y(1-y)\,x$</span>, and the middle factor kills it.</div>
+  <div class="quiz-fb" data-k="b">Not exactly zero, and not by design. It is the sigmoid's flatness at its ends, not the loss's intent, that silences the point.</div>
+  <div class="quiz-fb" data-k="c">Exactly. <span class="m">$0.99 \times 0.01 = 0.0099$</span>, so the gradient is two orders of magnitude smaller than the error deserves. This is saturation, and it is the specific bug cross-entropy was chosen to fix.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. THE SIGMOID ═══════════════════ -->
+<section id="sec-sigmoid">
+<h2><span class="secnum">2.</span> The sigmoid</h2>
+
+<p>
+The function doing the squashing deserves its own section. The
+<strong>sigmoid</strong>, also called the <strong>logistic function</strong>,
+is
+</p>
+
+$$ z = w^\top x, \qquad y = \sigma(z) = \frac{1}{1 + e^{-z}} \in [0, 1] $$
+
+<p>
+Trace its behaviour from the formula. As
+<span class="m">$z \to -\infty$</span>, the <span class="m">$e^{-z}$</span>
+in the denominator explodes and <span class="m">$y \to 0$</span>. At
+<span class="m">$z = 0$</span>, the denominator is exactly 2, so
+<span class="m">$y = 0.5$</span>: the model is on the fence precisely when
+the score is on the boundary. As <span class="m">$z \to +\infty$</span>,
+<span class="m">$e^{-z}$</span> vanishes and <span class="m">$y \to 1$</span>.
+An S-shaped ramp from 0 to 1, centred where the score is zero. In the
+vocabulary you will use for the rest of the course:
+<span class="m">$z$</span> is the logit, and <span class="m">$\sigma$</span>
+is the <strong>activation function</strong>, the nonlinearity applied to a
+linear score.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the sigmoid at five scores</div>
+  <p>
+  <span class="m">$\sigma(0) = \frac{1}{1+1} = 0.5$</span>.&ensp;
+  <span class="m">$\sigma(2) = \frac{1}{1 + e^{-2}} = \frac{1}{1.135} \approx 0.881$</span>.&ensp;
+  <span class="m">$\sigma(-2) = \frac{1}{1 + e^{2}} = \frac{1}{8.389} \approx 0.119$</span>.&ensp;
+  <span class="m">$\sigma(4) \approx 0.982$</span>.&ensp;
+  <span class="m">$\sigma(-4) \approx 0.018$</span>.
+  </p>
+  <p>Two things to notice and keep. Symmetry: <span class="m">$\sigma(-z) = 1 - \sigma(z)$</span>, which you can verify in every pair above. And compression: moving the score from 2 to 4 moves the output only from 0.881 to 0.982. Out on the tails, big changes in <span class="m">$z$</span> barely move <span class="m">$y$</span>, which is the same flatness that sabotaged Try #3.</p>
+</div>
+
+<p>
+In one dimension the model is
+<span class="m">$y = \sigma(w_0 + w_1 x)$</span>, and the two weights have
+clean jobs. The bias <span class="m">$w_0$</span> shifts the curve left and
+right: the centre sits where <span class="m">$w_0 + w_1 x = 0$</span>, at
+<span class="m">$x = -w_0 / w_1$</span>. The weight
+<span class="m">$w_1$</span> controls steepness: crank it and the ramp
+sharpens. Push <span class="m">$w_1 \to \infty$</span> and the sigmoid
+approaches a hard step, which means Try #1 is hiding inside this model as a
+limiting case. Logistic regression did not throw the threshold away, it made
+the threshold soft and therefore trainable. Prove all three claims with the
+sliders:
+</p>
+
+<div class="figure" id="fig-shaper">
+  <div class="fig-mount" data-fig="shaper"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the sigmoid shaper. Slide <span class="m">$w_0$</span> to shift the curve, <span class="m">$w_1$</span> to sharpen or flip it. The marked crossing is where <span class="m">$y = 0.5$</span>, the decision boundary, at <span class="m">$x = -w_0/w_1$</span>. Press the step-limit button and watch <span class="m">$w_1$</span> climb until the sigmoid is indistinguishable from Try #1's hard threshold.</p>
+</div>
+
+<p>In code, the sigmoid is one line, and it is the first of four functions this lesson builds:</p>
+
+<pre class="code" data-lang="python"><code>def sigmoid(z):
+    return 1 / (1 + np.exp(-z))   # works elementwise on arrays too</code></pre>
+
+<details class="check">
+  <summary>Check: what exactly does the step-function limit recover, and what does it cost?</summary>
+  <div>
+    <p>As <span class="m">$w_1 \to \infty$</span> with the boundary <span class="m">$-w_0/w_1$</span> held fixed, describe what the model becomes and what is gained or lost.</p>
+    <p><b>Answer.</b> The ramp's width shrinks toward zero, so <span class="m">$\sigma(w_0 + w_1 x)$</span> tends to 0 for <span class="m">$x$</span> below the boundary and 1 above it: exactly Try #1's hard-threshold classifier at the same boundary. What is lost is everything this lecture wanted. The outputs stop being graded confidences and become blunt verdicts, and the gradient dies: <span class="m">$y(1-y)$</span> is near zero for every point not sitting on the boundary, so training stalls. Steepness is confidence, and infinite steepness is untrainable overconfidence. You can watch the gradient readout in Fig 2.1 collapse as <span class="m">$w_1$</span> grows.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 3. PROBABILISTIC INTERPRETATION ═══════════════════ -->
+<section id="sec-prob">
+<h2><span class="secnum">3.</span> The probabilistic interpretation</h2>
+
+<p>
+So far the sigmoid is a squashing trick. Here is the reading that turns it
+into a model. Treat the output as the model's probability that the class is
+1:
+</p>
+
+$$ p(t = 1 \mid x; w) = y = \sigma(w^\top x), \qquad
+   p(t = 0 \mid x; w) = 1 - y $$
+
+<p>
+The two cases fold into one expression that will do real work in section 4.
+For <span class="m">$t \in \{0, 1\}$</span>:
+</p>
+
+$$ p(t \mid x; w) = y^{t} (1 - y)^{1 - t} $$
+
+<p>
+Check it against both cases, because compact formulas earn trust through
+arithmetic. If <span class="m">$t = 1$</span>: the expression is
+<span class="m">$y^1 (1-y)^0 = y$</span>. If <span class="m">$t = 0$</span>:
+it is <span class="m">$y^0 (1-y)^1 = 1 - y$</span>. The exponents act as a
+switch, selecting whichever probability matches the observed label.
+</p>
+
+<p>
+Under this reading, an output of <span class="m">$y = 0.8$</span> means "80%
+probability of the positive class". That sentence carries a promise: the
+number should behave like a real probability, so that among all the examples
+where the model says 0.8, about 80% actually turn out positive. An output
+with that property is called a <strong>calibrated probability</strong>, and
+it is what separates a probability from a score that merely lives in
+<span class="m">$[0, 1]$</span>.
+</p>
+
+<h3>The decision boundary is still a line</h3>
+
+<p>
+Where does the model stop preferring one class over the other? Where it is
+split evenly: <span class="m">$p = 0.5$</span>. The sigmoid hits 0.5 exactly
+when its input is zero, so the boundary is
+</p>
+
+$$ w^\top x + w_0 = 0 $$
+
+<p>
+which is the same linear boundary we have had since last lecture. Nothing
+about the geometry changed. What changed is everything around the line: the
+model now grades the whole plane, confident far from the boundary, uncertain
+near it, instead of painting two flat regions. A linear boundary, now with
+probabilities attached.
+</p>
+
+<div class="figure" id="fig-probmap">
+  <div class="fig-mount" data-fig="probmap"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the probability readout. The plane is shaded by <span class="m">$\sigma(w^\top x + w_0)$</span>, the orange contour is the <span class="m">$p = 0.5$</span> boundary, and it is a straight line. Drag the square handle to move the boundary, the round handle to rotate it, and the steepness slider to sharpen the ramp. Drag the white query point anywhere and read off the model's probability there, or press Fit to snap to the cross-entropy optimum.</p>
+</div>
+
+<p>
+The slides' running example makes it concrete: predict whether a student
+passes an exam from hours studied. One feature, one weight, one bias, and the
+output is a curve you can read decisions off directly:
+</p>
+
+<div class="figure" id="fig-exam">
+  <div class="fig-mount" data-fig="exam"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> pass or fail from hours studied. The dots are 20 students at 0 (fail) and 1 (pass); the curve is logistic regression fit to them by gradient descent, live. Slide the hours to read <span class="m">$p(\text{pass})$</span> at any study time, and slide the threshold to see where the decision flips. Around 2.7 hours the model is genuinely torn.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Logistic regression outputs smooth probabilities that curve gently across the plane in Fig 3.1. Is its decision boundary curved?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Yes, the sigmoid bends the boundary into an S-shape</button>
+    <button data-k="b">It depends on the data the model was trained on</button>
+    <button data-k="c">No. The boundary is the set where $\sigma(w^\top x + w_0) = 0.5$, which happens exactly where $w^\top x + w_0 = 0$: a straight line, no matter what the probabilities do around it</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The sigmoid bends the <em>output values</em>, not the input geometry. It is applied to the score after the linear map, so the level sets of the score are untouched lines.</div>
+  <div class="quiz-fb" data-k="b">The fitted position and angle depend on the data, but the shape never does: it is baked into the model class. Linear score in, linear level sets out.</div>
+  <div class="quiz-fb" data-k="c">Right. The sigmoid is monotonic, so thresholding the probability at 0.5 is identical to thresholding the logit at 0. Probabilities got richer; the geometry stayed linear. Nonlinear boundaries need nonlinear features, the same move as polynomial regression.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. TRAINING ═══════════════════ -->
+<section id="sec-training">
+<h2><span class="secnum">4.</span> Training: likelihood, cross-entropy, gradient descent</h2>
+
+<p>
+The model assigns a probability to every labelled example: probability
+<span class="m">$y^{(i)}$</span> if <span class="m">$t^{(i)} = 1$</span>, and
+<span class="m">$1 - y^{(i)}$</span> if <span class="m">$t^{(i)} = 0$</span>.
+So there is a natural definition of a good weight vector: one under which the
+training data we actually saw is probable. Multiply the per-example
+probabilities together (the compact form from section 3 doing its job) to get
+the <strong>likelihood</strong> of the training data:
+</p>
+
+$$ \ell(w) = \prod_{i=1}^{N} \left( y^{(i)} \right)^{t^{(i)}}
+   \left( 1 - y^{(i)} \right)^{1 - t^{(i)}} $$
+
+<p>
+Maximize that and you have trained the model. But products of hundreds of
+numbers in <span class="m">$[0,1]$</span> are numerically miserable and
+analytically awkward. The standard trick: the logarithm is monotonic, so
+<span class="m">$f$</span> and <span class="m">$\log f$</span> have the same
+maximizer. Take the log, and the product becomes a sum. Then flip the sign
+and divide by <span class="m">$N$</span>, because our habit is minimizing
+averages. What drops out is exactly the loss Try #4 pulled from a hat, now
+derived rather than guessed, the empirical <strong>cross-entropy</strong>:
+</p>
+
+$$ J_{CE}(w) = \frac{1}{N} \sum_{i=1}^{N}
+   \left[ -t^{(i)} \log y^{(i)} - (1 - t^{(i)}) \log\!\left(1 - y^{(i)}\right) \right],
+   \qquad y^{(i)} = \sigma\!\left(w^\top x^{(i)}\right) $$
+
+<p>
+Maximizing likelihood and minimizing cross-entropy are the same act. There is
+no closed-form solution this time (the sigmoid saw to that), so we train the
+way everything after linear regression trains, by <strong>gradient
+descent</strong>:
+</p>
+
+$$ w^{(k+1)} \leftarrow w^{(k)} - \alpha \, \nabla_w J_{CE}(w) $$
+
+<h3>The cancellation that justifies everything</h3>
+
+<p>
+Now the payoff for choosing this exact loss. Compute the gradient for one
+example by the chain rule, through the three stages loss, sigmoid, score:
+</p>
+
+$$ \frac{\partial L_{CE}}{\partial w}
+ = \frac{\partial L_{CE}}{\partial y}
+   \cdot \frac{\partial y}{\partial z}
+   \cdot \frac{\partial z}{\partial w}
+ = \underbrace{\frac{y - t}{y(1-y)}}_{\text{loss}}
+   \cdot \underbrace{y(1-y)}_{\text{sigmoid}}
+   \cdot \underbrace{x\vphantom{\frac{y}{y}}}_{\text{score}}
+ = (y - t)\, x $$
+
+<p>
+Look at what happened. The sigmoid contributes the slope factor
+<span class="m">$y(1-y)$</span>, the same factor that saturated Try #3. The
+cross-entropy contributes its exact reciprocal. They cancel, completely, and
+the surviving gradient over the dataset is
+</p>
+
+$$ \nabla_w J_{CE} = \frac{1}{N}\sum_{i=1}^{N}
+   \left( y^{(i)} - t^{(i)} \right) x^{(i)} $$
+
+<p>
+No saturation factor anywhere. A confident mistake has
+<span class="m">$|y - t| \approx 1$</span>, the largest gradient an example
+can produce, which is exactly the behaviour we asked for in section 1. And
+the form should look familiar: prediction minus target, times input. It is
+the same gradient linear regression had, with
+<span class="m">$\sigma(w^\top x)$</span> in place of
+<span class="m">$w^\top x$</span>. This cancellation is not luck. It is the
+reason cross-entropy is the loss: it is precisely the loss whose steepness
+grows to undo the sigmoid's flatness.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one gradient step, real numbers</div>
+  <p>One training example with augmented input <span class="m">$x = (1, 2)^\top$</span> (bias feature first) and label <span class="m">$t = 0$</span>. Current weights <span class="m">$w = (0, 1)^\top$</span>, learning rate <span class="m">$\alpha = 0.1$</span>.</p>
+  <p><b>Forward.</b> <span class="m">$z = w^\top x = 0 \cdot 1 + 1 \cdot 2 = 2$</span>, so <span class="m">$y = \sigma(2) \approx 0.881$</span>. The model is 88% sure this class-0 point is class 1: a confident mistake. Loss: <span class="m">$-\log(1 - 0.881) = -\log(0.119) \approx 2.13$</span>.</p>
+  <p><b>Gradient.</b> <span class="m">$(y - t)\,x = (0.881 - 0)\,(1, 2)^\top = (0.881,\ 1.762)^\top$</span>. Large, as a confident mistake deserves.</p>
+  <p><b>Step.</b> <span class="m">$w \leftarrow (0, 1)^\top - 0.1\,(0.881, 1.762)^\top = (-0.088,\ 0.824)^\top$</span>.</p>
+  <p><b>Did it help?</b> New score <span class="m">$z = -0.088 + 0.824 \times 2 = 1.560$</span>, new prediction <span class="m">$y = \sigma(1.560) \approx 0.826$</span>, new loss <span class="m">$-\log(0.174) \approx 1.75$</span>, down from 2.13. Still wrong, but less confident about it, and the next step pushes the same way.</p>
+  <p><b>The Try #3 comparison.</b> On the same point, the sigmoid+squared gradient is <span class="m">$(y-t)\,y(1-y)\,x = 0.881 \times 0.105 \times (1,2)^\top \approx (0.092,\ 0.185)^\top$</span>, about 9.5 times smaller. Same mistake, one-tenth the correction.</p>
+</div>
+
+<p>
+Now watch training happen at full scale, on data. This is the second
+signature figure. Run cross-entropy, then reset, switch the loss to
+sigmoid+squared, sabotage the initialization, and watch it freeze:
+</p>
+
+<div class="figure" id="fig-trainer">
+  <div class="fig-mount" data-fig="trainer"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the gradient-descent trainer. Left: the boundary and probability shading update as training runs; the flagged point is mislabelled, a confident mistake in waiting. Right: the live loss curve. Step, play, change <span class="m">$\alpha$</span>, and use Pause &amp; predict to commit to which way the next step pushes before it happens. Then press Sabotage: from a confidently wrong start, cross-entropy recovers and sigmoid+squared barely moves, because every gradient it computes is muted by <span class="m">$y(1-y) \approx 0$</span>.</p>
+</div>
+
+<h3>The training loop in code</h3>
+
+<p>
+Everything above compresses into a few honest lines. The loss for
+bookkeeping, and the loop that does the work:
+</p>
+
+<pre class="code" data-lang="python"><code>def cross_entropy(y, t):
+    return np.mean(-t * np.log(y) - (1 - t) * np.log(1 - y))
+
+def fit(X, t, alpha=0.3, epochs=5000):
+    w = np.zeros(X.shape[1])
+    for _ in range(epochs):
+        y = sigmoid(X @ w)              # forward: probabilities
+        grad = X.T @ (y - t) / len(t)   # the clean (y - t) x gradient
+        w -= alpha * grad               # step downhill
+    return w</code></pre>
+
+<p>
+And here is that exact loop wired to the exam dataset from Fig 3.2, really
+executing. Change the learning rate, the epochs, or the regularization
+strength <span class="m">$\lambda$</span> (a preview of section 5), and rerun
+it. And try <span class="m">$\alpha = 3$</span> once, on purpose: the step
+is too big for this valley, so the loss stops falling and starts bouncing
+between the walls, the same too-big-step failure you met in Lecture 4:
+</p>
+
+<div class="figure" id="fig-codeex">
+  <div class="fig-mount" data-fig="codeex"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> the training loop, live. The Python shown is faithfully mirrored by the code that runs when you press Run: same dataset, same gradient, same updates. The printout shows the loss trajectory, the final weights, and the training accuracy, all computed on the spot.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In the cross-entropy gradient derivation, what exactly cancels, and why is that the whole point?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The sigmoid's slope $y(1-y)$ cancels against the $1/[y(1-y)]$ in the loss derivative, leaving $(y-t)x$: the saturation factor that muted Try #3 is removed, so confident mistakes get full-strength gradients</button>
+    <button data-k="b">The inputs $x$ cancel, which is why the gradient does not depend on the data</button>
+    <button data-k="c">The targets $t$ cancel, which is why logistic regression is unsupervised</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Exactly. Cross-entropy's derivative blows up at the same rate the sigmoid's slope collapses, and the product is perfectly tame. The result behaves like linear regression's gradient with probabilities as the predictions.</div>
+  <div class="quiz-fb" data-k="b">The <span class="m">$x$</span> survives; it has to, or the gradient could not tell features apart. Look at the final form: <span class="m">$(y-t)x$</span>.</div>
+  <div class="quiz-fb" data-k="c">The target survives too, inside the residual <span class="m">$y - t$</span>. Without it there would be nothing to learn toward.</div>
+</div>
+
+<details class="check">
+  <summary>Coding check: complete the cross-entropy gradient step</summary>
+  <div>
+    <p>Fill in the two missing lines so the update implements one full-batch cross-entropy step. <code>X</code> is <span class="m">$N \times (D{+}1)$</span> with a bias column, <code>t</code> is length <span class="m">$N$</span>.</p>
+<pre class="code" data-lang="python"><code>y = sigmoid(X @ w)
+grad = ...          # (1) the gradient of J_CE
+w = ...             # (2) the descent update</code></pre>
+    <p><b>Answer.</b></p>
+<pre class="code" data-lang="python"><code>y = sigmoid(X @ w)
+grad = X.T @ (y - t) / len(t)   # (1)  (1/N) sum of (y - t) x
+w = w - alpha * grad            # (2)  step against the gradient</code></pre>
+    <p>Common bugs, worth naming: writing <code>t - y</code> and then also subtracting (a sign error that makes training climb the loss), forgetting the <code>1/N</code> (which silently multiplies your learning rate by <span class="m">$N$</span>), and applying the extra <span class="m">$y(1-y)$</span> factor out of habit from Try #3, which quietly reintroduces saturation into a loss that was chosen to remove it.</p>
+  </div>
+</details>
+
+<h3>From probabilities to decisions</h3>
+
+<p>
+One loose end. The model outputs probabilities, but the world eventually
+demands an action: flag the email or not, treat the patient or not. So the
+pipeline ends the way it started, with a threshold, now applied to the
+probability: predict class 1 when
+<span class="m">$y \ge \tau$</span>. The default is
+<span class="m">$\tau = 0.5$</span>, matching the boundary of section 3, but
+<span class="m">$\tau$</span> is yours to move, and moving it trades one kind
+of error against the other. Lowering <span class="m">$\tau$</span> catches
+more true positives at the cost of more false alarms; raising it does the
+reverse. The probabilities do not change at all. Only the decision rule does,
+which is exactly the freedom a probabilistic classifier buys you:
+</p>
+
+<div class="figure" id="fig-threshold">
+  <div class="fig-mount" data-fig="threshold"></div>
+  <p class="fig-caption"><b>Fig 4.3,</b> the threshold and what it costs. Every training point is placed at its predicted probability; drag the threshold <span class="m">$\tau$</span> through them and watch the confusion matrix and the precision, recall, and F1 readouts update live. The model is fixed the whole time. Only your decision rule moves.
+  <!-- flagged addition: the confusion matrix and precision/recall/F1 metrics are requested by the
+       lesson spec (interactive 7) but are not in lecture-06-source-content.md. -->
+  </p>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. REGULARIZATION ═══════════════════ -->
+<section id="sec-reg">
+<h2><span class="secnum">5.</span> Regularization</h2>
+
+<p>
+Logistic regression inherits linear regression's disease. With many features,
+or few examples, or a feature map that bends the boundary, the fit can chase
+noise, and the symptom is the same as before: weights ballooning to extreme
+values. There is an extra twist specific to classification: bigger weights
+mean a steeper sigmoid, which means more confidence everywhere, so an
+unregularized fit on accommodating data keeps inflating its weights to claim
+certainty it has not earned. The cure is the one from Lecture 4, an
+<strong>L2 penalty</strong> on the weights:
+</p>
+
+$$ J_{\text{reg}}(w) = J_{CE}(w) + \lambda \lVert w \rVert_2^2 $$
+
+<p>
+The first term wants to fit the labels. The second keeps the weights small,
+which keeps the sigmoid's ramp gentle and the probabilities humble, and it is
+the standard defence when features are many or data is limited. The
+hyperparameter <span class="m">$\lambda$</span> sets the exchange rate, and
+you choose it the honest way, on a validation split:
+</p>
+
+<div class="figure" id="fig-reg">
+  <div class="fig-mount" data-fig="reg"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the regularization dial. The model uses quadratic features so the boundary can bend, and three training labels are deliberately noisy. Slide <span class="m">$\lambda$</span>: at zero the boundary contorts around the noise with high confidence; as <span class="m">$\lambda$</span> grows the weight bars shrink, the boundary relaxes, and validation loss dips before underfitting sets in. Every fit is computed for real.</p>
+</div>
+
+<h3>The Bayesian view, in one paragraph</h3>
+
+<p>
+The penalty looks like an engineering hack. It has a principled reading,
+marked as extra reading in the slides but worth thirty seconds. Suppose that
+before seeing any data you believed small weights were more plausible than
+large ones, encoded as a prior distribution
+<span class="m">$p(w) \propto \exp(-\lambda \lVert w \rVert_2^2)$</span>, a
+Gaussian centred at zero. Bayes' rule combines that belief with the data's
+likelihood into a posterior,
+<span class="m">$p(w \mid t, X) \propto p(t \mid X; w)\, p(w)$</span>.
+Take the negative log of the posterior and the likelihood term becomes our
+cross-entropy while the prior term becomes exactly
+<span class="m">$\lambda \lVert w \rVert_2^2$</span>. So minimizing the
+regularized objective is <strong>MAP estimation</strong>, maximum a
+posteriori: finding the most probable weights given the data and a Gaussian
+preference for small ones. L2 regularization is a prior wearing a loss
+function's clothes.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You swap the L2 penalty $\lambda \lVert w \rVert_2^2$ for an L1 penalty $\lambda \sum_j |w_j|$. What does L1 do to the weights that L2 does not, and why is that useful?</p>
+  <div class="quiz-opts">
+    <button data-k="a">L1 makes all weights larger, which improves confidence</button>
+    <button data-k="b">L1 drives many weights to exactly zero (sparse solutions), while L2 only shrinks them toward zero; a zero weight deletes its feature, so L1 performs feature selection as a side effect of training</button>
+    <button data-k="c">Nothing changes: any penalty that grows with the weights behaves identically</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Both penalties push weights toward zero, never away from it. They differ in how they push.</div>
+  <div class="quiz-fb" data-k="b">Right. L2's pull weakens as a weight approaches zero (the gradient <span class="m">$2\lambda w$</span> vanishes), so weights get small but almost never exactly zero. L1's pull is a constant <span class="m">$\lambda$</span> all the way down, so weak features are snapped to exactly zero and drop out of the model entirely. That sparsity is the lasso, introduced by Robert Tibshirani, and it doubles as automatic feature selection: the surviving nonzero weights name the features that matter.</div>
+  <div class="quiz-fb" data-k="c">The penalties' shapes matter enormously near zero. One has a rounded floor, the other a kink, and the kink is what pins weights at exactly zero.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. SOFTMAX ═══════════════════ -->
+<section id="sec-softmax">
+<h2><span class="secnum">6.</span> Softmax: more than two classes</h2>
+
+<p>
+Everything so far is binary. The generalization to
+<span class="m">$K$</span> classes is almost embarrassingly direct, and the
+slides file it under extra reading, but you will meet it in every neural
+network for the rest of the course, so build it now. Give each class its own
+score, a full linear model per class:
+</p>
+
+$$ z_k = w_k^\top x + w_{k0}, \qquad k = 1, \dots, K $$
+
+<p>
+Now convert <span class="m">$K$</span> raw scores into a probability
+distribution. The recipe is the <strong>softmax</strong>: exponentiate every
+score (making everything positive and amplifying gaps), then normalize so the
+results sum to 1:
+</p>
+
+$$ p(C_k \mid x) = \frac{\exp(z_k)}{\sum_{j=1}^{K} \exp(z_j)}, \qquad
+   \sum_{k=1}^{K} p(C_k \mid x) = 1 $$
+
+<p>
+Predict the most probable class,
+<span class="m">$\arg\max_k p(C_k \mid x)$</span>, and train by the exact
+logic of section 4: maximize the likelihood of the observed labels, which
+means minimizing the multi-class cross-entropy,
+<span class="m">$-\log p(C_{\text{true}} \mid x)$</span> averaged over the
+data. The correspondence to keep: binary logistic regression is one score
+into a sigmoid, out comes the probability of class 1. Multi-class is one
+score <em>per class</em> into a softmax, out comes a distribution over all
+the classes. The sigmoid is the <span class="m">$K = 2$</span> special case
+in disguise.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: a softmax over three scores</div>
+  <p>Scores <span class="m">$z = (2,\ 1,\ -1)$</span>.</p>
+  <p><b>Exponentiate.</b> <span class="m">$e^{2} \approx 7.389$</span>, <span class="m">$e^{1} \approx 2.718$</span>, <span class="m">$e^{-1} \approx 0.368$</span>. Sum: <span class="m">$7.389 + 2.718 + 0.368 = 10.475$</span>.</p>
+  <p><b>Normalize.</b>
+  <span class="m">$p(C_1) = 7.389 / 10.475 \approx 0.705$</span>,&ensp;
+  <span class="m">$p(C_2) = 2.718 / 10.475 \approx 0.259$</span>,&ensp;
+  <span class="m">$p(C_3) = 0.368 / 10.475 \approx 0.035$</span>.</p>
+  <p><b>Check.</b> <span class="m">$0.705 + 0.259 + 0.035 = 0.999 \approx 1$</span> (rounding). It always sums to exactly 1 by construction: the denominator is the sum of the numerators.</p>
+  <p><b>Use it.</b> The prediction is <span class="m">$\arg\max$</span>, class 1. If the true class is 1, the per-example loss is <span class="m">$-\log(0.705) \approx 0.349$</span>. If the true class had been 3, the loss would be <span class="m">$-\log(0.035) \approx 3.35$</span>: the same confident-mistake asymmetry as the binary case.</p>
+</div>
+
+<div class="figure" id="fig-softmax">
+  <div class="fig-mount" data-fig="softmax"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the softmax explorer. Three classes, one linear score each, trained with multi-class cross-entropy. The shaded regions are the argmax decision regions. Drag the query point and watch the three scores feed the softmax: the probability bars always sum to 1, dominated by one class deep in its region and genuinely split near the frontiers where regions meet.</p>
+</div>
+
+<p>The fourth and final function of the lesson:</p>
+
+<pre class="code" data-lang="python"><code>def softmax(z):
+    e = np.exp(z - z.max())   # subtract the max for numerical safety
+    return e / e.sum()</code></pre>
+
+<details class="check">
+  <summary>Check: compute a softmax yourself, then write the loss</summary>
+  <div>
+    <p>A three-class model produces scores <span class="m">$z = (1,\ 3,\ 0)$</span> for some input. Compute the softmax probabilities, verify they sum to 1, state the predicted class, and write the negative log-likelihood if the true class is class 3.</p>
+    <p><b>Answer.</b> Exponentials: <span class="m">$e^1 \approx 2.718$</span>, <span class="m">$e^3 \approx 20.086$</span>, <span class="m">$e^0 = 1$</span>; sum <span class="m">$\approx 23.804$</span>. Probabilities: <span class="m">$p(C_1) \approx 2.718/23.804 = 0.114$</span>, <span class="m">$p(C_2) \approx 20.086/23.804 = 0.844$</span>, <span class="m">$p(C_3) \approx 1/23.804 = 0.042$</span>. Sum: <span class="m">$0.114 + 0.844 + 0.042 = 1.000$</span>. Predicted class: <span class="m">$\arg\max = C_2$</span>. If the truth is <span class="m">$C_3$</span>, the negative log-likelihood is <span class="m">$-\log p(C_3) = -\log(0.042) \approx 3.17$</span>, a heavy penalty, because the model put only 4.2% of its belief on the right answer.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 7. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">7.</span> Summary and method card</h2>
+
+<p>
+The whole model is one pipeline, each stage earned by a failure in section 1.
+A linear score <span class="m">$z = w^\top x + w_0$</span>, because linear
+models are trainable and interpretable. A sigmoid
+<span class="m">$y = \sigma(z)$</span>, because decisions need graded
+confidence, not verdicts. Cross-entropy training by gradient descent, because
+it is the likelihood in disguise and its gradient
+<span class="m">$(y - t)\,x$</span> never saturates. And a threshold
+<span class="m">$\tau$</span> at the very end, because actions are discrete
+even when beliefs are not. Logistic regression is a probabilistic linear
+classifier: honest probability estimates attached to a boundary that is still
+a straight line in whatever feature space you chose.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Logistic regression</div>
+  <table>
+    <tr><th>Assumption</th><td>The log-odds of the positive class are linear in the features.</td></tr>
+    <tr><th>Model class</th><td>A linear score through a sigmoid: <span class="m">$p(t{=}1 \mid x) = \sigma(w^\top x + w_0)$</span>. Boundary at <span class="m">$p = 0.5$</span>, a hyperplane.</td></tr>
+    <tr><th>Learning / selection</th><td>Minimize binary cross-entropy (maximum likelihood), usually by gradient-based optimization, with regularization; pick <span class="m">$\lambda$</span> on validation data.</td></tr>
+    <tr><th>Prediction</th><td>Probability <span class="m">$y = \sigma(w^\top x + w_0)$</span>; classify by thresholding at <span class="m">$\tau$</span> (default 0.5, movable when error costs are asymmetric).</td></tr>
+    <tr><th>Strengths</th><td>Fast, interpretable (each weight shifts the log-odds), probabilistic, a strong binary baseline.</td></tr>
+    <tr><th>Limitations</th><td>The boundary is linear in the chosen feature space; probabilities may need calibration before you trust them.</td></tr>
+    <tr><th>Next step</th><td>Softmax for multi-class, or nonlinear feature maps and nonlinear models.</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: similarity (kNN), rules (decision
+trees), parametric regression, linear classification, and now the first
+<em>differentiable</em> classifier, trained end to end by gradient descent on
+a principled loss. That template, score, activation, cross-entropy,
+gradients, is not a stop on the way to neural networks. It is the first
+neural network, one neuron large, and the coming lectures mostly stack more
+of it.
+</p>
+</section>
+
+<!-- ═══════════════════ 8. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">8.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to use the
+ideas, not recite them. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A colleague trains a sigmoid classifier with squared loss. Early on it improves, then it plants a confident wrong prediction on a mislabelled point and never fixes it, even after thousands more epochs. Diagnosis?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The learning rate is too high; lower it and the point will be fixed</button>
+    <button data-k="b">The dataset is too small; more data is the only cure</button>
+    <button data-k="c">Saturation: the squared-loss gradient carries the factor $y(1-y)$, which is nearly zero on a confident prediction, so the mistake generates no learning signal. Switch to cross-entropy, whose gradient $(y-t)x$ stays large there</button>
+  </div>
+  <div class="quiz-fb" data-k="a">A high <span class="m">$\alpha$</span> causes oscillation or divergence, loss jumping around, not a frozen mistake. This model is calm and stuck, a different signature.</div>
+  <div class="quiz-fb" data-k="b">More data dilutes the point's influence but does not restore its gradient. The muting factor is in the loss's own chain rule.</div>
+  <div class="quiz-fb" data-k="c">Right, and you reproduced this in Fig 4.1: sabotaged sigmoid+squared training barely moves, while cross-entropy recovers, because its loss derivative exactly cancels the <span class="m">$y(1-y)$</span> factor.</div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">One feature in your dataset is measured in millimetres (values around 10,000) and another in metres (values around 10). You train logistic regression with gradient descent and it crawls. Why does scaling matter here when it never mattered for decision trees?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Gradient descent takes one step size $\alpha$ for all weights, but each weight's gradient is scaled by its feature's magnitude: huge features force a tiny $\alpha$ to stay stable, which starves the small-feature directions. Standardizing the features rounds out the loss landscape. Trees just threshold one feature at a time, so units never mix</button>
+    <button data-k="b">Large numbers overflow the sigmoid, so the model cannot run at all</button>
+    <button data-k="c">Scaling only matters for distance-based models like kNN, never for logistic regression</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Exactly. Look at the gradient <span class="m">$(y - t)x$</span>: the feature's raw scale multiplies straight into the update. Mismatched scales stretch the loss bowl into a canyon, and one global <span class="m">$\alpha$</span> cannot suit both the steep and the shallow directions. This is why scaling matters for optimization-based models generally.</div>
+  <div class="quiz-fb" data-k="b">The sigmoid saturates gracefully at extreme scores rather than overflowing (with the usual numerically safe implementation). The real damage is to the geometry of optimization.</div>
+  <div class="quiz-fb" data-k="c">kNN suffers through its distance metric, and optimization-based models suffer through their gradients. Different mechanism, same prescription: standardize.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): derive the log-odds form, then defend the weights' interpretability</summary>
+  <div>
+    <p>Starting from <span class="m">$p = \sigma(w^\top x + w_0)$</span>, solve for <span class="m">$\log \frac{p}{1-p}$</span>, and explain what each weight means.</p>
+    <p><b>Answer.</b> Write <span class="m">$z = w^\top x + w_0$</span>, so <span class="m">$p = 1/(1 + e^{-z})$</span>. Rearranged: <span class="m">$1 + e^{-z} = 1/p$</span>, so <span class="m">$e^{-z} = (1-p)/p$</span>, so <span class="m">$-z = \log\frac{1-p}{p}$</span>, and finally</p>
+    $$ \log \frac{p}{1-p} = w^\top x + w_0 $$
+    <p>The quantity on the left is the <b>log-odds</b>: odds are <span class="m">$p/(1-p)$</span>, the ratio of belief for to belief against, and the model makes their logarithm exactly linear in the features. This is the assumption on the method card, derived rather than asserted. Interpretability falls out: increase feature <span class="m">$x_j$</span> by one unit, holding the rest fixed, and the log-odds change by exactly <span class="m">$w_j$</span>, equivalently the odds multiply by <span class="m">$e^{w_j}$</span>, regardless of where you started. A weight of 0.7 means each unit of that feature roughly doubles the odds (<span class="m">$e^{0.7} \approx 2.01$</span>). Sign gives direction, magnitude gives strength, and zero means irrelevant, which is why section 5's L1 penalty doubles as feature selection.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): when do you move the threshold off 0.5, and what does it trade?</summary>
+  <div>
+    <p>Give a scenario for lowering <span class="m">$\tau$</span>, a scenario for raising it, and name the quantity being traded.</p>
+    <p><b>Answer.</b> Move <span class="m">$\tau$</span> whenever the two kinds of error have different costs, which is nearly always. <b>Lower it</b> (say <span class="m">$\tau = 0.2$</span>) when missing a positive is expensive: cancer screening, fraud detection, smoke alarms. You flag anything with even modest probability, catching more true positives (recall rises) while accepting more false alarms (precision falls). <b>Raise it</b> (say <span class="m">$\tau = 0.9$</span>) when acting on a false positive is expensive: auto-blocking a user's account, sending police to an address. Now flags are rare but trustworthy: precision rises, recall falls. The trade is precision against recall, false alarms against misses, and you walked it with your own hands in Fig 4.3. The deeper point: the model did not change, so training and deciding are separable problems. Learn calibrated probabilities once; let each application choose its own <span class="m">$\tau$</span> from its own cost structure.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): logistic regression is a one-neuron neural network. Unpack that.</summary>
+  <div>
+    <p>Map each part of logistic regression onto the anatomy of a single artificial neuron, then say what stacking would add.</p>
+    <p><b>Answer.</b> A neuron computes a weighted sum of its inputs plus a bias, then applies a nonlinearity. That is logistic regression, term for term: the weights <span class="m">$w$</span> are the connection strengths, <span class="m">$w_0$</span> is the bias, the logit <span class="m">$z = w^\top x + w_0$</span> is the pre-activation, and the sigmoid is the activation function producing the output <span class="m">$y \in [0,1]$</span>. Training matches too: cross-entropy loss, gradients by the chain rule (the three-factor product in section 4 is backpropagation through one unit), weight updates by gradient descent. What one neuron cannot do is bend its boundary: the decision surface is a hyperplane, full stop. Stacking fixes exactly that. Feed the input through a layer of such units and their outputs become learned features; a second layer draws a linear boundary in that learned space, which is a nonlinear boundary in the original one. Section 5's quadratic features did this by hand; a network learns the feature map itself. Everything in this lesson, the sigmoid, the cross-entropy, the <span class="m">$(y-t)x$</span> gradient, gets reused verbatim when we build networks.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is logistic regression: four tries, three instructive failures, and a model whose every part is there for a defensible reason. A linear score for trainability, a sigmoid for graded belief, cross-entropy because it is the likelihood and because its gradient refuses to saturate, a threshold you place deliberately, a penalty that is secretly a prior, and a softmax waiting when two classes become many. Next lecture we step back and ask why models err at all, and meet the bias-variance trade-off and the ensembles that exploit it.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../linear-classification/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 5: Linear Classification</div>
+  </a>
+  <a href="../bias-variance-ensembles/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 7: Bias, Variance &amp; Ensembles</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 6 &middot; Logistic Regression</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

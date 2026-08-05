@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Language Models — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on language modelling: the chain rule, n-grams and data sparsity, tokenization, one-hot vectors, word embeddings and analogies, neural language models, decoding, and perplexity.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 13 &middot; The ML Bible</div>
+  <h1>Language Models</h1>
+  <p class="lede">
+    Every lecture so far took inputs that were already numbers: pixels,
+    measurements, features. Language arrives as words, and words come with a
+    property no image has: an inherent order. "A smart person" and "a person
+    smart" contain the same three words, and only one of them sounds right.
+    This lecture turns that intuition into a machine. The whole subject
+    compresses into one move: treat language as a prediction problem, given
+    the previous words, predict the next one. Counting gets us surprisingly
+    far, then hits a wall called data sparsity, and climbing over that wall
+    forces us to invent tokens, embeddings, and neural language models, the
+    exact machinery underneath every modern chatbot.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: which sentence sounds right?</a></li>
+    <li><a href="#sec-prob">Language as probability</a></li>
+    <li><a href="#sec-ngram">The n-gram model: counting as learning</a></li>
+    <li><a href="#sec-tokens">Turning text into numbers</a></li>
+    <li><a href="#sec-embed">Word embeddings</a></li>
+    <li><a href="#sec-neural">Neural language models</a></li>
+    <li><a href="#sec-decode">Training and decoding</a></li>
+    <li><a href="#sec-eval">Evaluating language models</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: which sentence sounds right?</h2>
+
+<p>
+Read these two word sequences: <em>"a smart person"</em> and <em>"a person
+smart"</em>. You did not deliberate. Some circuit in your head instantly
+scored the first one higher, and you could do it because you have consumed a
+lifetime of English and know which words tend to follow which. Now hand the
+same two sequences to a machine. Nothing we have built in this course can
+express "sounds right". Classifiers separate classes, regressors fit curves,
+CNNs find patterns in grids. None of them has an opinion about word order.
+</p>
+
+<p>
+Here is the reframe the whole lecture stands on. "Sounds right" is a
+probability statement: among all the word sequences English speakers produce,
+"a smart person" occurs often and "a person smart" almost never. So build a
+model that assigns every sequence a probability, and the fluency judgement
+becomes arithmetic: score both sequences, prefer the higher one. A model that
+does this is called a <strong>language model</strong>, and below is a tiny
+real one doing exactly that judgement, trained by counting word pairs in an
+eight-sentence corpus:
+</p>
+
+<div class="figure" id="fig-seqprob">
+  <div class="fig-mount" data-fig="seqprob"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the sequence scorer. A bigram model counts word pairs in the small corpus shown, then scores both candidate sequences as a product of per-word conditional probabilities, exactly the chain rule of section 1. Every factor is computed live from the counts; the never-seen pair "person&nbsp;smart" gets a tiny smoothed probability and drags its whole product down by a factor of about fifty.</p>
+</div>
+
+<p>
+Keep the shape of that figure in mind: a sequence's score is a
+<em>product</em>, one factor per word, and each factor asks "given what came
+before, how likely is this next word?" That question, predict the next word,
+turns out to be the master key. Score sentences, generate text, autocomplete
+a search box: all of it reduces to next-word prediction done well.
+</p>
+</section>
+
+<!-- ═══════════════════ 1. LANGUAGE AS PROBABILITY ═══════════════════ -->
+<section id="sec-prob">
+<h2><span class="secnum">1.</span> Language as probability</h2>
+
+<p>
+Four terms before anything else, because everything in this lecture is built
+from them:
+</p>
+
+<dl class="deflist">
+  <dt>Corpus</dt>
+  <dd>A collection of text documents. Our training data.</dd>
+  <dt>Token</dt>
+  <dd>A basic unit of text: a word, a piece of a word, or a character. For now, read "token" as "word"; section 3 complicates this on purpose.</dd>
+  <dt>Vocabulary <span class="m">$\mathcal{V}$</span></dt>
+  <dd>The set of unique tokens, of size <span class="m">$|\mathcal{V}|$</span>.</dd>
+  <dt>Language model</dt>
+  <dd>A model that assigns probabilities to token sequences.</dd>
+</dl>
+
+<p>
+So how do we assign a probability to a whole sequence
+<span class="m">$s = (w_1, \dots, w_T)$</span>? The chain rule of conditional
+probability factors any joint distribution into a product of conditionals,
+one per position:
+</p>
+
+$$ p(s) = p(w_1, \dots, w_T) = \prod_{t=1}^{T} p(w_t \mid w_1, \dots, w_{t-1}) $$
+
+<p>
+Read it as a story: the probability of a sentence is the probability of its
+first word, times the probability of the second word given the first, times
+the probability of the third given the first two, and so on to the end. For
+"a smart person" that is
+<span class="m">$p(\text{a}) \cdot p(\text{smart} \mid \text{a}) \cdot
+p(\text{person} \mid \text{a smart})$</span>, which is exactly what Fig 0.1
+multiplied out. Two things make this factorization the right one for
+language. It is <em>exact</em>, no approximation yet. And every factor is a
+<strong>next-word prediction</strong>: the entire modelling problem has become
+"estimate <span class="m">$p(\text{next word} \mid \text{words so far})$</span>".
+</p>
+
+<p>
+Now the catch. The conditioning context <span class="m">$w_1, \dots,
+w_{t-1}$</span> grows with <span class="m">$t$</span>: word fifty conditions
+on forty-nine previous words, and virtually no two long histories in any
+corpus are identical, so we could never estimate a separate distribution for
+each one. The classical fix is to <em>truncate the memory</em>. The
+<strong>nth-order Markov assumption</strong> says the next word depends only
+on the last <span class="m">$n-1$</span> words:
+</p>
+
+$$ p(w_1, \dots, w_T) \approx \prod_{t=1}^{T} p(w_t \mid w_{t-(n-1)}, \dots, w_{t-1}) $$
+
+<p>
+This is an approximation, and a lossy one: with
+<span class="m">$n = 3$</span>, the model deciding the tenth word remembers
+only words eight and nine. But it buys us something decisive: the context is
+now a fixed, short window, and there are few enough short windows that we can
+actually estimate a distribution for each. A model built this way is called
+an n-gram model, where an <strong>n-gram</strong> is just a contiguous
+sequence of <span class="m">$n$</span> tokens ("a smart" is a bigram,
+"a smart person" is a trigram).
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Under a trigram model (<span class="m">$n = 3$</span>), which words does <span class="m">$p(w_{10} \mid \cdot)$</span> actually condition on?</p>
+  <div class="quiz-opts">
+    <button data-k="a">All nine previous words, that is what the chain rule says</button>
+    <button data-k="b">Only <span class="m">$w_8$</span> and <span class="m">$w_9$</span>, the last <span class="m">$n - 1 = 2$</span> words</button>
+    <button data-k="c">Only <span class="m">$w_9$</span>, the single previous word</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That is the exact chain rule, before the approximation. The whole point of the Markov assumption is to throw the distant words away so each context becomes estimable.</div>
+  <div class="quiz-fb" data-k="b">Right. An n-gram model keeps <span class="m">$n-1$</span> words of memory, so a trigram model sees a two-word window and nothing before it. Everything the model will ever know about word ten lives in words eight and nine.</div>
+  <div class="quiz-fb" data-k="c">One word of memory is a bigram model (<span class="m">$n = 2$</span>). The trigram keeps one more word: <span class="m">$w_8$</span> and <span class="m">$w_9$</span>.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 2. N-GRAM MODEL ═══════════════════ -->
+<section id="sec-ngram">
+<h2><span class="secnum">2.</span> The n-gram model: counting as learning</h2>
+
+<p>
+The Markov assumption left us needing
+<span class="m">$p(w_t \mid \text{context})$</span> for every short context.
+Where do those numbers come from? From the oldest estimator there is:
+counting. Conditional probability says
+<span class="m">$P(B \mid A) = P(A, B) / P(A)$</span>, so estimate both the
+numerator and denominator by their corpus frequencies:
+</p>
+
+$$ p(w_t \mid \text{context}) \approx
+   \frac{\operatorname{count}(\text{context},\, w_t)}{\operatorname{count}(\text{context},\, \cdot)} $$
+
+<p>
+That is the entire learning algorithm. Conceptually the model is a giant
+table: one row per context (for a trigram model, one row per word pair,
+roughly <span class="m">$|\mathcal{V}|^2$</span> rows), one column per
+possible next word (<span class="m">$|\mathcal{V}|$</span> columns), and each
+row, once divided by its total, is a probability distribution over the next
+word. One bookkeeping detail: we mark the end of every sentence with a
+special <code>&lt;/s&gt;</code> token, so "what follows the last word" has a
+well-defined answer, and pad the start with <code>&lt;s&gt;</code> so the
+first word has a context too. Those special tokens count as vocabulary
+entries like any other.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: bigrams from the Sam corpus</div>
+  <p>Train a bigram model on three sentences: <em>"I am Sam"</em>, <em>"Sam I am"</em>, <em>"I do not like green eggs and ham"</em>. The word "I" appears as a context 3 times, followed by "am" twice and "do" once. The word "am" appears as a context twice, followed by "Sam" once and by the end-of-sentence marker once:</p>
+  $$ p(\text{am} \mid \text{I}) = \tfrac{2}{3}, \qquad
+     p(\text{do} \mid \text{I}) = \tfrac{1}{3}, \qquad
+     p(\text{Sam} \mid \text{am}) = \tfrac{1}{2}, \qquad
+     p(\text{I} \mid \text{am}) = 0 $$
+  <p>Note the zero: "am I" never occurs in the corpus, so the model declares it impossible. File that away; it becomes the villain of this section.</p>
+</div>
+
+<p>
+Build the table yourself. The corpus below is editable, the counts and
+probabilities recompute on every keystroke, and the slider changes
+<span class="m">$n$</span> so you can watch the same corpus stretch across a
+bigger and bigger table:
+</p>
+
+<div class="figure" id="fig-ngramtable">
+  <div class="fig-mount" data-fig="ngramtable"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the n-gram counting table, the signature figure of the counting approach. Rows are contexts, columns are next words, and every count comes live from the corpus box. Click a row to see it as a probability distribution and query <span class="m">$p(\text{next} \mid \text{context})$</span>; with the Sam corpus and <span class="m">$n=2$</span>, the "i" row reproduces <span class="m">$p(\text{am} \mid \text{I}) = 2/3$</span> exactly. Then raise <span class="m">$n$</span> and watch the readout: the number of possible table cells explodes as <span class="m">$|\mathcal{V}|^n$</span> while the observed counts stay fixed, so the table fills with zeros.</p>
+</div>
+
+<details class="check">
+  <summary>Check: two bigram estimates, from the table</summary>
+  <div>
+    <p>From the Sam corpus, estimate <span class="m">$p(\text{Sam} \mid \text{am})$</span> and <span class="m">$p(\text{not} \mid \text{do})$</span> by hand, then verify both in Fig 2.1.</p>
+    <p><b>Answer.</b> "am" occurs as a context twice: once followed by "Sam" ("I <em>am Sam</em>") and once at the end of a sentence ("Sam I <em>am</em>", where the next token is <code>&lt;/s&gt;</code>). So <span class="m">$p(\text{Sam} \mid \text{am}) = 1/2$</span>. "do" occurs once, followed by "not", so <span class="m">$p(\text{not} \mid \text{do}) = 1/1 = 1$</span>. The second estimate should worry you: it is built from a single observation, and it claims certainty. Small denominators make loud, unreliable claims, which is data sparsity in miniature.</p>
+  </div>
+</details>
+
+<h3>Generation: run the table in reverse</h3>
+
+<p>
+A table of next-word distributions does not just score text, it can
+<em>write</em> text. Start from a context, look up its row, sample a next
+word from that distribution, append it, shift the context window forward, and
+repeat until the model emits the end-of-sentence token. Higher
+<span class="m">$n$</span> means more context per decision and locally more
+coherent output; it also means each specific context was seen fewer times, so
+the model has fewer continuations to choose from and starts parroting whole
+phrases from the corpus:
+</p>
+
+<div class="figure" id="fig-ngramgen">
+  <div class="fig-mount" data-fig="ngramgen"></div>
+  <p class="fig-caption"><b>Fig 2.2,</b> the n-gram text generator. Each step shows the current context (purple), the live next-word distribution sampled from the counting table, and the sampled word (orange) getting appended. At <span class="m">$n=1$</span> the output is word salad, at <span class="m">$n=2$</span> word pairs make local sense, and at <span class="m">$n=3$</span> whole phrases from the corpus reappear because most trigram rows contain a single continuation.</p>
+</div>
+
+<h3>The wall: data sparsity</h3>
+
+<p>
+So why not keep raising <span class="m">$n$</span>? Ten words of context
+would surely predict better than two. Count what that costs. The table has
+one cell per possible n-gram, about <span class="m">$|\mathcal{V}|^n$</span>
+cells, which is exponential in <span class="m">$n$</span>. A modest 10,000-word
+vocabulary gives <span class="m">$10^{8}$</span> bigram cells,
+<span class="m">$10^{12}$</span> trigram cells,
+<span class="m">$10^{16}$</span> 4-gram cells. Meanwhile the corpus stayed
+the same size, so the counts spread thinner and thinner: most long contexts
+occur rarely or never, and
+<span class="m">$\operatorname{count}(\text{context}, \cdot) \approx 0$</span>
+for almost every row. That hurts twice. A tiny denominator makes the estimate
+noisy, like the overconfident <span class="m">$p(\text{not} \mid \text{do}) = 1$</span>
+above. And a zero numerator assigns probability exactly 0 to perfectly
+plausible next words, the way our model declared "am I" impossible after
+three sentences. Longer contexts are more informative <em>in principle</em>
+and less estimable <em>in practice</em>, and that tension is the engine
+driving the rest of this lecture.
+</p>
+
+<p>
+The counting machinery is a few lines of Python. <code>ngram_counts</code>
+builds the table, <code>p_next</code> normalizes one row into a distribution:
+</p>
+
+<pre class="code" data-lang="python"><code>def ngram_counts(corpus, n):
+    counts = {}                                # context tuple -> {next word: count}
+    for sentence in corpus:
+        words = ["&lt;s&gt;"] * (n - 1) + sentence.split() + ["&lt;/s&gt;"]
+        for i in range(n - 1, len(words)):
+            ctx, w = tuple(words[i - n + 1 : i]), words[i]
+            row = counts.setdefault(ctx, {})
+            row[w] = row.get(w, 0) + 1
+    return counts
+
+def p_next(counts, ctx):                       # one row -> a distribution
+    row = counts.get(tuple(ctx), {})
+    total = sum(row.values())
+    return {w: c / total for w, c in row.items()}</code></pre>
+
+<p>
+Run it for real. The corpus box is editable, so test your own sentences and
+your own queries:
+</p>
+
+<div class="figure" id="fig-ngramcode">
+  <div class="fig-mount" data-fig="ngramcode"></div>
+  <p class="fig-caption"><b>Fig 2.3,</b> a live <code>ngram_counts</code>. Edit the corpus, pick <span class="m">$n$</span>, type a context, and press Run: the functions above execute against your text and print the context's count row and the normalized <code>p_next</code> distribution. Try context "i" on the Sam corpus, then a context that never occurs and see the model come up empty.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why does a longer context (bigger <span class="m">$n$</span>) make each individual probability estimate <em>less</em> reliable, even though more context is more informative?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Longer contexts make the arithmetic slower, so we round more aggressively</button>
+    <button data-k="b">The chain rule stops being exact once contexts are longer than two words</button>
+    <button data-k="c">The number of possible contexts grows exponentially with <span class="m">$n$</span> while the corpus does not, so each context is seen rarely or never, giving noisy ratios and false zeros</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Speed is not the issue; counting is cheap. The problem is statistical, not computational: the counts themselves become too small to trust.</div>
+  <div class="quiz-fb" data-k="b">The chain rule is exact for any length. It is the estimates of each factor that degrade: more specific contexts means fewer matching observations per context.</div>
+  <div class="quiz-fb" data-k="c">Exactly. About <span class="m">$|\mathcal{V}|^n$</span> cells share a fixed number of observations, so a bigger <span class="m">$n$</span> means each estimate rests on fewer examples: noisy when the count is small, and exactly zero for everything never observed. Fig 2.1's sparsity readout shows the ratio collapsing as you raise <span class="m">$n$</span>.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 3. TOKENIZATION ═══════════════════ -->
+<section id="sec-tokens">
+<h2><span class="secnum">3.</span> Turning text into numbers</h2>
+
+<p>
+Everything so far manipulated words as opaque symbols, which counting can get
+away with. To go further, and in particular to put language into a neural
+network, we need an honest answer to a question we skipped: how does raw text
+become numbers a model can compute with? The pipeline every modern system
+uses has four steps:
+</p>
+
+$$ \text{characters} \;\to\; \text{tokens} \;\to\; \text{token IDs} \;\to\; \text{vectors} \;\to\; \text{learned language model} $$
+
+<h3>Step one: tokenization is a choice</h3>
+
+<p>
+<strong>Tokenization</strong> splits raw text into the units the model will
+treat as atomic. It sounds trivial, split on spaces, until the details
+arrive: contractions ("don't"), names, URLs, emojis, and every word the
+corpus never contained. And there is no single correct answer, because the
+split is a modelling decision. <strong>Word-level</strong> tokenization is
+simple and easy to inspect, but needs special rules for all the cases above
+and drowns in unseen words. <strong>Named-entity</strong> tokenization keeps
+multi-word names like "University of Waterloo" together as single units.
+<strong>Subword</strong> tokenization, the choice of modern LLMs, splits rare
+words into reusable pieces ("unbelievably" into something like
+"un&nbsp;believ&nbsp;ably") so that even a word never seen in training is
+built from pieces that were. A related classical trick,
+<strong>lemmatization</strong>, maps surface forms to a dictionary form
+("spending" to "spend", "better" to "good"); it strips superficial variation,
+which helps some classical pipelines and destroys distinctions others need,
+so it is task-dependent. Same string, three different token sequences:
+</p>
+
+<div class="figure" id="fig-tokenizer">
+  <div class="fig-mount" data-fig="tokenizer"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> the tokenizer playground. Type any text and toggle between word-level, subword, and named-entity tokenization: the chips are the tokens, the small number under each is its integer ID in the vocabulary built from your text under that scheme. The same string gives different token counts and different vocabularies under each scheme, which is the point: tokenization is a choice, not a fact of the text.</p>
+</div>
+
+<h3>Step two: token IDs, and why they lie</h3>
+
+<p>
+After tokenization, each distinct token type gets a unique integer ID in
+<span class="m">$[1, |\mathcal{V}|]$</span>, because models index tables with
+integers, not strings. Here is the trap: those integers <em>look</em> like
+numbers but are only labels. A bigger ID does not mean a more important word,
+and a smaller gap between IDs does not mean more similar meaning. The fact
+that <span class="m">$|251 - 255| < |251 - 999|$</span> tells you nothing
+about the words behind those IDs; alphabetical neighbours are not semantic
+neighbours. Feed raw IDs into a model that adds and multiplies its inputs and
+you have silently asserted that word 500 is "halfway between" word 1 and word
+999, an ordering nobody intended:
+</p>
+
+<div class="figure" id="fig-onehot">
+  <div class="fig-mount" data-fig="onehot"></div>
+  <p class="fig-caption"><b>Fig 3.2,</b> IDs versus one-hot. Left view: three words placed at their IDs on a number line; the ID distances (computed live) put "pizza" next to "pillow" and far from "burger", a nonsense geometry. Right view: the same words as one-hot vectors, shown as length-<span class="m">$|\mathcal{V}|$</span> strips with a single 1; every pairwise dot product is 0, so the false ordering is gone, and so is every notion of similarity.</p>
+</div>
+
+<p>
+The standard first fix is <strong>one-hot encoding</strong>: represent token
+<span class="m">$w$</span> as a vector of length
+<span class="m">$|\mathcal{V}|$</span> that is all zeros except a single 1 at
+position <span class="m">$w$</span>,
+</p>
+
+$$ o_{w,j} = \begin{cases} 1 & j = w \\ 0 & \text{otherwise} \end{cases} $$
+
+<p>
+One-hot vectors treat identity as purely categorical, which repairs the false
+ordering: no word is "bigger" than another, and no word is spuriously close
+to another. But look at the price. The vectors are enormous
+(<span class="m">$|\mathcal{V}|$</span> dimensions for a single word) and
+almost entirely zeros, and every pair of distinct words is exactly
+orthogonal: <span class="m">$o_{\text{summer}}^\top o_{\text{autumn}} = 0$</span>,
+the same as <span class="m">$o_{\text{summer}}^\top o_{\text{tractor}} = 0$</span>.
+"Summer" and "autumn" should have <em>something</em> in common, and one-hot
+encoding is structurally incapable of saying so. We fixed the lie and
+installed a blindness.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Why not feed raw token IDs into a neural network, and what does switching to one-hot vectors fix and fail to fix?</p>
+  <div class="quiz-opts">
+    <button data-k="a">IDs are too large numerically; one-hot rescales them to 0s and 1s, which also captures similarity</button>
+    <button data-k="b">IDs impose a fake numerical ordering on categorical labels; one-hot removes the fake ordering but leaves all word pairs equally distant, so similarity is still missing</button>
+    <button data-k="c">IDs change between corpora; one-hot vectors are corpus-independent and also encode meaning</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Scale is fixable with normalization. The real problem is that arithmetic on labels asserts orderings and distances nobody intended, and one-hot encodes no similarity at all: all pairs are orthogonal.</div>
+  <div class="quiz-fb" data-k="b">Right on both counts. One-hot repairs the categorical-versus-numerical confusion, and the orthogonality that makes it safe also makes it blind: "summer" is exactly as far from "autumn" as from "tractor". Getting similarity into the geometry is the next section's job.</div>
+  <div class="quiz-fb" data-k="c">Both representations are tied to a vocabulary, and neither claim about meaning holds: one-hot vectors carry no similarity information whatsoever.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 4. WORD EMBEDDINGS ═══════════════════ -->
+<section id="sec-embed">
+<h2><span class="secnum">4.</span> Word embeddings</h2>
+
+<p>
+We want vectors where similar words are geometrically close. But what makes
+two words "similar", and how would a machine ever measure it without
+understanding meaning? The answer is one of the great ideas of computational
+linguistics, the <strong>distributional hypothesis</strong> (Firth, 1957):
+<em>"You shall know a word by the company it keeps."</em> Words that occur in
+similar contexts have related meanings. You learn what "sushi" is partly
+because it shows up in the same sentence-shaped slots as "pizza": after
+"ate", before "tastes fresh", near "ordered". Meaning leaves a statistical
+fingerprint, and the fingerprint is countable.
+</p>
+
+<p>
+So count it. Give each word <span class="m">$w$</span> a
+<strong>context-count vector</strong> <span class="m">$c_w$</span> with one
+entry per vocabulary word, holding how often that word appears near
+<span class="m">$w$</span> in the corpus. Similar words now get vectors
+pointing in similar directions, and we measure that with <strong>cosine
+similarity</strong>, the same measure the k-NN lecture used:
+</p>
+
+$$ \cos\theta = \frac{c_{w_1}^\top c_{w_2}}{\lVert c_{w_1} \rVert\, \lVert c_{w_2} \rVert} $$
+
+<p>
+This works, genuinely: "pizza" and "burger" score high because they share
+neighbours, "pizza" and "guitar" score low. But the vectors are still
+<span class="m">$|\mathcal{V}|$</span>-dimensional and mostly zeros,
+meaningful but huge. The final step is compression: a <strong>dense word
+embedding</strong> maps each word to
+<span class="m">$e_w \in \mathbb{R}^d$</span> with
+<span class="m">$d \ll |\mathcal{V}|$</span>, keeping the semantic geometry
+(<span class="m">$e_{\text{pizza}} \approx e_{\text{burger}}$</span>) while
+shrinking thousands of dimensions to a few hundred. The coordinates of
+<span class="m">$e_w$</span> are learned features, not named context words;
+no individual dimension means anything by itself, only the geometry does.
+Watch the whole compression happen on a real co-occurrence matrix:
+</p>
+
+<div class="figure" id="fig-densify">
+  <div class="fig-mount" data-fig="densify"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> from context counts to a dense embedding. Pick a word: its full context-count row over the 31-word vocabulary (computed live from the mini-corpus) shrinks to a <span class="m">$d$</span>-dimensional dense vector via a low-rank factorization of the co-occurrence matrix, computed in your browser. The cosine table shows that with enough dimensions the similar pairs stay similar and the dissimilar pairs stay dissimilar; slide <span class="m">$d$</span> down to 1 or 2 and watch the geometry collapse, every word forced to look like every other.</p>
+</div>
+
+<p>
+Where do dense embeddings come from at scale? The figure above used the
+linear-algebra route: stack all the context counts into a co-occurrence
+matrix <span class="m">$X \in \mathbb{R}^{|\mathcal{V}| \times |\mathcal{V}|}$</span>
+and find a low-rank approximation
+<span class="m">$X \approx R\tilde{R}^\top$</span>, so each count is
+approximated by a dot product of two short vectors,
+<span class="m">$x_{ij} \approx r_i^\top \tilde{r}_j$</span>, and each row of
+<span class="m">$R$</span> becomes a word vector. The famous embedding
+methods are refinements of exactly this idea; the details are optional depth:
+</p>
+
+<details class="check">
+  <summary>For the interested reader: GloVe and Word2Vec</summary>
+  <div>
+    <p><b>GloVe</b> fits the <em>logarithm</em> of the co-occurrence counts rather than the raw counts, with a weighting function that mutes unreliable rare pairs, minimizing</p>
+    $$ J(R, \tilde{R}) = \sum_{i,j} f(x_{ij}) \left( \log x_{ij} - r_i^\top \tilde{r}_j \right)^2,
+       \qquad f(x) = \begin{cases} (x/100)^{3/4} & x < 100 \\ 1 & x \ge 100 \end{cases} $$
+    <p>The log tames the hugely frequent pairs (otherwise "the" would dominate every fit) and <span class="m">$f$</span> down-weights counts too small to trust, the same small-denominator worry as in section 2.</p>
+    <p><b>Word2Vec</b> reaches the same destination through a prediction task instead of a matrix factorization: <b>CBOW</b> trains a model to predict a target word from its surrounding context words, and <b>skip-gram</b> predicts the context words from the target. Either way, words appearing in similar contexts are pushed toward similar vectors, because they must make similar predictions. Both methods bank on the same hypothesis: meaning is reflected in word-context statistics.</p>
+  </div>
+</details>
+
+<p>
+Here is the payoff that made word embeddings famous. Because the geometry
+encodes meaning, <em>directions</em> in embedding space become relationships,
+and analogies turn into vector arithmetic:
+</p>
+
+$$ e(\text{Paris}) - e(\text{France}) \;\approx\; e(\text{Rome}) - e(\text{Italy}) $$
+
+<p>
+The vector from a country to its capital is roughly the same arrow no matter
+which country you start from, so "Paris is to France as ? is to Italy" is
+answerable by adding arrows. Explore the geometry:
+</p>
+
+<div class="figure" id="fig-embedgeo">
+  <div class="fig-mount" data-fig="embedgeo"></div>
+  <p class="fig-caption"><b>Fig 4.2,</b> embedding geometry and analogies, the centrepiece of this section. A curated 2-D embedding (real embeddings live in hundreds of dimensions; these coordinates are hand-laid so the page can draw them honestly). In similarity mode, click any two words to compute their cosine similarity from the plotted coordinates. In analogy mode, pick two country&ndash;capital pairs: the two difference vectors are drawn as near-parallel arrows, and the computed point <span class="m">$e(\text{capital}_1) - e(\text{country}_1) + e(\text{country}_2)$</span> is marked with its nearest word.</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">What does the vector <span class="m">$e(\text{Paris}) - e(\text{France}) + e(\text{Italy})$</span> point near, and why?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Near <span class="m">$e(\text{France})$</span>, because the subtraction and addition of country vectors roughly cancel</button>
+    <button data-k="b">Near <span class="m">$e(\text{Paris})$</span>, because Paris dominates the sum</button>
+    <button data-k="c">Near <span class="m">$e(\text{Rome})$</span>, because <span class="m">$e(\text{Paris}) - e(\text{France})$</span> is approximately the "capital of" direction, and adding it to Italy lands on Italy's capital</button>
+  </div>
+  <div class="quiz-fb" data-k="a">The country vectors do not cancel: France is subtracted but Italy is added, and they are different countries. What survives is Italy plus the capital-of arrow.</div>
+  <div class="quiz-fb" data-k="b">Paris contributes, but the point of the arithmetic is what gets <em>removed</em>: subtracting France strips away the France-specific part of Paris, leaving a reusable relationship vector.</div>
+  <div class="quiz-fb" data-k="c">Right. The difference isolates the relationship ("capital of") from the specific country, and adding <span class="m">$e(\text{Italy})$</span> reapplies the relationship to a new country. Fig 4.2 draws exactly this construction and finds Rome as the nearest word.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. NEURAL LANGUAGE MODELS ═══════════════════ -->
+<section id="sec-neural">
+<h2><span class="secnum">5.</span> Neural language models</h2>
+
+<p>
+Time to collect the debt from section 2. The n-gram model died of data
+sparsity because it treated every context as an unrelated row in a table:
+what it learned about "the dog" taught it nothing about "the cat". But we now
+own vectors where cat and dog are <em>close</em>. So replace the lookup table
+with a learned function: map the context words to their embeddings, and let a
+neural network turn those embeddings into a distribution over the next word,
+</p>
+
+$$ \text{context embeddings} \;\longmapsto\; p_\theta(\cdot \mid \text{context}) $$
+
+<p>
+Similar contexts now produce similar inputs to the network, and therefore
+similar predictions, automatically. The embeddings live in an
+<strong>embedding table</strong>
+<span class="m">$E \in \mathbb{R}^{|\mathcal{V}| \times d}$</span>, one row
+per vocabulary token; the "embedding layer" you meet in every deep-learning
+framework does nothing more mysterious than return row
+<span class="m">$w$</span>: <span class="m">$e_w = E[w] \in \mathbb{R}^d$</span>.
+And crucially, <span class="m">$E$</span> is a parameter, learned by
+backpropagation along with everything else, so the network invents whatever
+word geometry helps it predict next words.
+</p>
+
+<p>
+The simplest full design is the <strong>neural trigram model</strong>, same
+two-word context as a count trigram, different machinery. Four steps:
+</p>
+
+<ol>
+  <li>Look up the two context words: <span class="m">$e_{w_{t-2}} = E[w_{t-2}]$</span>, <span class="m">$e_{w_{t-1}} = E[w_{t-1}]$</span>.</li>
+  <li>Concatenate them: <span class="m">$c_t = [\,e_{w_{t-2}}^\top,\ e_{w_{t-1}}^\top\,]^\top \in \mathbb{R}^{2d}$</span>.</li>
+  <li>One linear layer produces a score per vocabulary word: <span class="m">$z_t = W c_t + b$</span>, with <span class="m">$W \in \mathbb{R}^{|\mathcal{V}| \times 2d}$</span>.</li>
+  <li>Softmax turns scores into the next-word distribution: <span class="m">$p_\theta(w_t \mid w_{t-2}, w_{t-1}) = \operatorname{softmax}(z_t)$</span>.</li>
+</ol>
+
+<p>
+Steps 3 and 4 should look familiar: this is exactly the multi-class logistic
+regression head from Lecture 6, with <span class="m">$|\mathcal{V}|$</span>
+classes (one per word) and the concatenated embeddings as the feature vector.
+The model below is real: it trained in your browser on a 14-sentence corpus,
+and every number in it is live:
+</p>
+
+<div class="figure" id="fig-neurallm">
+  <div class="fig-mount" data-fig="neurallm"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> the neural trigram next-word predictor, the signature figure of this section. Pick the two context words: their embedding rows (trained live on the pet corpus at page load) are looked up, concatenated, pushed through <span class="m">$z = Wc + b$</span>, and softmaxed into the bar distribution, with the winning word highlighted in green. Change the context and watch the whole distribution shift. The readout counts this model's actual parameters, <span class="m">$3d|\mathcal{V}|$</span>, against the <span class="m">$|\mathcal{V}|^3$</span> cells a count trigram would need for the same vocabulary.</p>
+</div>
+
+<h3>The parameter count, and why it matters</h3>
+
+<p>
+Count what this model costs. The embedding table is
+<span class="m">$|\mathcal{V}| \times d$</span>, the linear layer is
+<span class="m">$|\mathcal{V}| \times 2d$</span> (ignore the bias), so
+</p>
+
+$$ \underbrace{d|\mathcal{V}|}_{E} \;+\; \underbrace{2d|\mathcal{V}|}_{W} \;=\; 3d|\mathcal{V}| $$
+
+<p>
+parameters, <em>linear</em> in both the vocabulary size and the embedding
+dimension. The count trigram needed a table of roughly
+<span class="m">$|\mathcal{V}|^3$</span> cells, exponential in the context
+length. Concretely, with <span class="m">$|\mathcal{V}| = 10{,}000$</span>
+and <span class="m">$d = 100$</span>: the neural trigram has
+<span class="m">$3 \cdot 100 \cdot 10{,}000 = 3 \times 10^6$</span>
+parameters, while the count table has
+<span class="m">$10{,}000^3 = 10^{12}$</span> cells. Three million numbers
+you can train against a trillion cells you could never fill.
+</p>
+
+<p>
+And the win is bigger than storage. The neural model <strong>generalizes
+through shared embeddings</strong>. Suppose "the cat is eating" never occurs
+in training but "the dog is eating" does. The count model looks up the row
+for context "the cat", finds no "is" ever followed it, and answers exactly
+zero. The neural model computes with <span class="m">$e_{\text{cat}}$</span>,
+and since cat and dog appear in similar contexts elsewhere in the corpus,
+training pushed <span class="m">$e_{\text{cat}} \approx e_{\text{dog}}$</span>,
+so the cat context produces nearly the dog context's input and inherits a
+healthy probability for "is". Knowledge about dogs transfers to cats through
+the geometry. Watch both models answer the same query:
+</p>
+
+<div class="figure" id="fig-generalize">
+  <div class="fig-mount" data-fig="generalize"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> the generalization demo. The training corpus contains "the dog is ..." sentences but never "the cat is". Left: the count trigram's row for context "the cat", where <span class="m">$p(\text{is})$</span> is exactly 0. Right: the trained neural model's distribution for the same context, where "is" gets real probability because the learned embeddings put cat near dog (their live cosine similarity is shown). Flip the context to "the dog" and the two models roughly agree, because that context has data.</p>
+</div>
+
+<p>
+One honest caveat: a single linear layer on concatenated embeddings can only
+capture additive interactions between the two context words. <strong>Deeper</strong>
+models insert hidden layers,
+<span class="m">$h^{(\ell)} = \sigma(W^{(\ell)} c + b^{(\ell)})$</span> with
+<span class="m">$z_t = W^{(L)} h^{(L)} + b^{(L)}$</span>, buying nonlinear
+interactions between the context embeddings, the same depth-for-expressiveness
+trade the neural networks lectures priced out.
+</p>
+
+<details class="check">
+  <summary>Check: parameters, and the unseen context</summary>
+  <div>
+    <p>(a) A neural trigram uses <span class="m">$|\mathcal{V}| = 5{,}000$</span> and <span class="m">$d = 64$</span>. How many parameters does it have (ignoring biases), and how many cells would the count trigram's table need? (b) In one sentence, why does the neural model give a nonzero probability for a context it has never seen?</p>
+    <p><b>Answer.</b> (a) <span class="m">$3d|\mathcal{V}| = 3 \cdot 64 \cdot 5{,}000 = 960{,}000$</span> parameters, just under a million, against <span class="m">$|\mathcal{V}|^3 = 5{,}000^3 = 1.25 \times 10^{11}$</span> table cells, about 130,000 times more. (b) Because an unseen context still maps to embeddings, and if its words resemble words from seen contexts, the network's input is close to inputs it trained on, so its output is close too; the count model has no notion of "close", only "same row or not".</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 6. TRAINING AND DECODING ═══════════════════ -->
+<section id="sec-decode">
+<h2><span class="secnum">6.</span> Training and decoding</h2>
+
+<h3>Training: teacher forcing</h3>
+
+<p>
+Where does the training signal come from? This is the quietly beautiful part:
+language modelling is supervised learning where <em>the text labels
+itself</em>. Every position in every sentence is an example: input, the words
+so far <span class="m">$w_{&lt;t}$</span>; label, the actual next word
+<span class="m">$w_t$</span>. No annotation, no human labelling, just text.
+During training, the model always conditions on the <em>true</em> previous
+words from the corpus, a regime called <strong>teacher forcing</strong>, and
+is rewarded for putting high probability on the true next word. Two special
+tokens do the bookkeeping: <code>&lt;BOS&gt;</code> pads the left edge so a
+trigram model always has two context words, even at position one, and
+<code>&lt;EOS&gt;</code> gives the model a way to end a sentence.
+</p>
+
+<p>
+Treating sentences as independent, we maximize the likelihood
+<span class="m">$\prod_i p(s^{(i)})$</span>, with each sentence factored by
+the chain rule as <span class="m">$p(s) = \prod_t p(w_t \mid w_{&lt;t})$</span>.
+Maximizing log-likelihood is exactly minimizing cross-entropy, the same loss
+as logistic regression, summed over positions:
+</p>
+
+$$ -\log p(s) = -\sum_{t=1}^{T} \log p(w_t \mid w_{&lt;t})
+   = -\sum_{t=1}^{T} \sum_{w=1}^{|\mathcal{V}|} t_{tw} \log y_{tw} $$
+
+<p>
+where <span class="m">$t_{tw}$</span> is the one-hot target at position
+<span class="m">$t$</span> and <span class="m">$y_{tw}$</span> the predicted
+probability. Every position is a <span class="m">$|\mathcal{V}|$</span>-way
+classification problem, and the loss is the log-loss you already know.
+</p>
+
+<h3>Generation: the model is on its own</h3>
+
+<p>
+Generation breaks the symmetry. At generation time there is no true history,
+so the model conditions on <em>its own previous outputs</em>:
+</p>
+
+$$ \hat{w}_t = \operatorname{Decode}\!\left( p_\theta(\cdot \mid \hat{w}_{&lt;t}) \right) $$
+
+<p>
+That <span class="m">$\operatorname{Decode}$</span> is a genuine choice, and
+it is worth being precise about what kind of choice: a <strong>decoding
+rule</strong> is not a different model. The same trained
+<span class="m">$p_\theta$</span> produces wildly different text depending on
+how you turn each distribution into a word:
+</p>
+
+<ul>
+  <li><b>Greedy</b>: <span class="m">$\hat{w}_t = \arg\max_v\, p_\theta(v \mid \hat{w}_{&lt;t})$</span>. Deterministic, safe, and prone to getting stuck repeating locally plausible phrases.</li>
+  <li><b>Sampling with temperature</b>: divide the logits by <span class="m">$\tau$</span> before the softmax,
+  $$ p_\tau(v) = \frac{\exp(z_v / \tau)}{\sum_u \exp(z_u / \tau)} $$
+  Small <span class="m">$\tau$</span> sharpens the distribution toward the argmax; large <span class="m">$\tau$</span> flattens it toward uniform. Temperature is a dial between "predictable" and "chaotic".</li>
+  <li><b>Top-k</b>: sample, but only from the <span class="m">$k$</span> most probable tokens, renormalized. Cuts off the long tail of unlikely words.</li>
+  <li><b>Top-p (nucleus)</b>: sample from the <em>smallest</em> set of tokens whose cumulative probability reaches <span class="m">$p$</span>. The cutoff adapts: a confident distribution keeps few tokens, an uncertain one keeps many.</li>
+  <li><b>Beam search</b>: keep <span class="m">$B$</span> partial sentences alive and grow the ones with the best total <span class="m">$\sum_t \log p_\theta(w_t \mid w_{&lt;t})$</span>. Strong for translation and summarization, where one high-probability answer is wanted; for open-ended generation it drifts generic and repetitive.</li>
+</ul>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: softmax, then temperature</div>
+  <p>Say the model scores three candidate next words with logits <span class="m">$z = (2, 1, 0)$</span>. The plain softmax (<span class="m">$\tau = 1$</span>) exponentiates and normalizes: <span class="m">$e^2 = 7.389$</span>, <span class="m">$e^1 = 2.718$</span>, <span class="m">$e^0 = 1$</span>, sum <span class="m">$11.107$</span>, so</p>
+  $$ p = (0.665,\ 0.245,\ 0.090) $$
+  <p>Cool it to <span class="m">$\tau = 0.5$</span>: the logits double to <span class="m">$(4, 2, 0)$</span> and the top word takes over, <span class="m">$p_{0.5} = (0.867,\ 0.117,\ 0.016)$</span>. Heat it to <span class="m">$\tau = 2$</span>: the logits halve to <span class="m">$(1, 0.5, 0)$</span> and the distribution flattens, <span class="m">$p_{2} = (0.506,\ 0.307,\ 0.186)$</span>. Same model, same scores, three different personalities.</p>
+</div>
+
+<pre class="code" data-lang="python"><code>def softmax(z):
+    ez = [math.exp(v - max(z)) for v in z]     # subtract max: numerical safety
+    return [v / sum(ez) for v in ez]
+
+def sample_with_temperature(z, tau=1.0):
+    p = softmax([v / tau for v in z])
+    r = random.random()                        # inverse-CDF sampling
+    for w, pw in enumerate(p):
+        r -= pw
+        if r &lt;= 0:
+            return w</code></pre>
+
+<p>
+Now drive all four rules against one fixed next-word distribution and watch
+what each one does to it:
+</p>
+
+<div class="figure" id="fig-decoding">
+  <div class="fig-mount" data-fig="decoding"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the decoding explorer. One fixed set of next-word logits for the context "the weather is". The temperature slider reshapes the bars through <span class="m">$p_\tau$</span> (recomputed live), top-k and top-p grey out the tokens their rule discards, and Sample draws real samples from whatever distribution you have built; greedy always returns the same word. Push <span class="m">$\tau$</span> up and watch "purple" and "algebra" start winning samples.</p>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You lower the sampling temperature from <span class="m">$\tau = 1$</span> toward <span class="m">$\tau \to 0$</span>. What happens to generation?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The distribution sharpens around its argmax, so output becomes more predictable and repetitive, approaching greedy decoding in the limit</button>
+    <button data-k="b">The distribution flattens toward uniform, so output becomes more diverse and error-prone</button>
+    <button data-k="c">Nothing changes: temperature rescales logits, and softmax normalization cancels any rescaling</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. Dividing logits by a small <span class="m">$\tau$</span> stretches the gaps between scores, and the exponential turns bigger gaps into lopsided probabilities. At <span class="m">$\tau \to 0$</span> all mass lands on the top token: greedy decoding, recovered as a limit.</div>
+  <div class="quiz-fb" data-k="b">Backwards: that is <em>raising</em> the temperature. Check the worked example: <span class="m">$\tau = 0.5$</span> pushed the top word from 0.665 to 0.867.</div>
+  <div class="quiz-fb" data-k="c">Softmax is not scale-invariant: <span class="m">$\operatorname{softmax}(z/\tau) \ne \operatorname{softmax}(z)$</span> unless the logits are all equal. The exponential makes rescaling change the shape, which is the entire point of the dial.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 7. EVALUATION ═══════════════════ -->
+<section id="sec-eval">
+<h2><span class="secnum">7.</span> Evaluating language models</h2>
+
+<p>
+Two language models disagree; which is better? The <strong>extrinsic</strong>
+answer plugs each model into a real downstream system, translation, speech
+recognition, summarization, and measures which helps more. That is the
+measurement you actually care about, and it is expensive, slow, and specific
+to one application. The <strong>intrinsic</strong> answer scores held-out
+text directly: a good language model should be <em>less surprised</em> by
+real text it has never seen, meaning it assigns that text higher probability.
+</p>
+
+<p>
+The standard intrinsic metric is <strong>perplexity</strong>. Take the
+held-out tokens <span class="m">$w_1, \dots, w_M$</span>, compute the average
+negative log2-probability the model assigns each one (the average "bits of
+surprise"), then exponentiate back:
+</p>
+
+$$ \bar{\ell} = -\frac{1}{M} \sum_{t=1}^{M} \log_2 p_\theta(w_t \mid w_{&lt;t}),
+   \qquad \operatorname{PPL} = 2^{\bar{\ell}} $$
+
+<p>
+Lower is better. The exponentiation is what makes the number interpretable: a
+perplexity of 10 means the model is, on average, as uncertain as if it were
+choosing uniformly among 10 plausible next words. A useless model that
+guesses uniformly over the whole vocabulary lands at perplexity exactly
+<span class="m">$|\mathcal{V}|$</span>; every bit of learned structure ratchets
+that number down.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: perplexity of four tokens</div>
+  <p>A model assigns a held-out four-token sequence the step-by-step probabilities <span class="m">$\tfrac{1}{2},\ \tfrac{1}{4},\ \tfrac{1}{4},\ \tfrac{1}{8}$</span>. The surprises are <span class="m">$-\log_2$</span> of each: <span class="m">$1, 2, 2, 3$</span> bits. Average: <span class="m">$\bar\ell = 8/4 = 2$</span> bits. Perplexity: <span class="m">$2^2 = 4$</span>. The model behaves as if it were choosing among about four plausible words at each step.</p>
+</div>
+
+<pre class="code" data-lang="python"><code>def perplexity(model, text):
+    words = ["&lt;s&gt;"] + text.split() + ["&lt;/s&gt;"]
+    bits = 0.0
+    for i in range(1, len(words)):
+        p = model(words[i], context=words[:i])   # p(w_i | w_&lt;i)
+        bits += -math.log2(p)
+    return 2 ** (bits / (len(words) - 1))</code></pre>
+
+<div class="figure" id="fig-perplexity">
+  <div class="fig-mount" data-fig="perplexity"></div>
+  <p class="fig-caption"><b>Fig 7.1,</b> the perplexity meter. A bigram model trained live on the picnic corpus reads a held-out sentence token by token; each row shows <span class="m">$p(w_t \mid w_{t-1})$</span> and its bits of surprise, accumulating into the average and the final <span class="m">$\operatorname{PPL} = 2^{\bar\ell}$</span>. Compare against the uniform model, whose perplexity is exactly <span class="m">$|\mathcal{V}|$</span>, then switch to the scrambled sentence: same words, destroyed order, and the perplexity explodes, proof the model learned word order and not just word frequency.</p>
+</div>
+
+<p>
+Perplexity is a clean, fast, comparable number, and you should distrust it
+exactly as much as it deserves. It measures one-step prediction under teacher
+forcing on in-distribution text. It does not measure factual correctness (a
+fluent lie can be high-probability), long-range coherence (one step at a time
+never checks whether paragraph five contradicts paragraph one), downstream
+usefulness, or the quality of text under your actual decoder, which section 6
+showed can transform the same model's output completely. Perplexity is a good
+thermometer and a bad final exam.
+</p>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">On a held-out sequence of 5 tokens, a model assigns per-token probabilities <span class="m">$\tfrac{1}{2}, \tfrac{1}{2}, \tfrac{1}{4}, \tfrac{1}{4}, \tfrac{1}{16}$</span>. What is its perplexity?</p>
+  <div class="quiz-opts">
+    <button data-k="a">PPL = 2, because the most common probability is 1/2</button>
+    <button data-k="b">PPL = 4: the surprises are 1, 1, 2, 2, 4 bits, so <span class="m">$\bar\ell = 10/5 = 2$</span> and <span class="m">$2^2 = 4$</span></button>
+    <button data-k="c">PPL = 10, the total number of bits</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Perplexity averages the log-probabilities over all positions; the mode of the probabilities is not involved. Convert each to bits, average, then exponentiate.</div>
+  <div class="quiz-fb" data-k="b">Right. <span class="m">$-\log_2$</span> of each probability gives 1, 1, 2, 2, 4; the mean is 2 bits; <span class="m">$2^2 = 4$</span>. On average the model is as uncertain as a uniform choice among 4 words, even though one step was a 16-way surprise.</div>
+  <div class="quiz-fb" data-k="c">The 10 is the <em>total</em> bits; perplexity uses the per-token average (2 bits), then exponentiates: <span class="m">$2^2 = 4$</span>. Without the average, longer texts would look automatically worse.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 8. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">8.</span> Summary and method card</h2>
+
+<p>
+The lecture in one paragraph. Language is sequential, so model it as
+next-word prediction: the chain rule makes that exact, the Markov assumption
+makes it tractable. Counting n-grams works until the table
+(<span class="m">$|\mathcal{V}|^n$</span> cells) outgrows any corpus, and the
+zeros and noisy ratios of data sparsity take over. Fixing that required
+fixing the representation: tokens to IDs (labels, not measurements), IDs to
+one-hot vectors (categorical, but blind to similarity), one-hot to embeddings
+(dense vectors whose geometry <em>is</em> meaning, courtesy of the
+distributional hypothesis). With embeddings in hand, the neural language
+model replaces the exponential table with a
+<span class="m">$3d|\mathcal{V}|$</span>-parameter function that generalizes
+to unseen contexts through shared geometry. Training is supervised learning
+on free labels via teacher forcing and cross-entropy; generation is a
+separate decoding choice, from greedy to temperature to top-p; and perplexity
+gives a useful, limited measure of how surprised the model is by held-out
+text.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Language Models</div>
+  <table>
+    <tr><th>Assumption</th><td>A word's probability depends on its context, and words appearing in similar contexts have related meanings (the distributional hypothesis).</td></tr>
+    <tr><th>Model class</th><td>Sequence models that represent tokens with embeddings and predict the next word with a neural classifier, <span class="m">$p_\theta(w_t \mid \text{context}) = \operatorname{softmax}(W c_t + b)$</span>.</td></tr>
+    <tr><th>Learning / selection</th><td>Preprocess text to tokens and IDs; learn the embedding table and network weights by maximizing sequence likelihood, equivalently minimizing cross-entropy, with teacher forcing.</td></tr>
+    <tr><th>Prediction</th><td>Score sequences by the chain rule; generate by repeatedly decoding from <span class="m">$p_\theta(\cdot \mid \hat w_{&lt;t})$</span> with a chosen rule (greedy, temperature, top-k/top-p, beam).</td></tr>
+    <tr><th>Strengths</th><td>Handles sparsity far better than count tables (<span class="m">$3d|\mathcal{V}|$</span> vs <span class="m">$|\mathcal{V}|^n$</span>), learns semantic word vectors as a by-product, and reframes language as scalable next-word prediction.</td></tr>
+    <tr><th>Limitations</th><td>Fixed-context models still miss long-range dependencies and word order beyond the window; perplexity is only a proxy for quality; output depends heavily on the decoding rule.</td></tr>
+    <tr><th>Key hyperparameters</th><td>Context length <span class="m">$n$</span>, embedding dimension <span class="m">$d$</span>, network depth, tokenization scheme, and at generation time the decoding rule (<span class="m">$\tau$</span>, <span class="m">$k$</span>, <span class="m">$p$</span>, <span class="m">$B$</span>).</td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: the CNN lectures showed that respecting
+an input's structure (locality, weight sharing) beats brute force, and this
+lecture did the same for language, whose structure is sequential order and
+distributional meaning. The fixed context window is the one assumption still
+creaking: a trigram model, neural or not, cannot remember word eight when
+predicting word eighty. Next lecture removes that ceiling with recurrent
+networks that carry a memory across the whole sequence, the road that leads
+through LSTMs to attention and transformers, where next-word prediction at
+scale becomes the systems everyone now talks to.
+</p>
+</section>
+
+<!-- ═══════════════════ 9. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">9.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to design and
+explain, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">A neural trigram model and a count trigram model are trained on the same corpus with <span class="m">$|\mathcal{V}| = 20{,}000$</span> and <span class="m">$d = 50$</span>. Which statement is correct?</p>
+  <div class="quiz-opts">
+    <button data-k="a">The neural model stores <span class="m">$20{,}000^3$</span> parameters, the count model <span class="m">$3 \cdot 50 \cdot 20{,}000$</span></button>
+    <button data-k="b">Both need the same storage, since both condition on two words</button>
+    <button data-k="c">The neural model has <span class="m">$3 \cdot 50 \cdot 20{,}000 = 3 \times 10^6$</span> parameters; the count table has <span class="m">$20{,}000^3 = 8 \times 10^{12}$</span> cells, and unlike the neural model it assigns zero to any context it never saw</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Swapped: the exponential blow-up belongs to the counting table, the trim <span class="m">$3d|\mathcal{V}|$</span> to the neural model. That asymmetry is the whole argument for going neural.</div>
+  <div class="quiz-fb" data-k="b">Conditioning on the same context does not mean paying the same price: the table needs a cell per possible context-word combination, the network needs only embeddings plus one weight matrix.</div>
+  <div class="quiz-fb" data-k="c">Right, both halves. <span class="m">$3d|\mathcal{V}|$</span> is linear in vocabulary size while <span class="m">$|\mathcal{V}|^3$</span> is astronomical, and the deeper win is behavioural: shared embeddings let the neural model transfer what it knows to unseen contexts instead of answering 0 (Fig 5.2).</div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">Model A has perplexity 12 on held-out text; Model B has perplexity 45. What can you validly conclude?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Model A generates better text than Model B under any decoding rule</button>
+    <button data-k="b">Model A assigns higher average probability to the held-out text, as if choosing among ~12 plausible words per step instead of ~45; generation quality still depends on the decoder and is not guaranteed</button>
+    <button data-k="c">Model A is factually more accurate than Model B</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Perplexity is a teacher-forced, one-step measure; two models with different perplexities can flip in generation quality once a decoder and error accumulation enter. It suggests, it does not guarantee.</div>
+  <div class="quiz-fb" data-k="b">Right, and stated with exactly the right caution. Perplexity is a real signal, lower means less surprised by real text, but it is silent about long-range coherence, factuality, and behaviour under your chosen decoding rule.</div>
+  <div class="quiz-fb" data-k="c">Perplexity never checks facts: fluent, statistically typical text scores well whether or not it is true. Probability mass is not truth.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): design a decoding strategy</summary>
+  <div>
+    <p>You are building a brainstorming assistant that must produce <em>varied</em> suggestions (ten different taglines, not one tagline ten times) that are still <em>coherent</em> (no word salad). Design a decoding strategy and justify each choice against the alternatives.</p>
+    <p><b>Answer</b> (one good design). Rule out greedy and beam search first: both are deterministic-ish maximizers, so they collapse diversity, and beam search in open-ended generation drifts generic on top of that. Pure high-temperature sampling buys diversity but pays in coherence, because the flattened tail lets genuinely bad tokens through (Fig 6.1: crank <span class="m">$\tau$</span> and watch "algebra" win samples). The clean solution is <b>top-p (nucleus) sampling with a moderate temperature</b>, say <span class="m">$\tau \approx 0.9$</span> and <span class="m">$p \approx 0.9$</span>: the nucleus cutoff deletes the incoherent tail entirely, while sampling within the nucleus keeps runs different from each other. Top-p beats top-k here because the candidate set adapts: when the model is confident the nucleus is small and the output stays sharp, and when many continuations are genuinely plausible, exactly the situation brainstorming wants, the nucleus widens on its own. Then generate the ten taglines as ten independent samples.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): great perplexity, terrible generation</summary>
+  <div>
+    <p>A teammate reports: "our model's perplexity dropped from 40 to 9, but the text it generates still turns repetitive and derails after a few sentences." Explain how both observations can be true at once.</p>
+    <p><b>Answer.</b> Perplexity and generation test the model under different conditions. Perplexity is measured with teacher forcing: at every step the model is handed the <em>true</em> history from real held-out text and asked for one next-word distribution. Generation feeds the model <em>its own outputs</em> as history, so a small early oddity produces a context slightly unlike anything in training, which produces a slightly worse next prediction, and errors compound step by step; the perplexity number never sees this feedback loop. On top of that, perplexity is one-step-ahead, so long-range coherence, staying on topic across sentences, not contradicting itself, simply is not measured. And the decoding rule intervenes: a greedy decoder can lock a well-calibrated model into repetitive loops that sampling would escape. Better one-step prediction on real text (40 to 9) is compatible with all of these failure modes remaining.</p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): the softmax head is an old friend</summary>
+  <div>
+    <p>Show precisely how the neural trigram's output layer is multi-class logistic regression from Lecture 6. What plays the role of the input features, the classes, and the loss?</p>
+    <p><b>Answer.</b> Multi-class logistic regression computes one linear score per class from a feature vector, <span class="m">$z = Wx + b$</span>, applies a softmax, and trains with cross-entropy against a one-hot target. The neural trigram's head is literally this with a renaming: the feature vector <span class="m">$x$</span> is the concatenated context embedding <span class="m">$c_t \in \mathbb{R}^{2d}$</span>, the classes are the <span class="m">$|\mathcal{V}|$</span> vocabulary words (row <span class="m">$v$</span> of <span class="m">$W$</span> is class <span class="m">$v$</span>'s weight vector), and the loss <span class="m">$-\sum_w t_{tw} \log y_{tw}$</span> is the same cross-entropy with the true next word as the one-hot label. The only genuinely new ingredient is where the features come from: instead of being handed measurements, the model <em>learns</em> its features, because the embedding table behind <span class="m">$c_t$</span> is trained by the same gradient. Classifier head from Lecture 6, learned representation from Lecture 9, applied to text.</p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is language modelling from first principles: order makes language special, the chain rule turns order into next-word prediction, counting solves it until sparsity wins, and embeddings plus a softmax classifier solve what counting could not, with decoding and perplexity rounding out the toolkit. Every chatbot you have used is this lecture's machinery with a longer memory and more parameters. The longer memory is the next two lectures: recurrent networks, then attention and transformers.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../cnn-part-2/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 12: CNNs in Practice</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../sequence-models/index.html" style="text-align:right">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 14: Sequence Models</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; <a href="https://teaching.amirhkarimi.com/">The AI Learning Map</a> &middot; Lecture 13 &middot; Language Models</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>

@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gaussian Bayes Models — ECE 657 · The ML Bible</title>
+<meta name="description" content="A from-the-ground-up, fully interactive lesson on generative classification: the Bayes classifier, fitting Gaussians by MLE, the multivariate Gaussian, Gaussian discriminant analysis, Naive Bayes, and the QDA/LDA decision-boundary geometry.">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
+</head>
+<body>
+
+<a class="backlink" href="../index.html">&larr; ECE 657 Course Home</a>
+
+<header class="lesson-header">
+  <div class="chapter-label">ECE 657 &middot; Lecture 17 &middot; The ML Bible</div>
+  <h1>Gaussian Bayes Models</h1>
+  <p class="lede">
+    Every classifier so far has drawn a boundary. Logistic regression drew it
+    with a sigmoid, the SVM drew it with a margin, and neither one ever asked
+    what the data itself looks like. This lecture flips the question. Instead
+    of learning where spam ends and real mail begins, learn what spam looks
+    like, learn what real mail looks like, and when a new email arrives, ask
+    which portrait it resembles. That is generative classification: model each
+    class with a Gaussian, weigh in how common each class is, and let Bayes'
+    rule turn the crank. The payoff is a classifier we never had to optimize,
+    plus a beautiful surprise at the end: the shape of the boundary it implies,
+    curved, straight, or axis-aligned, is controlled entirely by what we assume
+    about the covariance.
+  </p>
+</header>
+
+<nav class="toc" aria-label="Table of contents">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#sec-hook">The hook: stop drawing boundaries</a></li>
+    <li><a href="#sec-genvdisc">Discriminative vs generative</a></li>
+    <li><a href="#sec-bayes">The Bayes classifier</a></li>
+    <li><a href="#sec-mle">Fitting Gaussians by MLE</a></li>
+    <li><a href="#sec-mvn">The multivariate Gaussian</a></li>
+    <li><a href="#sec-gda">The Gaussian Bayes classifier (GDA)</a></li>
+    <li><a href="#sec-nb">Naive Bayes</a></li>
+    <li><a href="#sec-boundaries">Decision boundaries: QDA, LDA, Gaussian Naive Bayes</a></li>
+    <li><a href="#sec-summary">Summary and method card</a></li>
+    <li><a href="#sec-quiz">End-of-lesson quiz</a></li>
+  </ol>
+</nav>
+
+<main class="lesson-body">
+
+<!-- ═══════════════════ 0. HOOK ═══════════════════ -->
+<section id="sec-hook">
+<h2><span class="secnum">0.</span> The hook: stop drawing boundaries</h2>
+
+<p>
+Picture the spam filter problem one more time. Two features per email, one
+point per email, two colours. Every classifier we have built would now hunt
+for a boundary: pick a family of separating surfaces, define a loss, run
+gradient descent, hope it converges somewhere sensible. Here is a different
+plan. Fit a Gaussian to the spam cloud. Fit a Gaussian to the real-mail
+cloud. Note that, say, 30% of email is spam. Done, that is the whole
+training procedure, and it is two closed-form fits from last lecture. When a
+new email arrives, evaluate both Gaussians at its feature vector, multiply
+each by how common its class is, and report the class with the bigger
+product.
+</p>
+
+<p>
+Where does the boundary come from? We never asked for one, but one appears
+anyway: it is the set of points where the two products tie. And here is the
+part that makes this lecture worth its slot in the course. The shape of that
+implied boundary is not something we tune. It falls out of what we assume
+about each class's covariance. Play with the destination before we build a
+single formula:
+</p>
+
+<div class="figure" id="fig-hookgallery">
+  <div class="fig-mount" data-fig="hookgallery"></div>
+  <p class="fig-caption"><b>Fig 0.1,</b> the destination: one spam dataset, three covariance assumptions, three boundary shapes, all computed live from fitted Gaussians and Bayes' rule. Per-class covariances give QDA and a curved boundary, a shared covariance gives LDA and a straight one, and a shared diagonal covariance gives Gaussian Naive Bayes with an axis-aligned world view. Drag the envelope to classify a new email under each regime. <!-- flagged addition: the spam dataset (capitalized-words %, links per email) is synthetic, generated by me for pedagogy; the source specifies the models, not this dataset. --></p>
+</div>
+
+<p>
+By the end of this lesson every word of that caption will be yours: the Bayes
+classifier, Gaussian discriminant analysis, Naive Bayes, and why QDA is
+curved while LDA is straight. The route is top down. First the philosophy
+(section 1), then the decision rule (section 2), then the estimation
+(sections 3 and 4), then the full classifier (section 5), then the drastic
+simplification (section 6), and finally the geometry (section 7).
+</p>
+</section>
+
+<!-- ═══════════════════ 1. DISCRIMINATIVE VS GENERATIVE ═══════════════════ -->
+<section id="sec-genvdisc">
+<h2><span class="secnum">1.</span> Discriminative vs generative</h2>
+
+<p>
+Both families solve the same prediction problem, but they learn different
+objects. A <strong>discriminative classifier</strong> learns the prediction
+directly: either the conditional probability
+<span class="m">$p(y \mid x)$</span>, the way logistic regression and softmax
+do, or a class score and a boundary, the way the SVM, the perceptron, and the
+least-squares classifier do. It never forms an opinion about the inputs
+themselves. Ask logistic regression "what does a typical spam email look
+like?" and it has nothing to say; it only knows how to separate.
+</p>
+
+<p>
+A <strong>generative classifier</strong> models how each class's data is
+distributed. It learns the <strong>class-likelihood</strong>
+<span class="m">$p(x \mid y)$</span>, what class <span class="m">$y$</span>'s
+inputs look like, together with the <strong>class prior</strong>
+<span class="m">$p(y)$</span>, how common class <span class="m">$y$</span>
+is. Together those are exactly the joint distribution,
+<span class="m">$p(x, y) = p(x \mid y)\, p(y)$</span>, which is why the family
+is called generative: a model of the joint could in principle generate new
+labelled data. Prediction is then recovered, not learned:
+<span class="m">$p(y \mid x)$</span> comes from Bayes' rule, which is
+section 2's whole job.
+</p>
+
+<div class="figure" id="fig-genvdisc">
+  <div class="fig-mount" data-fig="genvdisc"></div>
+  <p class="fig-caption"><b>Fig 1.1,</b> the same two-class data through both philosophies. The discriminative view learns one object, a boundary, and models nothing else; the generative view learns four objects, a Gaussian and a prior per class, and its overlap implies a boundary for free (dashed). Toggle between them and compare what each side would write down after training, listed under the plot and computed live from the data.</p>
+</div>
+
+<p>
+Why would anyone take the indirect route? Because the generative side gets to
+reuse everything the MLE lecture built. Each class-likelihood is fit on its
+own class's data by maximum likelihood, in closed form, no gradient descent,
+no learning rate. The prior is a counting exercise. And the model is
+interpretable: after training you can literally read off what the model
+thinks each class looks like. The price, and it is a real price, is that we
+must <em>assume</em> a distribution for <span class="m">$p(x \mid y)$</span>,
+and this lecture's choice of Gaussian is an assumption the data may or may
+not honour. Hold that thought until the method card.
+</p>
+</section>
+
+<!-- ═══════════════════ 2. THE BAYES CLASSIFIER ═══════════════════ -->
+<section id="sec-bayes">
+<h2><span class="secnum">2.</span> The Bayes classifier</h2>
+
+<p>
+Suppose the modeling is done: we hold a class-likelihood
+<span class="m">$p(x \mid C = k)$</span> for every class
+<span class="m">$k$</span> and a prior <span class="m">$p(C = k)$</span>.
+A new input <span class="m">$x_{\text{new}}$</span> arrives. What we want is
+the <em>posterior</em> probability of each class given the input, and Bayes'
+rule, the same identity that powered MAP estimation last lecture, delivers
+it:
+</p>
+
+$$ p(C = k \mid x_{\text{new}}) = \frac{p(x_{\text{new}} \mid C = k)\, p(C = k)}{p(x_{\text{new}})},
+   \qquad \text{posterior} = \frac{\text{class-likelihood} \times \text{prior}}{\text{evidence}}. $$
+
+<p>
+Read it as a tug of war between three characters:
+</p>
+
+<div class="hook-grid">
+  <div class="hook-card">
+    <div class="hook-emoji">🔍</div>
+    <div class="hook-q">Class-likelihood <span class="m">$p(x \mid C = k)$</span></div>
+    <div class="hook-a">Does this input look like your class? The portrait each class painted during training, evaluated at the query.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">⚖️</div>
+    <div class="hook-q">Prior <span class="m">$p(C = k)$</span></div>
+    <div class="hook-a">How common is your class in the first place? A rare class needs a strong resemblance to win.</div>
+  </div>
+  <div class="hook-card">
+    <div class="hook-emoji">🧾</div>
+    <div class="hook-q">Evidence <span class="m">$p(x_{\text{new}})$</span></div>
+    <div class="hook-a">How probable is this input overall, under any class? One number, shared by every class's denominator.</div>
+  </div>
+</div>
+
+<p>
+The posterior is likelihood times prior, normalized by the evidence. Now the
+key observation: when we compare classes, the evidence is the same number in
+every denominator. It cannot change which class wins. So the decision rule
+drops it:
+</p>
+
+$$ y(x) = \arg\max_k \; p(x \mid C = k)\, p(C = k). $$
+
+<p>
+This is the <strong>Bayes classifier</strong>, and it carries a guarantee the
+boundary-hunting methods never had: predicting the class with the highest
+posterior minimizes the expected number of mistakes. If the model of the data
+is right, no classifier does better on average. That is the prize for
+modeling <span class="m">$p(x \mid y)$</span> instead of attacking the
+boundary directly.
+</p>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: the diabetes example</div>
+  <!-- flagged addition: the source specifies the setup (white-blood-cell count x,
+       prior p(C=1)=0.3, per-class Gaussians fit by MLE, query x=48) but not the
+       fitted numbers; the specific mu and sigma values here are chosen by me and
+       every downstream number is computed from them. -->
+  <p>Screen for diabetes from a white-blood-cell count <span class="m">$x$</span>. Assume the prior <span class="m">$p(C = 1) = 0.3$</span> (30% of the screened population is diabetic), and suppose the per-class MLE fits from section 3 came out as healthy <span class="m">$\mathcal{N}(50, 4^2)$</span> and diabetic <span class="m">$\mathcal{N}(42, 6^2)$</span>. A patient shows <span class="m">$x = 48$</span>. Evaluate both class-likelihoods:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    p(48 | C=0) = N(48; 50, 16) = 0.0880&nbsp;&nbsp;&nbsp;&nbsp;p(48 | C=1) = N(48; 42, 36) = 0.0403
+  </p>
+  <p>Multiply by the priors and normalize. The evidence is just the sum of the two products:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    p(C=0) &middot; p(48|C=0) = 0.7 &times; 0.0880 = 0.0616<br>
+    p(C=1) &middot; p(48|C=1) = 0.3 &times; 0.0403 = 0.0121<br>
+    p(C=1 | 48) = 0.0121 / (0.0616 + 0.0121) = 0.164
+  </p>
+  <p>Posterior 16.4% diabetic, so the Bayes classifier says healthy. Notice both forces at work: <span class="m">$x = 48$</span> sits closer to the healthy mean, and the prior already leaned 70/30 against diabetes. Reproduce this exact case with the preset button in the figure below, then drag <span class="m">$x$</span> left and watch the verdict flip.</p>
+</div>
+
+<div class="figure" id="fig-bayes1d">
+  <div class="fig-mount" data-fig="bayes1d"></div>
+  <p class="fig-caption"><b>Fig 2.1,</b> the Bayes classifier on a number line, this lesson's first signature figure. The curves are prior-weighted class-likelihoods <span class="m">$p(x \mid C)\,p(C)$</span>; drag the query <span class="m">$x$</span> (or use arrow keys) to read both likelihoods, both posteriors, and the live verdict. The decision points sit where the curves cross, and the coloured band along the top of the plot marks each class's winning territory. Move the means, stretch the variances, slide the prior, and watch the territory get renegotiated; the Diabetes preset reproduces the worked example digit for digit.</p>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">At a query point, class A has likelihood <span class="m">$p(x \mid A) = 0.02$</span> with prior <span class="m">$0.9$</span>, and class B has likelihood <span class="m">$p(x \mid B) = 0.10$</span> with prior <span class="m">$0.1$</span>. The evidence <span class="m">$p(x)$</span> is unknown. Which class does the Bayes classifier pick?</p>
+  <div class="quiz-opts">
+    <button data-k="a">B, because its likelihood is five times larger</button>
+    <button data-k="b">A, because <span class="m">$0.02 \times 0.9 = 0.018 &gt; 0.10 \times 0.1 = 0.010$</span>, and the evidence is irrelevant to the argmax</button>
+    <button data-k="c">Cannot tell without computing the evidence <span class="m">$p(x)$</span></button>
+  </div>
+  <div class="quiz-fb" data-k="a">The likelihood is only half the story. B looks more like the query, but B is nine times rarer, and the product is what the posterior ranks. Multiply before you compare.</div>
+  <div class="quiz-fb" data-k="b">Right. The posterior is likelihood times prior divided by evidence, and the evidence divides <em>every</em> class's score by the same number, so it cannot reorder them. A's product wins, 0.018 to 0.010, posterior 64.3% for A.</div>
+  <div class="quiz-fb" data-k="c">The evidence is the same denominator for every class, so it scales all posteriors equally and never changes which one is biggest. That is exactly why the decision rule is the argmax of likelihood times prior.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 3. MLE FOR GAUSSIANS ═══════════════════ -->
+<section id="sec-mle">
+<h2><span class="secnum">3.</span> Fitting Gaussians by MLE</h2>
+
+<p>
+The Bayes classifier is a rule waiting for ingredients. Where do the
+class-likelihoods come from? This lecture's answer: assume each class's
+inputs are Gaussian, each class with its own parameters, and estimate those
+parameters from that class's training points. In one dimension the
+class-conditional density is
+</p>
+
+$$ p(x \mid C) = \frac{1}{\sqrt{2\pi}\,\sigma_C}\exp\!\left(-\frac{(x - \mu_C)^2}{2\sigma_C^2}\right), $$
+
+<p>
+and we already know from last lecture how to fit it: write the i.i.d.
+log-likelihood of the class's points, set the derivatives with respect to
+<span class="m">$\mu$</span> and <span class="m">$\sigma^2$</span> to zero,
+and closed forms drop out. The only new wrinkle is bookkeeping: for class
+<span class="m">$C_k$</span>, sum over the points whose label
+<span class="m">$t^{(i)}$</span> is <span class="m">$C_k$</span>, and nobody
+else's:
+</p>
+
+$$ \hat{\mu}_{ML} = \frac{1}{N}\sum_{i:\, t^{(i)} = C_k} x^{(i)}, \qquad
+   \hat{\sigma}^2_{ML} = \frac{1}{N}\sum_{i:\, t^{(i)} = C_k} \big(x^{(i)} - \hat{\mu}_{ML}\big)^2. $$
+
+<p>
+The sample mean and the sample variance of the class. No optimizer, no
+iterations. "Fit each class by MLE" is a phrase worth making literal, so do
+it yourself:
+</p>
+
+<div class="figure" id="fig-fitmle">
+  <div class="fig-mount" data-fig="fitmle"></div>
+  <p class="fig-caption"><b>Fig 3.1,</b> fit a Gaussian by MLE, literally. One class's points sit on the number line. First try to fit by eye: slide <span class="m">$\mu$</span> and <span class="m">$\sigma$</span> and watch the log-likelihood of the data respond. Then press Fit by MLE and the closed-form <span class="m">$\hat{\mu}, \hat{\sigma}$</span> snap into place, with the numbers shown; the log-likelihood readout confirms no hand-tuned curve beats them. Resample to try a fresh class.</p>
+</div>
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: one class, five points</div>
+  <p>Class points <span class="m">$\{4.2,\; 5.1,\; 4.7,\; 5.6,\; 4.4\}$</span>. The MLE mean is the sample mean:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &mu;&#770; = (4.2 + 5.1 + 4.7 + 5.6 + 4.4) / 5 = 24.0 / 5 = 4.8
+  </p>
+  <p>Deviations from 4.8 are <span class="m">$-0.6, 0.3, -0.1, 0.8, -0.4$</span>; square, average:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    &sigma;&#770;&sup2; = (0.36 + 0.09 + 0.01 + 0.64 + 0.16) / 5 = 1.26 / 5 = 0.252&nbsp;&nbsp;&nbsp;&nbsp;&sigma;&#770; = 0.502
+  </p>
+  <p>That pair <span class="m">$(\hat{\mu}, \hat{\sigma}^2) = (4.8, 0.252)$</span> defines this class's likelihood curve, ready to be multiplied by a prior in the Bayes rule. Repeat per class and the classifier is trained.</p>
+</div>
+
+<h3>From a number line to <span class="m">$d$</span> dimensions</h3>
+
+<p>
+Real inputs are vectors, so each class needs a Gaussian over
+<span class="m">$\mathbb{R}^d$</span>. Two objects replace the two scalars: a
+<strong>mean vector</strong>, and a <strong>covariance matrix</strong>
+<span class="m">$\Sigma$</span> that encodes each feature's variance on its
+diagonal and every pairwise covariance off it. The MLE estimates are the
+same recipe, promoted to vectors, over the class's <span class="m">$N$</span>
+points:
+</p>
+
+$$ \hat{\mu}_{ML} = \frac{1}{N}\sum_{i=1}^{N} x^{(i)}, \qquad
+   \hat{\Sigma}_{ML} = \frac{1}{N}\sum_{i=1}^{N} \big(x^{(i)} - \hat{\mu}_{ML}\big)\big(x^{(i)} - \hat{\mu}_{ML}\big)^\top. $$
+
+<p>
+How many numbers is that? Count them, because the count becomes the plot of
+sections 6 and 7. In 1-D a Gaussian costs 2 parameters, a mean and a
+variance. In <span class="m">$d$</span> dimensions:
+</p>
+
+$$ \underbrace{d}_{\text{means}} \;+\; \underbrace{d}_{\text{variances}} \;+\; \underbrace{\tfrac{d^2 - d}{2}}_{\text{covariances}} \;=\; O(d^2), $$
+
+<p>
+where the covariance term is halved because <span class="m">$\Sigma$</span>
+is symmetric: the covariance of feature 3 with feature 7 is the covariance of
+feature 7 with feature 3, counted once. At <span class="m">$d = 10$</span>
+that is <span class="m">$10 + 10 + 45 = 65$</span> parameters per class.
+Quadratic growth is a slow-burning problem; sections 5 and 6 watch it
+detonate.
+</p>
+
+<details class="check">
+  <summary>Check: why does each class get only its own points?</summary>
+  <div>
+    <p>The MLE sums range over <span class="m">$i$</span> with <span class="m">$t^{(i)} = C_k$</span>. Why not use all the data for every class, there is more of it?</p>
+    <p><b>Answer.</b> Because the object being estimated is <span class="m">$p(x \mid C = k)$</span>: the distribution of inputs <em>given</em> that the class is <span class="m">$k$</span>. Points from other classes are samples from other conditionals, and mixing them in would estimate the marginal <span class="m">$p(x)$</span> instead, blurring every class portrait toward the global average. The likelihood factorizes by class, so maximizing it splits into <span class="m">$k$</span> independent fits, each on its own subset. That is also the practical charm of generative training: each class's fit is a separate closed-form computation, and adding a new class later does not disturb the others. The other classes do enter the classifier, but through the comparison in the argmax, not through each other's fits.</p>
+  </div>
+</details>
+</section>
+
+<!-- ═══════════════════ 4. THE MULTIVARIATE GAUSSIAN ═══════════════════ -->
+<section id="sec-mvn">
+<h2><span class="secnum">4.</span> The multivariate Gaussian</h2>
+
+<p>
+Before stacking Gaussians into a classifier, get a feel for the object
+itself. The density over <span class="m">$\mathbb{R}^d$</span> is
+</p>
+
+$$ p(x) = \frac{1}{(2\pi)^{d/2}\,|\Sigma|^{1/2}}
+   \exp\!\left(-\tfrac{1}{2}(x - \mu)^\top \Sigma^{-1}(x - \mu)\right). $$
+
+<p>
+Squint and the 1-D formula is still visible: a normalizer out front, and an
+exponential of a negative squared distance. The distance is the new part.
+<span class="m">$(x - \mu)^\top \Sigma^{-1} (x - \mu)$</span> measures how far
+<span class="m">$x$</span> is from the mean <em>in units of the covariance</em>:
+directions where the data spreads widely count for little, directions where
+the data is tight count for a lot. Set that quadratic to a constant and you
+get the density's contour, an ellipse, and the covariance is the ellipse's
+shape dial:
+</p>
+
+<ul>
+  <li><strong>Isotropic</strong>, <span class="m">$\Sigma = \sigma^2 I$</span>: every direction identical, circular contours.</li>
+  <li><strong>Axis-aligned</strong>, unequal diagonal entries: an ellipse stretched along the coordinate axes, features uncorrelated but differently spread.</li>
+  <li><strong>Correlated</strong>, nonzero off-diagonal entries: the ellipse tilts, and the sign of the covariance sets the tilt direction, positive leaning up-right, negative leaning down-right.</li>
+</ul>
+
+<div class="figure" id="fig-covshape">
+  <div class="fig-mount" data-fig="covshape"></div>
+  <p class="fig-caption"><b>Fig 4.1,</b> the covariance-shape explorer, the intuition anchor for everything that follows. The density and its 1&sigma;/2&sigma; contour ellipses are computed live from the <span class="m">$\Sigma$</span> you dial in with the two variance sliders and the correlation slider; the matrix and its determinant update alongside. Walk the presets: isotropic (circle), axis-aligned (upright ellipse), and correlated (tilted ellipse, sign flips the tilt).</p>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">A 2-D Gaussian has <span class="m">$\Sigma = \begin{bmatrix} 2 &amp; 0 \\ 0 &amp; 0.5 \end{bmatrix}$</span>. What do its contours look like?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Circles, since the off-diagonals are zero</button>
+    <button data-k="b">Ellipses tilted at 45&deg;, since the variances differ</button>
+    <button data-k="c">Axis-aligned ellipses, wider along <span class="m">$x_1$</span> than <span class="m">$x_2$</span></button>
+  </div>
+  <div class="quiz-fb" data-k="a">Zero off-diagonals rule out tilt, not stretch. Circles need the diagonal entries equal too, the isotropic case <span class="m">$\sigma^2 I$</span>. Here the variances differ by a factor of four.</div>
+  <div class="quiz-fb" data-k="b">Tilt comes only from nonzero covariance between the features. With zeros off the diagonal the ellipse axes stay locked to the coordinate axes; unequal variances change the stretch, not the angle.</div>
+  <div class="quiz-fb" data-k="c">Right. Diagonal covariance means no tilt, and the larger variance (2 versus 0.5) stretches the ellipse along <span class="m">$x_1$</span>. Dial exactly this matrix into Fig 4.1 and check.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 5. GDA ═══════════════════ -->
+<section id="sec-gda">
+<h2><span class="secnum">5.</span> The Gaussian Bayes classifier (GDA)</h2>
+
+<p>
+Now assemble the machine. A <span class="m">$k$</span>-class
+<strong>Gaussian Bayes classifier</strong>, also called
+<strong>Gaussian discriminant analysis (GDA)</strong>, has two parts: a
+categorical prior <span class="m">$p(C = k)$</span> over the classes, and a
+Gaussian class-likelihood <span class="m">$\mathcal{N}(\mu_k, \Sigma_k)$</span>
+per class. Training is section 3 run <span class="m">$k$</span> times: fit
+each class's <span class="m">$\mu_k, \Sigma_k$</span> by MLE on that class's
+points, and set the priors from the class frequencies. Prediction is
+section 2: report the class with the biggest posterior. In log form, which is
+how any implementation actually computes it, the posterior of class
+<span class="m">$k$</span> is
+</p>
+
+$$ \log p(C = k \mid x) = -\tfrac{d}{2}\log(2\pi) - \tfrac{1}{2}\log|\Sigma_k|
+   - \tfrac{1}{2}(x - \mu_k)^\top \Sigma_k^{-1}(x - \mu_k) + \log p(C = k) - \log p(x), $$
+
+<p>
+and the decision is <span class="m">$y(x) = \arg\max_k p(C = k \mid x)$</span>.
+Read the terms as a scorecard: a constant everyone shares, a penalty for
+having a spread-out class (big <span class="m">$|\Sigma_k|$</span>), the
+covariance-scaled distance from the class mean, a bonus for being a common
+class, and the evidence term, which is identical across classes and gets
+dropped from the argmax exactly as before.
+</p>
+
+<div class="figure" id="fig-gda2d">
+  <div class="fig-mount" data-fig="gda2d"></div>
+  <p class="fig-caption"><b>Fig 5.1,</b> a full GDA classifier in 2-D, the second signature figure. Three classes, each fitted by MLE (mean crosses, 1&sigma;/2&sigma; ellipses), with the decision regions and boundaries computed live from the log-posteriors. Drag the query point (or use arrow keys) to read all three posteriors and the verdict. The covariance-mode toggle re-fits the same data three ways, full per-class, shared, and shared diagonal, morphing the boundaries from curved (QDA) to straight (LDA) to axis-aligned-portrait straight (Gaussian Naive Bayes), with the live Gaussian parameter count for each mode. <!-- flagged addition: the diagonal mode here shares one diagonal covariance across classes so the linear boundary shown is exact; section 7's table states the source's full case list. --></p>
+</div>
+
+<p>
+The parameter count in that figure deserves a hard stare. Each full
+covariance costs <span class="m">$O(d^2)$</span> numbers, and GDA fits one
+per class: <span class="m">$O(k \cdot d^2)$</span> parameters in total. In
+2-D that is charming. In 1000-D, one class's covariance alone is roughly half
+a million numbers, all of which need data to pin down, and the estimate is
+only trustworthy when the class has far more points than parameters. GDA in
+high dimensions is data-intensive, and that pressure is exactly what
+section 6 relieves.
+</p>
+
+<h3>The code</h3>
+
+<p>
+The whole classifier is four short functions. Note that
+<code>gda_predict</code> drops the evidence and works in logs, so products of
+tiny densities never underflow:
+</p>
+
+<pre class="code" data-lang="python"><code>import numpy as np
+
+def fit_gaussian(X_class):
+    mu = X_class.mean(axis=0)
+    D = X_class - mu
+    Sigma = D.T @ D / len(X_class)        # MLE: divide by N
+    return mu, Sigma
+
+def gaussian_pdf(x, mu, Sigma):
+    d = len(mu)
+    diff = x - mu
+    quad = diff @ np.linalg.inv(Sigma) @ diff
+    norm = (2 * np.pi) ** (d / 2) * np.linalg.det(Sigma) ** 0.5
+    return np.exp(-0.5 * quad) / norm
+
+def gda_fit(X, t, k):
+    classes = []
+    for c in range(k):
+        Xc = X[t == c]
+        mu, Sigma = fit_gaussian(Xc)
+        classes.append((mu, Sigma, len(Xc) / len(X)))   # prior = frequency
+    return classes
+
+def gda_predict(x, classes):
+    scores = [np.log(prior) + np.log(gaussian_pdf(x, mu, Sigma))
+              for mu, Sigma, prior in classes]
+    return int(np.argmax(scores))         # evidence not needed</code></pre>
+
+<p>
+Do not just read it, run it. The version below executes the same pipeline on
+a fixed toy dataset, and you can switch the covariance mode to preview
+section 7:
+</p>
+
+<div class="figure" id="fig-gdacode">
+  <div class="fig-mount" data-fig="gdacode"></div>
+  <p class="fig-caption"><b>Fig 5.2,</b> a live <code>gda_predict</code>. Press Run and the functions above execute for real on a fixed two-class toy dataset: the printed <span class="m">$\hat{\mu}_k$</span>, <span class="m">$\hat{\Sigma}_k$</span>, priors, per-class log-posterior scores, and the argmax verdict for the chosen query all come from the computation. Switch the covariance-mode select to a shared or shared-diagonal <span class="m">$\Sigma$</span> and press Run again to re-fit and re-score; watch the query near the boundary change its verdict between modes.</p>
+</div>
+
+<details class="check">
+  <summary>Check: why fit in high dimensions is the hard part</summary>
+  <div>
+    <p>Training GDA is closed-form, so what exactly makes it "data-intensive" at <span class="m">$O(k \cdot d^2)$</span> parameters? The formula computes instantly either way.</p>
+    <p><b>Answer.</b> The cost is statistical, not computational. Every entry of <span class="m">$\hat{\Sigma}_k$</span> is an average over class <span class="m">$k$</span>'s points, and an average over too few points is noise wearing a suit. With <span class="m">$d = 100$</span>, one class's covariance holds <span class="m">$100 + 4950 = 5050$</span> distinct numbers; estimate those from 200 points and most entries are guesses, the fitted ellipsoid degenerates, and <span class="m">$\Sigma_k^{-1}$</span>, which the log-posterior needs, becomes unstable or outright singular. That is why the section 7 menu exists: sharing the covariance pools every class's points into one estimate, and going diagonal cuts the count to <span class="m">$O(d)$</span>. The covariance constraint is not a modeling nicety, it is the knob that matches the parameter count to the data you actually have.</p>
+  </div>
+</details>
+
+<div class="quiz" data-correct="a">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">In <code>gda_predict</code>, the score is <code>log(prior) + log(gaussian_pdf(...))</code> and the evidence never appears. A teammate "fixes" it by dividing every score's probability by <span class="m">$p(x)$</span> before the argmax. What changes?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Nothing: subtracting the same <span class="m">$\log p(x)$</span> from every class's score shifts all of them equally and the argmax is unchanged</button>
+    <button data-k="b">The predictions become properly calibrated probabilities, so accuracy improves</button>
+    <button data-k="c">The code breaks, because <span class="m">$p(x)$</span> is unknowable</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Right. In log space the evidence is a common additive shift, and an argmax is blind to common shifts. That is the computational face of "the evidence is constant across classes". Compute it only when you want the posterior as an actual probability, as Fig 5.1's readout does by normalizing.</div>
+  <div class="quiz-fb" data-k="b">Normalizing does produce genuine posteriors, which is useful for reporting confidence, but the ranking of classes, and therefore every prediction and the accuracy, is untouched.</div>
+  <div class="quiz-fb" data-k="c"><span class="m">$p(x)$</span> is perfectly computable: sum the likelihood-times-prior products over the classes. It is skipped in the argmax because it is unnecessary, not because it is unavailable.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 6. NAIVE BAYES ═══════════════════ -->
+<section id="sec-nb">
+<h2><span class="secnum">6.</span> Naive Bayes</h2>
+
+<p>
+Back to spam, and this time take the features seriously. Represent an email
+by a binary bag-of-words vector <span class="m">$x \in \{0, 1\}^D$</span>:
+one bit per vocabulary word, 1 if the email contains it. With a vocabulary of
+<span class="m">$D$</span> words there are <span class="m">$2^D$</span>
+possible vectors, and an arbitrary class-likelihood
+<span class="m">$p(x \mid C = k)$</span> must assign a probability to every
+one of them: about <span class="m">$2^D - 1$</span> free parameters per
+class. At <span class="m">$D = 30$</span> that is already over a billion
+numbers; a realistic vocabulary makes the count larger than any dataset that
+will ever exist. Modeling the joint distribution of the features is
+intractable head on.
+</p>
+
+<p>
+<strong>Naive Bayes</strong> buys tractability with one aggressive
+assumption: the features are <em>conditionally independent given the
+class</em>. Once you know an email is spam, knowing it contains "winner"
+tells you nothing extra about whether it contains "free". Then the joint
+factorizes into per-feature pieces:
+</p>
+
+$$ p(c, x_1, \dots, x_D) = p(c)\prod_{d=1}^{D} p(x_d \mid c), $$
+
+<p>
+and the price list collapses: instead of <span class="m">$2^{D+1}$</span>
+numbers for the full joint over class and features, we need
+<span class="m">$D + 1$</span> Bernoulli parameters, one prior plus one
+per-word probability per class. The assumption is false, obviously, "free"
+and "winner" travel together in real spam, which is why the model is called
+naive. But false assumptions can still buy useful classifiers, and this one
+buys a factor-of-<span class="m">$2^D$</span> discount. Watch the two price
+tags diverge:
+</p>
+
+<div class="figure" id="fig-nbparams">
+  <div class="fig-mount" data-fig="nbparams"></div>
+  <p class="fig-caption"><b>Fig 6.1,</b> the independence assumption's payoff. Slide the vocabulary size <span class="m">$D$</span>: the full joint needs about <span class="m">$2^D - 1$</span> parameters per class (log scale, note the axis), while Naive Bayes needs <span class="m">$D + 1$</span>. Both counts are computed exactly and printed; the reference lines mark the size of real datasets, which the full joint outgrows before <span class="m">$D$</span> reaches 40.</p>
+</div>
+
+<p>
+The decision rule keeps the Bayes shape, with the product replacing the joint
+likelihood:
+</p>
+
+$$ y(x) = \arg\max_k \; p(C = k)\prod_{d=1}^{D} p(x_d \mid C = k). $$
+
+<div class="worked">
+  <div class="worked-title">Worked by hand: a three-word spam filter</div>
+  <!-- flagged addition: the source specifies the bag-of-words setup and the decision
+       rule but no numeric example; these conditional probabilities are invented by me
+       for the arithmetic. -->
+  <p>Vocabulary {free, meeting, winner}, priors <span class="m">$p(\text{spam}) = p(\text{ham}) = 0.5$</span>, and per-word conditionals estimated from data:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    p(free|spam)=0.8&nbsp;&nbsp;p(meeting|spam)=0.1&nbsp;&nbsp;p(winner|spam)=0.6<br>
+    p(free|ham)&nbsp;=0.2&nbsp;&nbsp;p(meeting|ham)&nbsp;=0.7&nbsp;&nbsp;p(winner|ham)&nbsp;=0.05
+  </p>
+  <p>An email contains "free" and "winner" but not "meeting": <span class="m">$x = (1, 0, 1)$</span>. Score each class, remembering an absent word contributes one minus its probability:</p>
+  <p style="font-family:var(--mono);font-size:14px">
+    spam: 0.5 &times; 0.8 &times; (1&minus;0.1) &times; 0.6 = 0.216<br>
+    ham:&nbsp; 0.5 &times; 0.2 &times; (1&minus;0.7) &times; 0.05 = 0.0015<br>
+    p(spam | x) = 0.216 / (0.216 + 0.0015) = 0.993
+  </p>
+  <p>Four multiplications per class, seven parameters total, and a 99.3% posterior. That is the whole model.</p>
+</div>
+
+<h3>Gaussian Naive Bayes: independence as a diagonal</h3>
+
+<p>
+What does the independence assumption look like back in the Gaussian world?
+A multivariate Gaussian's features are independent exactly when its
+covariances are zero, so <strong>Gaussian Naive Bayes</strong> is the
+Gaussian Bayes classifier with a diagonal covariance,
+<span class="m">$\Sigma = \operatorname{diag}(\sigma_1^2, \dots, \sigma_D^2)$</span>.
+The multivariate class-likelihood then factorizes into a product of 1-D
+Gaussians, one per feature:
+</p>
+
+$$ p(x \mid C = k) = \prod_{d=1}^{D} \mathcal{N}\!\big(x_d;\; \mu_{dk},\, \sigma_{dk}^2\big). $$
+
+<p>
+Same trade as the Bernoulli case: the full covariance's
+<span class="m">$O(d^2)$</span> parameters drop to <span class="m">$O(d)$</span>
+diagonal entries per class, at the cost of declaring every feature pair
+uncorrelated within a class. Geometrically, every class portrait is forced to
+be an axis-aligned ellipse from Fig 4.1's middle preset. Keep that picture;
+it becomes a boundary shape in the next section.
+</p>
+
+<p>
+In code, the change from <code>gda_predict</code> is one line of modeling:
+score each feature with its own 1-D Gaussian and sum the logs, which is the
+log of the product in the decision rule:
+</p>
+
+<pre class="code" data-lang="python"><code>def naive_bayes_predict(x, classes):
+    # classes: per class, (mu[d], var[d], prior); features independent given C
+    scores = []
+    for mu, var, prior in classes:
+        log_lik = sum(-0.5 * np.log(2 * np.pi * var[d])
+                      - (x[d] - mu[d]) ** 2 / (2 * var[d])
+                      for d in range(len(x)))          # log Π = Σ log
+        scores.append(np.log(prior) + log_lik)
+    return int(np.argmax(scores))</code></pre>
+
+<details class="check">
+  <summary>Check: Naive Bayes by hand on a weather table</summary>
+  <div>
+    <p>Ten days of records, two features (Outlook, Temp), and whether a match was played. Reworded from the assignment's tennis exercise, with fresh numbers:</p>
+    <p style="font-family:var(--mono);font-size:13.5px">
+      Play=yes (6): (Sunny,Cool) (Sunny,Mild) (Overcast,Hot) (Overcast,Cool) (Rain,Mild) (Rain,Cool)<br>
+      Play=no&nbsp; (4): (Sunny,Hot) (Sunny,Hot) (Sunny,Mild) (Rain,Cool)
+    </p>
+    <p>Predict Play for a new day that is (Sunny, Cool).</p>
+    <p><b>Answer.</b> Priors from frequencies: <span class="m">$p(\text{yes}) = 0.6$</span>, <span class="m">$p(\text{no}) = 0.4$</span>. Conditionals by counting within each class: <span class="m">$p(\text{Sunny} \mid \text{yes}) = 2/6$</span>, <span class="m">$p(\text{Cool} \mid \text{yes}) = 3/6$</span>, <span class="m">$p(\text{Sunny} \mid \text{no}) = 3/4$</span>, <span class="m">$p(\text{Cool} \mid \text{no}) = 1/4$</span>. Scores:</p>
+    <p style="font-family:var(--mono);font-size:14px">
+      yes: 0.6 &times; 2/6 &times; 3/6 = 0.100<br>
+      no:&nbsp; 0.4 &times; 3/4 &times; 1/4 = 0.075
+    </p>
+    <p>Play = yes, with posterior <span class="m">$0.100 / 0.175 = 0.571$</span>. Worth noticing how close the call is: Sunny leans hard toward no (3 of the 4 no-days were sunny), Cool leans toward yes, and the prior tips the balance. Every number came from counting, which is Naive Bayes's entire training procedure for categorical features.</p>
+  </div>
+</details>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">You multiply one feature by 1000 (say, metres become millimetres) and refit. What happens to Gaussian Naive Bayes's predictions, and why is this different from k-NN?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Predictions change drastically: the rescaled feature now dominates the product of likelihoods</button>
+    <button data-k="b">Predictions are essentially unchanged: the refit <span class="m">$\hat{\mu}_d$</span> and <span class="m">$\hat{\sigma}_d$</span> rescale with the feature, so each per-feature likelihood contributes the same relative evidence, while k-NN's shared distance metric would be dominated by the big feature</button>
+    <button data-k="c">Naive Bayes crashes, since variances cannot exceed one</button>
+  </div>
+  <div class="quiz-fb" data-k="a">That is the failure mode of distance-based models, not of Naive Bayes. Each feature here gets its own 1-D Gaussian whose parameters are re-estimated on the rescaled data, so the feature's standardized distance from the class mean is what it always was.</div>
+  <div class="quiz-fb" data-k="b">Right. Naive Bayes models each feature separately, so a per-feature rescaling is absorbed by that feature's own refit parameters (the density picks up a constant factor that is the same for every class, and constants common to all classes cancel in the argmax). k-NN pools features into one Euclidean distance, where the millimetre feature would drown the rest. That is why Naive Bayes is mostly indifferent to feature scaling.</div>
+  <div class="quiz-fb" data-k="c">Variances can be any positive number; a Gaussian's density can even exceed one, since it is a density, not a probability. Nothing crashes.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 7. DECISION BOUNDARIES ═══════════════════ -->
+<section id="sec-boundaries">
+<h2><span class="secnum">7.</span> Decision boundaries: QDA, LDA, Gaussian Naive Bayes</h2>
+
+<p>
+We never optimized a boundary in this whole lecture, but every Bayes
+classifier implies one: the set of inputs where two classes' posteriors tie.
+For <span class="m">$k = 2$</span>,
+</p>
+
+$$ p(C = 1 \mid x) = p(C = 0 \mid x)
+   \;\Rightarrow\; p(x \mid C = 1)\,p(C = 1) = p(x \mid C = 0)\,p(C = 0), $$
+
+<p>
+where the evidence cancelled from both sides, as usual. What does this set
+look like when the likelihoods are Gaussian? Take logs and expand in 1-D.
+Each side contributes <span class="m">$-\tfrac{(x - \mu_k)^2}{2\sigma_k^2} - \log\sigma_k + \log p(C = k)$</span>,
+and collecting powers of <span class="m">$x$</span> leaves
+</p>
+
+$$ a x^2 + b x + c = 0, \qquad
+   a = \frac{1}{2\sigma_0^2} - \frac{1}{2\sigma_1^2}, $$
+
+<p>
+a <strong>quadratic</strong> equation whenever
+<span class="m">$\sigma_1 \neq \sigma_0$</span>, with up to two roots: the
+narrow class can carve an island out of the middle of the wide class's
+territory. And if the variances are equal? Then
+<span class="m">$a = 0$</span>, the quadratic terms cancel, and the boundary
+is a single <strong>linear</strong> threshold. Watch the cancellation happen:
+</p>
+
+<div class="figure" id="fig-boundary1d">
+  <div class="fig-mount" data-fig="boundary1d"></div>
+  <p class="fig-caption"><b>Fig 7.1,</b> the equal-posterior condition becoming a quadratic. The coefficients <span class="m">$a, b, c$</span> are computed live from the two Gaussians and priors, the roots are solved and drawn as boundary lines, and the coloured band along the top shows each class's winning territory, two boundary points when the variances differ. Drag the variance sliders toward each other, or press Equalize, and watch <span class="m">$a \to 0$</span>: the quadratic degenerates and exactly one linear boundary survives.</p>
+</div>
+
+<p>
+The same expansion works in <span class="m">$d$</span> dimensions. Equating
+the two log-posteriors and dropping shared constants gives
+</p>
+
+$$ x^\top \Sigma_1^{-1} x - 2\mu_1^\top \Sigma_1^{-1} x
+   = x^\top \Sigma_2^{-1} x - 2\mu_2^\top \Sigma_2^{-1} x + \text{const}, $$
+
+<p>
+a quadratic function of <span class="m">$x$</span>: in 2-D the boundary is a
+conic, an ellipse, parabola, or hyperbola. But look at the quadratic terms.
+If the two classes share one covariance,
+<span class="m">$\Sigma_1 = \Sigma_2$</span>, then
+<span class="m">$x^\top \Sigma^{-1} x$</span> appears identically on both
+sides and cancels, and everything left is linear in
+<span class="m">$x$</span>: a straight boundary, from a model that never
+aimed for one. The covariance assumption is the boundary dial:
+</p>
+
+<div class="method-card">
+  <div class="method-title">Covariance structure &rarr; boundary geometry</div>
+  <table>
+    <tr><th><span class="m">$\Sigma_k$</span> not shared</th><td><strong>QDA</strong> (quadratic discriminant analysis): quadratic boundary, <span class="m">$O(k \cdot d^2)$</span> parameters.</td></tr>
+    <tr><th>Not shared, diagonal</th><td><strong>Gaussian Naive Bayes</strong>: linear boundary, axis-aligned class portraits, <span class="m">$O(k \cdot d)$</span> parameters.</td></tr>
+    <tr><th>Shared, arbitrary</th><td><strong>LDA</strong> (linear discriminant analysis): linear boundary, <span class="m">$O(d^2)$</span> parameters.</td></tr>
+    <tr><th>Shared, diagonal</th><td>Isotropic Gaussian Naive Bayes: linear boundary, <span class="m">$O(d)$</span> parameters.</td></tr>
+  </table>
+</div>
+
+<p>
+One dataset can wear all of these. The figure below fits it each way and
+morphs between the results, the same story Fig 0.1 promised, now with every
+gear visible:
+</p>
+
+<div class="figure" id="fig-morph">
+  <div class="fig-mount" data-fig="morph"></div>
+  <p class="fig-caption"><b>Fig 7.2,</b> the boundary morph. One two-class dataset; the slider interpolates each class's fitted covariance toward the shared (pooled) covariance, and the boundary, recomputed live at every step, bends from QDA's curve into LDA's straight line. The Diagonalize toggle zeroes the off-diagonal terms, snapping the ellipses upright for the Naive Bayes cases. The regime label, boundary shape, and parameter count track the table above.</p>
+</div>
+
+<p>
+Two vocabulary notes to lock in, straight from the mini-summary. The
+<em>Gaussian Bayes classifier</em> in its shared-covariance form,
+<span class="m">$\arg\max_k p(C = k)\, p(x \mid C = k)$</span> with one
+arbitrary <span class="m">$\Sigma$</span> for all classes, is the LDA case:
+linear boundaries. The <em>Gaussian Naive Bayes classifier</em> is the same
+rule with a diagonal covariance, so its likelihood factorizes over
+dimensions. Everything in this lecture is one classifier wearing different
+covariance constraints.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Check your understanding</div>
+  <p class="quiz-q">Two classes in <span class="m">$d = 20$</span> dimensions. Model A gives each class its own full covariance; model B shares one full covariance between them. What are the boundary shapes and Gaussian parameter counts (means plus covariances)?</p>
+  <div class="quiz-opts">
+    <button data-k="a">Both boundaries are quadratic; A needs twice B's parameters</button>
+    <button data-k="b">A is linear with 460 parameters, B is quadratic with 250</button>
+    <button data-k="c">A is QDA: quadratic boundary, <span class="m">$2 \times (20 + 210) = 460$</span> parameters; B is LDA: the <span class="m">$x^\top \Sigma^{-1} x$</span> terms cancel, linear boundary, <span class="m">$40 + 210 = 250$</span> parameters</button>
+  </div>
+  <div class="quiz-fb" data-k="a">B's boundary is not quadratic: sharing the covariance makes the quadratic terms identical on both sides of the equal-posterior equation, and they cancel. That cancellation is the whole LDA story.</div>
+  <div class="quiz-fb" data-k="b">You have the two models swapped. Per-class covariances (A) are what keep the quadratic terms alive; sharing (B) cancels them into a linear boundary.</div>
+  <div class="quiz-fb" data-k="c">Right. A covariance in 20-D costs <span class="m">$20 + (400 - 20)/2 = 210$</span> numbers, plus 20 means per class: A pays for two of everything (460), B pays for two means but one covariance (250), and B's reward for the constraint is a straight boundary.</div>
+</div>
+</section>
+
+<!-- ═══════════════════ 8. SUMMARY ═══════════════════ -->
+<section id="sec-summary">
+<h2><span class="secnum">8.</span> Summary and method card</h2>
+
+<p>
+One idea carried the whole lecture: model what inputs from each class look
+like, then use Bayes' rule to decide which class most likely generated a new
+input. The Bayes classifier is the decision rule,
+<span class="m">$\arg\max_k p(x \mid C = k)\, p(C = k)$</span>, with the
+evidence dropped because it cannot change the winner. MLE from last lecture
+supplies the ingredients in closed form: a mean and a variance per class in
+1-D, a mean vector and a covariance matrix in <span class="m">$d$</span>
+dimensions. The covariance is both the model's expressive power, tilting and
+stretching each class's portrait, and its appetite,
+<span class="m">$O(d^2)$</span> parameters per class. Naive Bayes tames the
+appetite by assuming conditional independence, collapsing
+<span class="m">$2^D$</span>-scale joints to <span class="m">$D + 1$</span>
+parameters, and in the Gaussian world that assumption is simply a diagonal
+covariance. And the boundary geometry is bookkeeping on the same quadratic:
+per-class covariances keep the quadratic terms alive (QDA), a shared
+covariance cancels them (LDA, linear), and diagonal restrictions buy
+axis-aligned portraits at <span class="m">$O(d)$</span> cost. If you want the
+full story in print, this is Bishop's Pattern Recognition and Machine
+Learning territory, with the decision-theory framing in Russell's Artificial
+Intelligence: A Modern Approach.
+</p>
+
+<div class="method-card">
+  <div class="method-title">Method card &middot; Gaussian Bayes Models &amp; GDA</div>
+  <table>
+    <tr><th>Assumption</th><td>Model what inputs from each class look like, then use Bayes' rule to decide which class most likely generated a new input.</td></tr>
+    <tr><th>Model class</th><td>Class priors <span class="m">$p(C = k)$</span> and class-conditionals <span class="m">$p(x \mid C = k)$</span>; Gaussian assumptions give GDA, conditional independence gives Naive Bayes.</td></tr>
+    <tr><th>Learning / selection</th><td>Estimate parameters from class-specific data by MLE; predict with <span class="m">$\arg\max_k p(x \mid C = k)\, p(C = k)$</span>.</td></tr>
+    <tr><th>Strengths</th><td>Probabilistically principled, interpretable, often closed-form; covariance assumptions give a direct handle on model complexity and boundary shape.</td></tr>
+    <tr><th>Limitations</th><td>Depends on distributional assumptions; full covariance estimation is data-intensive, while diagonal/independence assumptions can be too restrictive.</td></tr>
+    <tr><th>Next step</th><td>How covariance structure produces Gaussian Naive Bayes, LDA, and QDA, and the geometry of the resulting boundary; beyond that, richer generative models such as mixtures of Gaussians. <!-- flagged addition: the mixtures clause extends the source card's next-step line, foreshadowing the GMM peek-ahead in Quiz 5. --></td></tr>
+  </table>
+</div>
+
+<p>
+Where this sits in the course story: last lecture built the estimation
+machinery, likelihoods, priors, MLE and MAP, and this lecture spent it on
+classification, the first time the course has modeled the inputs instead of
+the boundary. Next lecture stays on the theme of modeling the data itself,
+but drops the labels entirely: principal component analysis asks what
+structure lives inside <span class="m">$x$</span> alone.
+</p>
+</section>
+
+<!-- ═══════════════════ 9. END QUIZ ═══════════════════ -->
+<section id="sec-quiz">
+<h2><span class="secnum">9.</span> End-of-lesson quiz</h2>
+
+<p>
+Two quick checks, then three transfer questions that ask you to decide and
+justify, not recall. Attempt each before expanding the answer.
+</p>
+
+<div class="quiz" data-correct="c">
+  <div class="quiz-label">Quiz 1</div>
+  <p class="quiz-q">What exactly does a generative classifier learn that a discriminative one does not, and how does it predict?</p>
+  <div class="quiz-opts">
+    <button data-k="a">It learns <span class="m">$p(y \mid x)$</span> directly, like logistic regression, but with Gaussian activations</button>
+    <button data-k="b">It learns only a boundary, but expresses it probabilistically</button>
+    <button data-k="c">It learns the class-likelihoods <span class="m">$p(x \mid y)$</span> and priors <span class="m">$p(y)$</span>, equivalently the joint <span class="m">$p(x, y)$</span>, and derives <span class="m">$p(y \mid x)$</span> through Bayes' rule at prediction time</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Learning <span class="m">$p(y \mid x)$</span> directly is the definition of the discriminative route. The generative route models the inputs per class and recovers the conditional afterwards.</div>
+  <div class="quiz-fb" data-k="b">A boundary is what discriminative score-based methods learn. The generative model never optimizes a boundary; one merely emerges where posteriors tie.</div>
+  <div class="quiz-fb" data-k="c">Right. Model the data per class, count the priors, and Bayes' rule turns the crank: <span class="m">$\arg\max_k p(x \mid C = k)\, p(C = k)$</span>, evidence dropped.</div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="quiz-label">Quiz 2</div>
+  <p class="quiz-q">A two-class Gaussian Bayes classifier is fit with one shared, arbitrary covariance matrix. A colleague expects a curved boundary "because Gaussians are curvy". What does the model actually produce?</p>
+  <div class="quiz-opts">
+    <button data-k="a">A quadratic boundary: Gaussian densities always give conic boundaries</button>
+    <button data-k="b">A linear boundary: with <span class="m">$\Sigma_1 = \Sigma_2$</span> the <span class="m">$x^\top \Sigma^{-1} x$</span> terms are identical in both log-posteriors and cancel, leaving a linear equation, the LDA case</button>
+    <button data-k="c">No boundary at all, since shared covariances make the classes indistinguishable</button>
+  </div>
+  <div class="quiz-fb" data-k="a">Only when each class keeps its own covariance (QDA). Sharing makes the quadratic terms equal on both sides of the tie equation, and equal terms cancel.</div>
+  <div class="quiz-fb" data-k="b">Right. The curviness of each density is real, but boundaries come from <em>differences</em> of log-densities, and sharing the covariance wipes out the quadratic difference. Fig 7.2's slider is exactly this cancellation in motion.</div>
+  <div class="quiz-fb" data-k="c">The class means still differ, and the linear term they generate is precisely the boundary. Shared shape does not mean shared location.</div>
+</div>
+
+<details class="check">
+  <summary>Quiz 3 (transfer): generative or discriminative, and defend it</summary>
+  <div>
+    <p>Two projects land on your desk. Project one: classify emails with 40 labelled examples, and the product team also wants to flag emails that look like nothing seen before. Project two: classify images of handwritten digits with two million labelled examples, maximizing raw accuracy. Pick a family for each and justify it.</p>
+    <p><b>Answer.</b> Project one wants generative, project two wants discriminative. With 40 examples, closed-form MLE fits of a heavily constrained generative model (Naive Bayes, or Gaussian Naive Bayes with its <span class="m">$O(d)$</span> parameters) are estimable where a flexible discriminative model would overfit, the priors let us encode how rare spam is without needing data to say so, and, decisively, a generative model owns a density: an email with tiny <span class="m">$p(x \mid C = k)$</span> under <em>every</em> class looks like nothing the model has seen, which is the flag the product team asked for. A discriminative model has no notion of "looks like nothing", it only knows which side of a boundary a point falls on. Project two reverses every consideration: with two million examples the data can pin down a flexible boundary directly, and the generative route's distributional assumptions (are digit images really Gaussian per class?) become the accuracy bottleneck. Learn <span class="m">$p(y \mid x)$</span> or the boundary directly and spend the data on it. The general rule: generative models earn their keep when data is scarce, priors matter, or you need the input distribution itself; discriminative models win when data is plentiful and the only question is the label. <!-- flagged addition: this decision guidance extends the source's strengths/limitations framing; the density-based anomaly flag anticipates the GMM peek-ahead below. --></p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 4 (transfer): LDA's line meets logistic regression's line</summary>
+  <div>
+    <p>LDA (shared covariance) produces a linear decision boundary. So does logistic regression. Same boundary family, so are they the same model? Where do they differ, and when would each win?</p>
+    <p><b>Answer.</b> Same family of boundaries, different routes to choosing one, and the routes matter. Work out LDA's log-posterior ratio: with <span class="m">$\Sigma_1 = \Sigma_0$</span>, <span class="m">$\log \frac{p(C=1 \mid x)}{p(C=0 \mid x)}$</span> is linear in <span class="m">$x$</span>, so the posterior has exactly the form <span class="m">$\sigma(w^\top x + b)$</span>: LDA is secretly a sigmoid over a linear score, the very shape logistic regression assumes from the start. The difference is what gets estimated. LDA reaches <span class="m">$w$</span> indirectly, by fitting means, a shared covariance, and priors to the whole input distribution by MLE; logistic regression fits <span class="m">$w$</span> directly by maximizing the conditional likelihood of the labels. When the Gaussian, shared-covariance story is roughly true, LDA squeezes more out of small samples, because it uses every point's position, not just its side of the boundary, to pin down the geometry. When the story is false, say the classes are skewed or heavy-tailed, LDA's boundary is bent by its wrong assumptions, while logistic regression, which never assumed anything about <span class="m">$p(x)$</span>, degrades more gracefully. Assumptions pay when they are true and charge when they are false, which is this lecture's method card in one sentence. <!-- flagged addition: the LDA-to-sigmoid connection responds to the lesson prompt's transfer question; it goes beyond the source file's content and is flagged accordingly. --></p>
+  </div>
+</details>
+
+<details class="check">
+  <summary>Quiz 5 (transfer): one Gaussian per class is not enough</summary>
+  <div>
+    <p>A class's data forms two separate clumps (say, fraudulent transactions split into "stolen card" and "fake merchant" patterns). One Gaussian per class fits poorly. Sketch the fix, and explain how the same idea gives an anomaly detector.</p>
+    <p><b>Answer.</b> Peek ahead: replace the single Gaussian with a <em>mixture</em> of Gaussians, <span class="m">$p(x \mid C) = \sum_m \pi_m\, \mathcal{N}(x; \mu_m, \Sigma_m)$</span>, weights <span class="m">$\pi_m$</span> summing to one. Each component covers one clump, and the class-likelihood becomes flexible enough for multi-modal classes while every downstream piece of this lecture, priors, Bayes' rule, the argmax, is untouched. The fitting is the one genuinely new ingredient: no closed form exists once components must share the points, which is what the EM algorithm handles when the course reaches Gaussian Mixture Models. The anomaly detector comes free, exactly because the model is generative: a fitted mixture assigns every point a log-likelihood <span class="m">$\log p(x)$</span>, so score incoming points and flag the ones far below the training data's typical range; they resemble no component, no matter the label. You can even sample from the mixture to sanity-check what the model believes the data looks like, a move no boundary-only model can offer. This is the source's flagged peek ahead at GMMs; the machinery arrives in a later lecture. <!-- flagged addition: peek ahead at Gaussian Mixture Models, per the source file's note on the assignment's Q6. --></p>
+  </div>
+</details>
+
+<div class="lesson-end">
+  <p>That is generative classification. We never drew a boundary, and got a better-principled one than the boundary hunters: model each class, count the priors, and let Bayes' rule decide, with the covariance assumption as a single dial that trades parameters for boundary shape, QDA to LDA to Naive Bayes. The deeper habit to keep is the modeling reflex itself: when a problem looks hard head on, ask what process generated the data, model that, and let probability do the deciding.</p>
+</div>
+
+<nav class="lesson-nav" aria-label="Lesson navigation">
+  <a href="../mle-map-bayesian/index.html">
+    <div class="nav-kicker">&larr; Previous lesson</div>
+    <div class="nav-title">Lecture 16: MLE, MAP &amp; Bayesian Prediction</div>
+  </a>
+  <span class="spacer"></span>
+  <a href="../pca/index.html">
+    <div class="nav-kicker">Next lesson &rarr;</div>
+    <div class="nav-title">Lecture 18: Principal Component Analysis</div>
+  </a>
+</nav>
+</section>
+
+</main>
+
+<footer class="lesson-footer">
+  <div>ECE 657 &middot; Intro to Machine Learning &middot; University of Waterloo</div>
+  <div><a href="../index.html">ECE 657 Course Home</a> &middot; Lecture 17 &middot; Gaussian Bayes Models</div>
+</footer>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  var tryRender = function () {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code"]
+      });
+    } else {
+      setTimeout(tryRender, 60);
+    }
+  };
+  tryRender();
+});
+</script>
+<script defer src="lesson-core.js"></script>
+<script defer src="figures-a.js"></script>
+<script defer src="figures-b.js"></script>
+</body>
+</html>
