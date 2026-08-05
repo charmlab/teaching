@@ -252,7 +252,7 @@ const MODULES = [
       { title:"★ Interactive Lesson — Support Vector Machines (Lecture 8)", type:"website", url:"modules/c-ml/svm/index.html" },
       { title:"StatQuest — Machine Learning playlists", type:"video", url:"https://statquest.org" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   { id:"c-nn", tier:"concepts", short:"DL",
     title:"Linear to Neural Models", sub:"linear and logistic regression, neural nets, backprop, depth & scale",
@@ -271,7 +271,7 @@ const MODULES = [
       { title:"StatQuest — Gradient Descent", type:"video", url:"https://youtu.be/sDv4f4s2SB8" },
       { title:"StatQuest — Stochastic Gradient Descent", type:"video", url:"https://youtu.be/vMh0zPT0tLI" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   // ---- Applied / Applications ----
   { id:"a-vision", tier:"applied", short:"CV",
@@ -284,7 +284,7 @@ const MODULES = [
       { title:"★ Interactive Lesson — Convolutional Neural Networks (Lecture 11)", type:"website", url:"modules/c-ml/cnn/index.html" },
       { title:"★ Interactive Lesson — CNNs in Practice (Lecture 12)", type:"website", url:"modules/c-ml/cnn-part-2/index.html" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   { id:"a-nlp", tier:"applied", short:"LM",
     title:"Language Models", sub:"embeddings → transformers",
@@ -301,7 +301,7 @@ const MODULES = [
       { title:"3Blue1Brown — Neural Networks (attention & transformers chapters)", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
       { title:"Karpathy — Neural Networks: Zero to Hero (GPT lectures)", type:"video", url:"https://karpathy.ai/zero-to-hero.html" },
     ],
-    ing:{listen:"wip", play:"planned", build:"planned"} },
+    ing:{listen:"wip", play:"live", build:"planned"} },
 
   { id:"a-agents", tier:"applied", short:"Ag",
     title:"AI Agents", sub:"reasoning, tools, memory",
@@ -342,7 +342,7 @@ const MODULES = [
       { title:"★ Interactive Lesson — MLE, MAP & Bayesian Prediction (Lecture 16)", type:"website", url:"modules/c-ml/mle-map-bayesian/index.html" },
       { title:"★ Interactive Lesson — Gaussian Bayes Models (Lecture 17)", type:"website", url:"modules/c-ml/gaussian-bayes/index.html" },
     ],
-    ing:{listen:"planned", play:"planned", build:"planned"} },
+    ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"x-unsup", tier:"concepts", short:"Un",
     title:"Unsupervised Learning", sub:"PCA, clustering, Gaussian mixtures",
@@ -356,7 +356,7 @@ const MODULES = [
       { title:"★ Interactive Lesson — Clustering: K-Means & GMMs (Lecture 20)", type:"website", url:"modules/c-ml/clustering/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
-    ing:{listen:"planned", play:"planned", build:"planned"} },
+    ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"x-rl", tier:"concepts", short:"RL",
     title:"Reinforcement Learning", sub:"bandits, MDPs, value functions, policy gradient",
@@ -368,7 +368,7 @@ const MODULES = [
       { title:"★ Interactive Lesson — Reinforcement Learning (Lecture 21)", type:"website", url:"modules/c-ml/reinforcement-learning/index.html" },
       { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
     ],
-    ing:{listen:"planned", play:"planned", build:"planned"} },
+    ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"s-causal", tier:"specializations", short:"Cau", planned:true,
     title:"Causal AI", sub:"interventions, counterfactuals, causal graphs",
