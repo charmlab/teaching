@@ -41,6 +41,30 @@ table.mtx td.pouch-win { outline: 2.5px solid var(--green); outline-offset: -2.5
 .legend-row .lg { display: flex; align-items: center; gap: 6px; }
 .legend-row .sw { width: 14px; height: 3.5px; border-radius: 2px; display: inline-block; }
 </style>
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
 </head>
 <body>
 

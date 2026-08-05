@@ -13,6 +13,30 @@
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23e8590c'/%3E%3Ctext x='32' y='43' font-family='Georgia,serif' font-weight='bold' font-size='30' fill='%23fff' text-anchor='middle'%3EML%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="lesson.css">
+<script>
+/* Google Analytics 4 (same property as the Learning Map; filter by hostname in GA) */
+(function () {
+  var GA_ID = "G-PLH5YY7PQS";
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  window.gtag = gtag;
+  function load() {
+    if (window.__gaLoaded) return;
+    window.__gaLoaded = true;
+    var s = document.createElement("script");
+    s.async = true;
+    s.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+    document.head.appendChild(s);
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+  }
+  if ("requestIdleCallback" in window) {
+    window.addEventListener("load", function () { requestIdleCallback(load, { timeout: 3000 }); }, { once: true });
+  } else {
+    window.addEventListener("load", load, { once: true });
+  }
+})();
+</script>
 </head>
 <body>
 
