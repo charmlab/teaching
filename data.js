@@ -244,7 +244,7 @@ const MODULES = [
     blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
     aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
-      { title:"★ ECE 657 Course Home — all interactive lessons (Lectures 2–19)", type:"website", url:"modules/c-ml/index.html" },
+      { title:"★ ECE 657 & 457B Course Home — all interactive lessons (Lectures 2–19)", type:"website", url:"modules/c-ml/index.html" },
       { title:"★ Interactive Lesson — k-Nearest Neighbours (Lecture 2)", type:"website", url:"modules/c-ml/knn/index.html" },
       { title:"★ Interactive Lesson — Decision Trees (Lecture 3)", type:"website", url:"modules/c-ml/decision-trees/index.html" },
       { title:"★ Interactive Lesson — Linear Regression (Lecture 4)", type:"website", url:"modules/c-ml/linear-regression/index.html" },
