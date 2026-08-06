@@ -17,7 +17,7 @@ metric on the features.
 ::: example
 A bank wants to flag risky loans. A new applicant is compared to the $k=5$
 most similar past applicants; if 4 of 5 defaulted, the application is flagged.
-:::
+::: 
 
 ::: student
 **Why scaling matters.** With Euclidean distance
@@ -43,7 +43,8 @@ shows: scatter plot with shaded decision regions, live
 id: knn-voting
 goal: animate the k nearest neighbours being found and voting
 style: manim, 20–30 seconds
-:::
+::: 
+
 
 Choosing $k$ trades off noise against blur: small $k$ memorizes, large $k$
 oversmooths.
