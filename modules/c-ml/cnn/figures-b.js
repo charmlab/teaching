@@ -35,6 +35,11 @@
     ];
     const Wn = 7;
 
+    // The padding ring is drawn hatched and cooler than the image's own zeros:
+    // both hold 0, but only one of them is real data, and the figure is useless
+    // if you cannot see which ring the kernel is currently sitting on.
+    const PAD_FILL = "#e9edf2", PAD_HATCH = "#c6cfd9", PAD_NUM = "#a7b1bc";
+
     let K = 3, P = 1, S = 1;
     let idx = 0, playing = null;
 
@@ -56,7 +61,7 @@
     }
 
     const { cv, ctx, W, H } = LR.canvas(mount, 820, 400, {
-      aria: "Padding and stride explorer: kernel positions animated over a padded seven by seven input with the live output size",
+      aria: "Padding and stride explorer: kernel positions animated over a seven by seven input wrapped in a hatched ring of zero padding, with the live output size",
     });
     const ro = LR.readout(mount, [
       { k: "formula", label: "Ŵ = (W − K + 2P)/S + 1" },
@@ -78,8 +83,7 @@
       draw();
     }
 
-    function patchSum(i, j) {
-      const im = CNN.pad(IMG, P);
+    function patchSum(im, i, j) {
       let s = 0;
       for (let a = 0; a < K; a++)
         for (let b = 0; b < K; b++) s += im[i * S + a][j * S + b];
@@ -97,16 +101,43 @@
       const total = Wn + 2 * P;
       const ci = Math.min(30, Math.floor(300 / total));
       const IXX = 40, IYY = 70;
-      CNN.label(ctx, IXX, IYY - 12, "input 7 × 7, padding " + P + " (grey ring = zeros)");
       const im = CNN.pad(IMG, P);
+      const isPad = (r, c) => r < P || c < P || r >= total - P || c >= total - P;
+      CNN.label(ctx, IXX, IYY - 12,
+        P > 0
+          ? "input 7 × 7 (outlined) + " + P + " ring" + (P > 1 ? "s" : "") + " of zero padding (hatched)"
+          : "input 7 × 7, no padding");
       CNN.grid(ctx, IXX, IYY, ci, im, {
-        fill: function (v, r, c) {
-          const inPad = r < P || c < P || r >= total - P || c >= total - P;
-          return inPad ? "#f3f3f3" : CNN.gray(v);
-        },
+        fill: (v, r, c) => (isPad(r, c) ? PAD_FILL : CNN.gray(v)),
         num: (v) => (ci >= 22 ? CNN.fmtV(v) : null),
-        numColor: (v) => (v > 0.5 ? "#fff" : "#adadad"),
+        numColor: (v, r, c) => (isPad(r, c) ? PAD_NUM : v > 0.5 ? "#fff" : "#adadad"),
       });
+
+      if (P > 0) {
+        const span = total * ci - 1, inner = Wn * ci - 1;
+        // hatch the ring only: outer square minus the real image, even-odd clipped
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(IXX, IYY, span, span);
+        ctx.rect(IXX + P * ci, IYY + P * ci, inner, inner);
+        ctx.clip("evenodd");
+        ctx.strokeStyle = PAD_HATCH;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let d = 0; d < 2 * span; d += 8) {
+          ctx.moveTo(IXX + d, IYY);
+          ctx.lineTo(IXX + d - span, IYY + span);
+        }
+        ctx.stroke();
+        ctx.restore();
+        // outline the real image: everything outside it was invented by padding
+        ctx.strokeStyle = C.text;
+        ctx.lineWidth = 1.8;
+        ctx.strokeRect(IXX + P * ci - 0.5, IYY + P * ci - 0.5, Wn * ci, Wn * ci);
+        CNN.label(ctx, IXX, IYY + total * ci + 18,
+          "hatched = zeros invented by padding, not part of the image");
+      }
+
       // kernel box
       ctx.strokeStyle = C.orange; ctx.lineWidth = 3;
       ctx.strokeRect(IXX + j * S * ci - 1, IYY + i * S * ci - 1, K * ci, K * ci);
@@ -118,7 +149,7 @@
       const outGrid = [];
       for (let r = 0; r < n; r++) {
         const row = [];
-        for (let c = 0; c < n; c++) row.push(r * n + c <= idx ? patchSum(r, c) : null);
+        for (let c = 0; c < n; c++) row.push(r * n + c <= idx ? patchSum(im, r, c) : null);
         outGrid.push(row);
       }
       const filledMax = Math.max(1, K * K);
