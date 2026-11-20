@@ -325,3 +325,7 @@ html[lang="fa"] #path .step-card { text-align: right; }
   .pill .pill-name { font-size: 12px; }
   .pill .pill-tag  { font-size: 9.5px; }
 }
+
+/* .site-nav .inner's padding was zeroing the .wrap side padding on narrow screens */
+.site-nav .inner.wrap { padding-left: 24px; padding-right: 24px; }
+@media (max-width: 720px) { .site-nav .inner.wrap { padding-left: 16px; padding-right: 16px; } }

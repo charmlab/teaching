@@ -1,0 +1,45 @@
+# The AI Learning Map
+
+> Free, interactive machine-learning and AI lessons by Amir-Hossein Karimi (Assistant Professor, Electrical & Computer Engineering, University of Waterloo). Built from the ECE 657 & 457B Introduction to Machine Learning course: each lesson combines a from-scratch written explanation, live interactive figures, short lecture videos (free on YouTube), and a quiz.
+
+The map is organised by audience: Public (use AI), Students (build AI), Leaders (lead with AI), and Scholars (advance AI). Modules without original lessons link to curated external resources.
+
+## Lessons by module
+
+### Classical ML Models
+- [k-Nearest Neighbours](https://teaching.amirhkarimi.com/modules/c-ml/knn/index.html): Data representation, distance, Voronoi boundaries, choosing k, and where KNN breaks.
+- [Decision Trees](https://teaching.amirhkarimi.com/modules/c-ml/decision-trees/index.html): Tree anatomy, decision regions, entropy, information gain, greedy learning, overfitting, and pruning.
+- [Bias, Variance & Ensembles](https://teaching.amirhkarimi.com/modules/c-ml/bias-variance-ensembles/index.html): The decomposition, majority voting, bagging, random forests, AdaBoost, and gradient boosting.
+- [MLE, MAP & Bayesian Prediction](https://teaching.amirhkarimi.com/modules/c-ml/mle-map-bayesian/index.html): Probability versus likelihood, maximum likelihood estimation, priors and posteriors, MAP, conjugacy, and fully Bayesian prediction.
+- [Gaussian Bayes Models](https://teaching.amirhkarimi.com/modules/c-ml/gaussian-bayes/index.html): The Bayes classifier, fitting Gaussians by MLE, the multivariate Gaussian, Gaussian discriminant analysis, Naive Bayes, and the QDA/LDA decision-boundary geometry.
+- [Support Vector Machines](https://teaching.amirhkarimi.com/modules/c-ml/svm/index.html): Max-margin classification, support vectors, soft margins and slack, feature maps, and the kernel trick.
+
+### Linear to Neural Models
+- [Linear Regression](https://teaching.amirhkarimi.com/modules/c-ml/linear-regression/index.html): Models, losses, optimization, gradient descent, overfitting, and ridge regression.
+- [Linear Classification](https://teaching.amirhkarimi.com/modules/c-ml/linear-classification/index.html): Scores, thresholds, decision boundaries, precision and recall, the perceptron, and multi-class strategies.
+- [Logistic Regression](https://teaching.amirhkarimi.com/modules/c-ml/logistic-regression/index.html): The four tries, the sigmoid, probabilistic outputs, cross-entropy, gradient descent, regularization, and softmax.
+- [Neural Networks](https://teaching.amirhkarimi.com/modules/c-ml/neural-networks/index.html): The XOR wall, feature maps, representation learning, MLPs, expressivity, and a hand-built network that solves XOR.
+- [Backpropagation](https://teaching.amirhkarimi.com/modules/c-ml/backpropagation/index.html): The chain rule on a computation graph, error signals, SGD, and the training tricks that make deep networks work.
+
+### Unsupervised Learning
+- [Principal Component Analysis](https://teaching.amirhkarimi.com/modules/c-ml/pca/index.html): Dimensionality reduction, eigenvectors of the covariance matrix, the PCA algorithm, the variance/reconstruction duality, scree plots, compression and denoising, random projections, and supervised PCA.
+- [Autoencoders and VAEs](https://teaching.amirhkarimi.com/modules/c-ml/autoencoders/index.html): From PCA's fixed encoder/decoder to learned, nonlinear, and deep autoencoders, sparse and denoising variants, the latent-space failure modes, and the VAE with the reparameterization trick and KL regularization.
+- [Clustering & Density Estimation](https://teaching.amirhkarimi.com/modules/c-ml/clustering/index.html): K-means, soft K-means, the generative view, Gaussian mixture models, latent variables, and the EM algorithm.
+
+### Computer Vision
+- [Convolutional Neural Networks](https://teaching.amirhkarimi.com/modules/c-ml/cnn/index.html): Locality, weight sharing, the sliding dot product, padding and stride, filter banks, ReLU, pooling, and growing receptive fields.
+- [CNNs in Practice](https://teaching.amirhkarimi.com/modules/c-ml/cnn-part-2/index.html): 1x1 convolutions, large curated datasets, GPUs and scaling, the LeNet-to-ResNet architecture lineage, transfer learning, interpretability, adversarial examples, and dense prediction.
+
+### Language Models
+- [Language Models](https://teaching.amirhkarimi.com/modules/c-ml/language-models/index.html): The chain rule, n-grams and data sparsity, tokenization, one-hot vectors, word embeddings and analogies, neural language models, decoding, and perplexity.
+- [Sequence Models](https://teaching.amirhkarimi.com/modules/c-ml/sequence-models/index.html): Recurrent networks, hidden state as memory, backpropagation through time, vanishing and exploding gradients, gradient clipping, LSTMs and GRUs, bidirectional and stacked cells, and the seq2seq bottleneck that motivates attention.
+- [Attention and Transformers](https://teaching.amirhkarimi.com/modules/c-ml/attention-transformers/index.html): Queries, keys, and values, multi-head attention, the transformer block, architecture families, the LLM training pipeline, token economics, context windows, and scaling laws.
+
+### Reinforcement Learning
+- [Reinforcement Learning](https://teaching.amirhkarimi.com/modules/c-ml/reinforcement-learning/index.html): Multi-armed bandits and the exploration-exploitation dilemma, Markov decision processes, value functions, Bellman equations, value and policy iteration, and Q-learning, with live agents you can train.
+
+## Other pages
+
+- [The AI Learning Map (home)](https://teaching.amirhkarimi.com/)
+- [ECE 657 & 457B course home](https://teaching.amirhkarimi.com/modules/c-ml/index.html)
+- [Amir-Hossein Karimi, personal website](https://amirhkarimi.com)

@@ -35,9 +35,9 @@ function getLang() {
 function setLang(l) { localStorage.setItem("alm-lang", l); }
 
 /* ---------- Audience ---------- */
-const AUD_LABEL   = { student: "🧑🏻‍🎓 Student", executive: "💼 Executive",    public: "🌐 Public"        };
-const AUD_TAGLINE = { student: "🎯 build AI",  executive: "🎯 lead with AI",  public: "🎯 use AI"       };
-const AUD_TAGLINE_FA = { student: "🎯 هوش مصنوعی بسازید", executive: "🎯 با هوش مصنوعی رهبری کنید", public: "🎯 از هوش مصنوعی استفاده کنید" };
+const AUD_LABEL   = { student: "🧑🏻‍🎓 Students", executive: "💼 Leaders", public: "🌐 Public", scholar: "🔬 Scholars" };
+const AUD_TAGLINE = { student: "build AI", executive: "lead with AI", public: "use AI", scholar: "advance AI" };
+const AUD_TAGLINE_FA = { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید", scholar: "هوش مصنوعی را پیش ببرید" };
 
 /* ---------- Tier display names (3-tier: foundations / concepts / applications) ---------- */
 const TIER_LABEL = {
@@ -58,12 +58,12 @@ const STRINGS = {
   en: {
     find_level: "Find your level · تعیین سطح",
     lang_btn: "فا",
-    audience: { student: "🧑🏻‍🎓 Student", executive: "💼 Executive", public: "🌐 Public" },
-    tagline:  { student: "🎯 build AI", executive: "🎯 lead with AI", public: "🎯 use AI" },
-    tier_label: { foundations:"Foundations", concepts:"Concepts", applied:"Applications", specializations:"Specializations" },
+    audience: { student: "🧑🏻‍🎓 Students", executive: "💼 Leaders", public: "🌐 Public", scholar: "🔬 Scholars" },
+    tagline:  { student: "build AI", executive: "lead with AI", public: "use AI", scholar: "advance AI" },
+    tier_label: { foundations:"Foundations", concepts:"Concepts", applied:"Applications", specializations:"Specializations", planned:"Under development" },
     views: { map: "Skill tree", path: "Your path" },
     map_title: "The AI Learning Map",
-    map_subtitle: "One coherent path from mathematical foundations to production AI systems — at the right depth for who you are. Each module, three ways in:",
+    map_subtitle: "From mathematical foundations to production AI systems — at the right depth for who you are.",
     ing: {
       listen: { name: "Listen", tag: "for concepts",
         desc: "Watch or listen to the lecture — slides, video, or podcast." },
@@ -80,7 +80,7 @@ const STRINGS = {
     ref_note: "Reference module — no original content here. Learn this from the excellent resources below.",
     supervised_learning: "Supervised Learning",
     back_to_map: "← back to the map",
-    minimap_label: "you are here — click a node to travel",
+    minimap_label: "click any module to jump there",
     resources_title: "\u{1F4DA} Learn more",
     resources_sub: "Hand-picked videos, websites, and readings from other excellent teachers.",
     resources_empty: "Curated resources for this module are on their way.",
@@ -98,13 +98,13 @@ const STRINGS = {
   fa: {
     find_level: "تعیین سطح",
     lang_btn: "EN",
-    audience: { student: "🧑🏻‍🎓 دانشجو", executive: "💼 مدیر اجرایی", public: "🌐 عموم" },
-    tagline:  { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید" },
-    tier_label: { foundations:"مبانی", concepts:"مفاهیم", applied:"کاربردها", specializations:"تخصص‌ها" },
+    audience: { student: "🧑🏻‍🎓 دانشجویان", executive: "💼 مدیران", public: "🌐 عموم", scholar: "🔬 پژوهشگران" },
+    tagline:  { student: "هوش مصنوعی بسازید", executive: "با هوش مصنوعی رهبری کنید", public: "از هوش مصنوعی استفاده کنید", scholar: "هوش مصنوعی را پیش ببرید" },
+    tier_label: { foundations:"مبانی", concepts:"مفاهیم", applied:"کاربردها", specializations:"تخصص‌ها", planned:"در دست ساخت" },
     supervised_learning: "یادگیری با نظارت",
     views: { map: "درخت مهارت", path: "مسیر شما" },
     map_title: "نقشه یادگیری هوش مصنوعی",
-    map_subtitle: "یک مسیر منسجم از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب برای شما. هر ماژول، سه روش:",
+    map_subtitle: "از مبانی ریاضی تا سیستم‌های هوش مصنوعی — با عمق مناسب برای شما",
     ing: {
       listen: { name: "گوش بده",  tag: "برای مفاهیم",
         desc: "جلسات درس را تماشا کنید یا گوش دهید." },
@@ -120,7 +120,7 @@ const STRINGS = {
     },
     ref_note: "ماژول مرجع — محتوای اصلی ندارد. از منابع عالی زیر یاد بگیرید.",
     back_to_map: "→ بازگشت به نقشه",
-    minimap_label: "شما اینجایید — روی یک گره کلیک کنید",
+    minimap_label: "روی هر ماژول کلیک کنید تا به آن بروید",
     resources_title: "\u{1F4DA} بیشتر بیاموزید",
     resources_sub: "ویدیوها، وبسایت‌ها و منابع انتخابی.",
     resources_empty: "منابع بهزودی برای این ماژول در راه است.",
@@ -219,29 +219,37 @@ const MODULES = [
     resources:[], ing:{} },
 
   // ---- Core / Concepts ----
-  { id:"c-intro", tier:"foundations", short:"Lit",
+  { id:"c-intro", tier:"foundations", short:"Lit", ref:true,
     title:"AI Literacy", sub:"what AI is & its history",
     title_fa:"مبانی هوش مصنوعی", sub_fa:"هوش مصنوعی چیست و تاریخچه آن",
     blurb:"What AI and machine learning actually are, where they sit in the broader landscape, when to use them (and when not to), and the common thread across all the methods ahead.",
     blurb_fa:"هوش مصنوعی و یادگیری ماشین واقعاً چه هستند، کجا در چشم‌انداز گسترده‌تر جای می‌گیرند، چه زمانی باید از آن‌ها استفاده کرد، و وجه مشترک تمام روش‌های پیش رو.",
     aud:["public"], prereqs:[],
-    resources:[],
+    resources:[
+      { title:"Elements of AI — free intro course (University of Helsinki)", type:"website", url:"https://www.elementsofai.com/" },
+      { title:"Andrew Ng — AI for Everyone", type:"video", url:"https://www.coursera.org/learn/ai-for-everyone" },
+      { title:"3Blue1Brown — Neural Networks (visual intuition)", type:"video", url:"https://www.3blue1brown.com/topics/neural-networks" },
+    ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"c-flu", tier:"foundations", short:"Flu", planned:true,
+  { id:"c-flu", tier:"foundations", short:"Flu", planned:true, ref:true,
     title:"AI Fluency", sub:"prompts, tools & workflows",
     title_fa:"مهارت هوش مصنوعی", sub_fa:"پرامپت‌نویسی، ابزارها و گردش‌های کاری",
     blurb:"How to use AI tools effectively: prompting strategies, working with LLMs, integrating AI into real workflows, and evaluating outputs critically.",
     blurb_fa:"چگونه ابزارهای هوش مصنوعی را به طور موثر استفاده کنیم: استراتژی‌های پرامپت، کار با LLM‌ها، ادغام هوش مصنوعی در گردش‌های کاری واقعی و ارزیابی نتایج.",
     aud:["public"], prereqs:[],
-    resources:[],
+    resources:[
+      { title:"Anthropic Academy — AI Fluency: Framework & Foundations (free)", type:"website", url:"https://www.anthropic.com/ai-fluency" },
+      { title:"Anthropic — Interactive Prompt Engineering Tutorial", type:"website", url:"https://github.com/anthropics/prompt-eng-interactive-tutorial" },
+      { title:"Ethan Mollick — One Useful Thing (working with AI, in practice)", type:"website", url:"https://www.oneusefulthing.org/" },
+    ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 
   { id:"c-ml", tier:"concepts", short:"ML",
-    title:"Classical ML Models", sub:"nearest neighbors, decision trees, ensembling, naive bayes",
+    title:"Classical ML Models", sub:"nearest neighbors, decision trees, ensembles, naive bayes, SVMs",
     title_fa:"مدل‌های کلاسیک یادگیری ماشین", sub_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، یادگیری گروهی",
-    blurb:"KNN, decision trees, ensembles, linear regression, logistic regression and SVMs — supervised learning end-to-end. The running thread: linear models and linear separability, and where they break.",
-    blurb_fa:"KNN، درخت‌های تصمیم، مجموعه‌ها، رگرسیون خطی، رگرسیون لجستیک و SVM. موضوع مشترک: مدل‌های خطی و جداسازی خطی — و جایی که شکست می‌خورند.",
+    blurb:"Nearest neighbours, decision trees, ensembles, probabilistic learning (MLE, MAP, Bayes), Gaussian & naive Bayes, and SVMs — the classic toolbox of supervised learning, each built from scratch with interactive figures, lecture clips, and a quiz.",
+    blurb_fa:"نزدیک‌ترین همسایه، درخت‌های تصمیم، یادگیری گروهی، بیز گاوسی و ساده، و SVM — جعبه‌ابزار کلاسیک یادگیری نظارت‌شده، هر کدام از پایه با شکل‌های تعاملی، کلیپ‌های درس و آزمون.",
     aud:["student","executive"], prereqs:["junc-f2c"],
     resources:[
       { title:"★ ECE 657 & 457B Course Home — all interactive lessons (Lectures 2–19)", type:"website", url:"modules/c-ml/index.html" },
@@ -257,8 +265,8 @@ const MODULES = [
   { id:"c-nn", tier:"concepts", short:"DL",
     title:"Linear to Neural Models", sub:"linear and logistic regression, neural nets, backprop, depth & scale",
     title_fa:"از خطی تا عصبی", sub_fa:"شبکه‌های عصبی، پس‌انتشار، عمق و مقیاس",
-    blurb:"Linear models as neural nets, activations and nonlinearity, backprop intuition, loss functions, gradient descent — then deeper: depth, regularization, and the transformer architecture.",
-    blurb_fa:"مدل‌های خطی به عنوان شبکه‌های عصبی، فعال‌سازی‌ها و غیرخطی بودن، شهود پس‌انتشار، توابع خسارت، گرادیان کاهشی — و عمیق‌تر: عمق، منظم‌سازی، و معماری ترانسفورمر.",
+    blurb:"Linear and logistic regression and linear classifiers, then neural networks and backpropagation — from a single linear unit to deep networks, each step built from scratch.",
+    blurb_fa:"رگرسیون خطی و لجستیک و طبقه‌بندهای خطی، سپس شبکه‌های عصبی و پس‌انتشار — از یک واحد خطی تا شبکه‌های عمیق، هر گام از پایه.",
     aud:["student","executive"], prereqs:["c-ml"],
     resources:[
       { title:"★ Interactive Lesson — Linear Classification (Lecture 5)", type:"website", url:"modules/c-ml/linear-classification/index.html" },
@@ -303,13 +311,18 @@ const MODULES = [
     ],
     ing:{listen:"wip", play:"live", build:"planned"} },
 
-  { id:"a-agents", tier:"applied", short:"Ag",
+  { id:"a-agents", tier:"applied", short:"Ag", ref:true,
     title:"AI Agents", sub:"reasoning, tools, memory",
     title_fa:"عامل‌های هوش مصنوعی", sub_fa:"استدلال، ابزار، حافظه",
     blurb:"Agents and reasoning, planning and memory, tool / function calling, workflows and orchestration, multi-agent concepts.",
     blurb_fa:"عامل‌ها و استدلال، برنامه‌ریزی و حافظه، فراخوانی ابزار/تابع، گردش‌های کاری و هماهنگی، مفاهیم چند عاملی.",
     aud:["executive"], prereqs:["a-nlp"],
-    resources:[],
+    resources:[
+      { title:"Anthropic — Building Effective Agents", type:"website", url:"https://www.anthropic.com/engineering/building-effective-agents" },
+      { title:"Hugging Face — AI Agents Course (free, hands-on)", type:"website", url:"https://huggingface.co/learn/agents-course" },
+      { title:"UC Berkeley — Agentic AI MOOC (Dawn Song, recorded lectures)", type:"video", url:"https://rdi.berkeley.edu/agentic-ai/f25" },
+      { title:"Lilian Weng — LLM Powered Autonomous Agents", type:"website", url:"https://lilianweng.github.io/posts/2023-06-23-agent/" },
+    ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
 
@@ -320,15 +333,22 @@ const MODULES = [
     blurb_fa:"هوش مصنوعی تجسم‌یافته — درک، برنامه‌ریزی حرکت و کنترل در محیط‌های فیزیکی.",
     aud:["student"], prereqs:["c-nn","x-rl"],
     resources:[
+      { title:"Russ Tedrake — Underactuated Robotics (MIT notes + lectures)", type:"book", url:"https://underactuated.mit.edu/" },
+      { title:"Lynch & Park — Modern Robotics (free book + videos)", type:"book", url:"https://hades.mech.northwestern.edu/index.php/Modern_Robotics" },
       { title:"Stanford CS223A — Introduction to Robotics", type:"website", url:"https://see.stanford.edu/Course/CS223A" },
     ], ing:{listen:"planned", play:"planned", build:"planned"} },
-  { id:"a-systems", tier:"applied", short:"Sys",
+  { id:"a-systems", tier:"applied", short:"Sys", ref:true,
     title:"AI Systems & MLOps", sub:"models → production",
     title_fa:"سیستم‌های هوش مصنوعی", sub_fa:"مدل‌ها تا تولید",
     blurb:"From models to systems: retrieval and RAG, APIs and services, end-to-end evaluation, reliability and observability.",
     blurb_fa:"از مدل‌ها به سیستم‌ها: بازیابی و RAG، API‌ها و سرویس‌ها، ارزیابی انتها به انتها، قابلیت اطمینان و مشاهده‌پذیری.",
     aud:["executive"], prereqs:["a-agents","a-vision"],
-    resources:[],
+    resources:[
+      { title:"Made With ML — MLOps Course (Goku Mohandas)", type:"website", url:"https://madewithml.com/courses/mlops/" },
+      { title:"DataTalks.Club — MLOps Zoomcamp (free)", type:"video", url:"https://github.com/DataTalksClub/mlops-zoomcamp" },
+      { title:"Full Stack Deep Learning — course lectures", type:"video", url:"https://fullstackdeeplearning.com/" },
+      { title:"Google — Rules of Machine Learning", type:"website", url:"https://developers.google.com/machine-learning/guides/rules-of-ml" },
+    ],
     ing:{listen:"wip", play:"planned", build:"planned"} },
 
   // ---- Advanced / Specializations ----
@@ -345,7 +365,7 @@ const MODULES = [
     ing:{listen:"planned", play:"live", build:"planned"} },
 
   { id:"x-unsup", tier:"concepts", short:"Un",
-    title:"Unsupervised Learning", sub:"PCA, clustering, Gaussian mixtures",
+    title:"Unsupervised Learning", sub:"PCA, autoencoders, clustering & mixtures",
     title_fa:"یادگیری بدون نظارت", sub_fa:"PCA، خوشه‌بندی، مخلوط گاوسی",
     blurb:"Dimensionality reduction, clustering, and representation learning — finding structure without labels.",
     blurb_fa:"کاهش بعد، خوشه‌بندی و یادگیری بازنمایی — یافتن ساختار بدون برچسب.",
@@ -365,42 +385,63 @@ const MODULES = [
     blurb_fa:"MDP، توابع ارزش، Q-learning و گرادیان سیاست — یادگیری از طریق تعامل با محیط.",
     aud:["student"], prereqs:["junc-f2c"],
     resources:[
-      { title:"★ Interactive Lesson — Reinforcement Learning (Lecture 21)", type:"website", url:"modules/c-ml/reinforcement-learning/index.html" },
-      { title:"StatQuest — Principal Component Analysis (PCA), Step-by-Step", type:"video", url:"https://youtu.be/FgakZw6K1QQ" },
+      { title:"Sutton & Barto — Reinforcement Learning: An Introduction (free book)", type:"book", url:"http://incompleteideas.net/book/the-book-2nd.html" },
+      { title:"David Silver — RL Course (DeepMind / UCL)", type:"video", url:"https://www.davidsilver.uk/teaching/" },
+      { title:"Hugging Face — Deep RL Course (free, hands-on)", type:"website", url:"https://huggingface.co/learn/deep-rl-course" },
     ],
     ing:{listen:"planned", play:"live", build:"planned"} },
 
-  { id:"s-causal", tier:"specializations", short:"Cau", planned:true,
+  { id:"s-causal", tier:"specializations", short:"Cau", planned:true, ref:true,
     title:"Causal AI", sub:"interventions, counterfactuals, causal graphs",
     title_fa:"هوش مصنوعی علّی", sub_fa:"مداخلات، واقعیت‌های خلاف، گراف‌های علّی",
     blurb:"Beyond correlation — learning causal structure, do-calculus, and counterfactual reasoning.",
     blurb_fa:"فراتر از همبستگی — یادگیری ساختار علّی، حساب do و استدلال خلاف واقع.",
-    aud:["student"], prereqs:[],
-    resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
+    aud:["scholar"], prereqs:[],
+    resources:[
+      { title:"Brady Neal — Introduction to Causal Inference (course + videos)", type:"video", url:"https://bradyneal.github.io/causal-inference-course" },
+      { title:"Brady Neal — Introduction to Causal Inference (free book, PDF)", type:"pdf", url:"https://bradyneal.github.io/Introduction_to_Causal_Inference-Dec17_2020-Neal.pdf" },
+      { title:"Peters, Janzing & Schölkopf — Elements of Causal Inference (open access)", type:"book", url:"https://library.oapen.org/handle/20.500.12657/26040" },
+      { title:"Hernán & Robins — Causal Inference: What If (free book)", type:"book", url:"https://miguelhernan.org/whatifbook" },
+    ], ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"s-xai", tier:"specializations", short:"XAI", planned:true,
+  { id:"s-xai", tier:"specializations", short:"XAI", planned:true, ref:true,
     title:"Explainable AI", sub:"interpretability, attribution, auditing",
     title_fa:"هوش مصنوعی قابل تفسیر", sub_fa:"تفسیرپذیری، انتساب، ممیزی",
     blurb:"Making model decisions transparent — feature attribution, saliency, and auditing.",
     blurb_fa:"شفاف‌سازی تصمیمات مدل — انتساب ویژگی، برجستگی و ممیزی.",
-    aud:["student"], prereqs:[],
-    resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
+    aud:["scholar"], prereqs:[],
+    resources:[
+      { title:"Christoph Molnar — Interpretable Machine Learning (free book)", type:"book", url:"https://christophm.github.io/interpretable-ml-book/" },
+      { title:"Hima Lakkaraju (Harvard) — Explainable AI course", type:"website", url:"https://interpretable-ml-class.github.io/" },
+      { title:"Karimi et al. — A Survey of Algorithmic Recourse", type:"pdf", url:"https://arxiv.org/abs/2010.04050" },
+      { title:"Anthropic — Transformer Circuits (mechanistic interpretability)", type:"website", url:"https://transformer-circuits.pub/" },
+    ], ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"s-nsai", tier:"specializations", short:"NS", planned:true,
+  { id:"s-nsai", tier:"specializations", short:"NS", planned:true, ref:true,
     title:"Neuro-symbolic AI", sub:"logic + learning, reasoning over knowledge",
     title_fa:"هوش مصنوعی عصبی-نمادین", sub_fa:"منطق + یادگیری، استدلال بر دانش",
     blurb:"Combining neural networks with symbolic reasoning — structured knowledge, logic, and learning.",
     blurb_fa:"ترکیب شبکه‌های عصبی با استدلال نمادین — دانش ساختاریافته، منطق و یادگیری.",
-    aud:["student"], prereqs:[],
-    resources:[], ing:{listen:"planned", play:"planned", build:"planned"} },
+    aud:["scholar"], prereqs:[],
+    resources:[
+      { title:"Garcez & Lamb — Neurosymbolic AI: The 3rd Wave", type:"pdf", url:"https://arxiv.org/abs/2012.05876" },
+      { title:"Chaudhuri et al. — Neurosymbolic Programming (monograph, PDF)", type:"pdf", url:"https://www.cs.utexas.edu/~swarat/pubs/PGL-049-Plain.pdf" },
+      { title:"NeurIPS 2022 Tutorial — Neurosymbolic Programming", type:"video", url:"https://neurips.cc/virtual/2022/tutorial/55804" },
+      { title:"CMU 10-747 — Neuro-Symbolic AI (course)", type:"website", url:"https://www.cs.cmu.edu/~pradeepr/747/" },
+    ], ing:{listen:"planned", play:"planned", build:"planned"} },
 
-  { id:"x-rai", tier:"foundations", short:"Eth", planned:true,
+  { id:"x-rai", tier:"foundations", short:"Eth", planned:true, ref:true,
     title:"AI Ethics", sub:"case studies, risks & responsible use",
     title_fa:"اخلاق هوش مصنوعی", sub_fa:"مطالعات موردی، خطرات و استفاده مسئولانه",
     blurb:"Real-world case studies on where AI goes wrong — bias, misinformation, privacy violations, job displacement, and more. A practical guide to what AI should and shouldn't be used for, with no technical background required.",
     blurb_fa:"مطالعات موردی واقعی در موردی که هوش مصنوعی اشتباه می‌رود — تعصب، اطلاعات نادرست، نقض حریم خصوصی، و بیشتر. راهنمای عملی برای اینکه هوش مصنوعی باید و نباید برای چه مواردی استفاده شود.",
     aud:["public","student","executive"], prereqs:[],
-    resources:[],
+    resources:[
+      { title:"Barocas, Hardt & Narayanan — Fairness and Machine Learning (free book)", type:"book", url:"https://fairmlbook.org/" },
+      { title:"fast.ai — Practical Data Ethics (free course, Rachel Thomas)", type:"video", url:"https://www.fast.ai/posts/2020-08-19-data-ethics.html" },
+      { title:"Rachel Thomas — 11 Short Videos About AI Ethics", type:"video", url:"https://www.fast.ai/posts/2021-08-17-eleven-videos.html" },
+      { title:"University of Helsinki — Ethics of AI (free course)", type:"website", url:"https://ethics-of-ai.mooc.fi/" },
+    ],
     ing:{listen:"planned", play:"planned", build:"planned"} },
 ];
 
@@ -494,7 +535,7 @@ const PATHS = {
 function getAudience() {
   const a = localStorage.getItem("alm-audience");
   if (a === "practitioner") return "executive"; // migrate old value
-  return (a === "student" || a === "executive" || a === "public") ? a : "student";
+  return (a === "student" || a === "executive" || a === "public" || a === "scholar") ? a : "student";
 }
 function setAudience(a) { localStorage.setItem("alm-audience", a); }
 

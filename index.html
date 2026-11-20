@@ -4,13 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The AI Learning Map &middot; Amir-Hossein Karimi</title>
+<meta name="description" content="The AI Learning Map by Amir-Hossein Karimi (University of Waterloo): free interactive lessons, lecture videos, and curated resources on machine learning and AI — from math foundations to deep learning, for the public, students, leaders, and scholars.">
+<link rel="canonical" href="https://teaching.amirhkarimi.com/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Amir-Hossein Karimi · Teaching">
+<meta property="og:title" content="The AI Learning Map">
+<meta property="og:description" content="Free interactive ML/AI lessons with lecture videos and quizzes — at the right depth for who you are.">
+<meta property="og:url" content="https://teaching.amirhkarimi.com/">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"The AI Learning Map","url":"https://teaching.amirhkarimi.com/","author":{"@type":"Person","name":"Amir-Hossein Karimi","url":"https://amirhkarimi.com","affiliation":{"@type":"Organization","name":"University of Waterloo"}}}</script>
 <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <style>
   /* ---------- Hero ---------- */
   header.hero { padding: 48px 0 16px; text-align: center; }
   h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 600; letter-spacing: -1px; line-height: 1.15; }
-  .subtitle { max-width: 600px; margin: 14px auto 0; color: var(--muted); font-size: 16px; font-weight: 300; }
+  .subtitle { padding: 0 20px; max-width: 760px; margin: 14px auto 0; color: var(--muted); font-size: 16px; font-weight: 300; }
   .ingredients-strip { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 20px; }
   .ingredients-strip span {
     font-size: 12.5px; background: #fff; border: 1px solid var(--line);
@@ -41,9 +50,19 @@
   #view-pills .pill-icon { width: 14px; height: 14px; flex-shrink: 0; opacity: 0.75; }
   #view-pills .pill.active .pill-icon { opacity: 1; }
 
-  /* Public audience pill — distinct blue-indigo */
-  #audience-pills .pill[data-aud="public"].active { background: #5a72c0; border-color: #5a72c0; }
-  #audience-pills .pill[data-aud="public"]:hover:not(.active) { border-color: #5a72c0; color: #5a72c0; }
+  /* Audience pills — colors match amirhkarimi.com audience pyramid */
+  #audience-pills .pill[data-aud="public"].active    { background: #a9530c; border-color: #a9530c; }
+  #audience-pills .pill[data-aud="student"].active   { background: #3b6d11; border-color: #3b6d11; }
+  #audience-pills .pill[data-aud="executive"].active { background: #8a5f17; border-color: #8a5f17; }
+  #audience-pills .pill[data-aud="scholar"].active   { background: #1f6db5; border-color: #1f6db5; }
+  #audience-pills .pill[data-aud="public"]:hover:not(.active)    { border-color: #a9530c; color: #a9530c; }
+  #audience-pills .pill[data-aud="student"]:hover:not(.active)   { border-color: #3b6d11; color: #3b6d11; }
+  #audience-pills .pill[data-aud="executive"]:hover:not(.active) { border-color: #8a5f17; color: #8a5f17; }
+  #audience-pills .pill[data-aud="scholar"]:hover:not(.active)   { border-color: #1f6db5; color: #1f6db5; }
+  .controls-inner { align-items: center; }
+  .tier-legend-item.planned .swatch {
+    background: repeating-linear-gradient(-45deg, #f5c518 0px, #f5c518 2.5px, #1a1a1a 2.5px, #1a1a1a 5px);
+  }
 
   /* ---------- Skill tree canvas ---------- */
   #map-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -162,23 +181,49 @@
   .ing-option .d { font-size: 12.5px; color: var(--muted); }
 
   /* ---------- Mobile ---------- */
-  @media (max-width: 900px) and (min-width: 641px) {
-    .node .t { font-size: 9.5px; }
-    .node .s { font-size: 8px; }
+  /* Grid layout (narrow screens, < 900px) — set by JS */
+  body.grid-mode #map-scroll { overflow: hidden; }
+  body.grid-mode #map { min-width: unset; max-width: 356px; margin-left: auto; margin-right: auto; }
+  body.grid-mode .node .s { display: none; }
+  body.grid-mode .node { padding: 2px 6px 2px 8px; justify-content: center; }
+  body.grid-mode .node .t { font-size: 11.5px; white-space: normal; overflow: hidden; text-overflow: unset; line-height: 1.2;
+             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  body.grid-mode #supervised-plate .plate-label { font-size: 7px; letter-spacing: 0.4px; white-space: nowrap; }
+
+  /* .controls / nav padding rules were zeroing the .wrap side padding on narrow screens */
+  .controls.wrap, .site-nav .inner.wrap { padding-left: 24px; padding-right: 24px; }
+  @media (max-width: 720px) { .controls.wrap, .site-nav .inner.wrap { padding-left: 16px; padding-right: 16px; } }
+
+  /* Controls stack and centre before they would wrap awkwardly */
+  @media (max-width: 1000px) {
+    .controls-inner { flex-direction: column; gap: 10px; align-items: center; }
+    .pills, .tier-legend { justify-content: center; }
+    .controls-inner > div:last-child { align-self: center; }
   }
 
   @media (max-width: 640px) {
     #view-pills { display: none; }                      /* hide Your Path toggle */
     #map-scroll { overflow: hidden; }                   /* no inner scroll — scale handles sizing */
     #map { min-width: unset; }                          /* let map shrink freely */
-    .node .s { display: none; }                         /* drop subtitles */
-    .node .t { font-size: 14px; white-space: normal; overflow: visible; text-overflow: unset; line-height: 1.25; }
+    main.wrap { padding-left: 10px; padding-right: 10px; }
     header.hero { padding: 28px 24px 12px; }
     .subtitle { padding: 0 20px; }
     .controls-inner { flex-direction: column; gap: 8px; align-items: center; }
     .pills { justify-content: center; }
     .tier-legend { justify-content: center; }
+    #audience-pills { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 340px; }
   }
+
+  /* crawlable index of every module and lesson */
+  .browse { margin: 10px auto 30px; font-size: 13px; color: var(--muted); }
+  .browse summary { cursor: pointer; text-align: center; font-weight: 600; letter-spacing: .3px; }
+  .browse-list { columns: 3 220px; column-gap: 28px; margin: 16px 0 6px; padding: 0; list-style: none; }
+  .browse-list > li { break-inside: avoid; margin-bottom: 10px; }
+  .browse-list > li > a { font-weight: 600; color: var(--text); }
+  .browse-list ul { list-style: none; padding: 2px 0 0 10px; margin: 0; }
+  .browse-list a { color: var(--muted); }
+  .browse-list a:hover, .browse-more a:hover { color: var(--accent-dark); }
+  .browse-more { text-align: center; }
 </style>
 </head>
 <body>
@@ -195,51 +240,24 @@
 
 <header class="hero wrap">
   <h1 id="hero-title">The AI Learning Map</h1>
-  <p class="subtitle" id="hero-subtitle">One coherent path from mathematical foundations to production AI systems &mdash; at the right depth for who you are. Each module, three ways in:</p>
-  <div class="ingredients-strip" id="ing-strip">
-    <span>&#127911; <b>Listen</b> for concepts</span>
-    <span>&#127918; <b>Play</b> for intuition</span>
-    <span>&#128296; <b>Build</b> for mastery</span>
-  </div>
+  <p class="subtitle" id="hero-subtitle">From mathematical foundations to production AI systems &mdash; at the right depth for who you are.</p>
 </header>
 
 <div class="controls wrap">
   <div class="controls-inner">
-    <div>
-      <div class="pills" id="audience-pills">
-        <button class="pill" data-aud="public"><span class="pill-name">🌐 Public</span><span class="pill-tag">🎯 use AI</span></button>
-        <button class="pill" data-aud="student"><span class="pill-name">🧑🏻‍🎓 Student</span><span class="pill-tag">🎯 build AI</span></button>
-        <button class="pill" data-aud="executive"><span class="pill-name">💼 Executive</span><span class="pill-tag">🎯 lead with AI</span></button>
-      </div>
+    <div class="pills" id="audience-pills">
+      <button class="pill" data-aud="public"><span class="pill-name">🌐 Public</span><span class="pill-tag">use AI</span></button>
+      <button class="pill" data-aud="student"><span class="pill-name">🧑🏻‍🎓 Students</span><span class="pill-tag">build AI</span></button>
+      <button class="pill" data-aud="executive"><span class="pill-name">💼 Leaders</span><span class="pill-tag">lead with AI</span></button>
+      <button class="pill" data-aud="scholar"><span class="pill-name">🔬 Scholars</span><span class="pill-tag">advance AI</span></button>
     </div>
-    <div class="pills" id="view-pills">
-      <button class="pill active" data-view="map">
-        <svg class="pill-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-          <circle cx="7" cy="2.5" r="1.5"/>
-          <circle cx="2.5" cy="11" r="1.5"/>
-          <circle cx="11.5" cy="11" r="1.5"/>
-          <line x1="7" y1="4" x2="3.3" y2="9.5"/>
-          <line x1="7" y1="4" x2="10.7" y2="9.5"/>
-        </svg>
-        <span class="pill-label">Skill tree</span>
-      </button>
-      <button class="pill" data-view="path">
-        <svg class="pill-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-          <circle cx="2.5" cy="2.5" r="1.5"/>
-          <circle cx="7" cy="7" r="1.5"/>
-          <circle cx="11.5" cy="11.5" r="1.5"/>
-          <polyline points="4,4 6,6"/>
-          <polyline points="8,8 10,10"/>
-        </svg>
-        <span class="pill-label">Your path</span>
-      </button>
+    <div class="tier-legend" id="tier-legend">
+      <div class="tier-legend-item foundations"><div class="swatch"></div><span id="tl-foundations">Foundations</span></div>
+      <div class="tier-legend-item concepts"><div class="swatch"></div><span id="tl-concepts">Concepts</span></div>
+      <div class="tier-legend-item applied"><div class="swatch"></div><span id="tl-applied">Applications</span></div>
+      <div class="tier-legend-item specializations"><div class="swatch"></div><span id="tl-specializations">Specializations</span></div>
+      <div class="tier-legend-item planned"><div class="swatch"></div><span id="tl-planned">Under development</span></div>
     </div>
-  </div>
-  <div class="tier-legend" id="tier-legend">
-    <div class="tier-legend-item foundations"><div class="swatch"></div><span id="tl-foundations">Foundations</span></div>
-    <div class="tier-legend-item concepts">   <div class="swatch"></div><span id="tl-concepts">Concepts</span></div>
-    <div class="tier-legend-item applied">    <div class="swatch"></div><span id="tl-applied">Applications</span></div>
-    <div class="tier-legend-item specializations"><div class="swatch"></div><span id="tl-specializations">Specializations</span></div>
   </div>
 </div>
 
@@ -257,24 +275,58 @@
   <div class="modal" id="popup"></div>
 </div>
 
+<section class="browse wrap" aria-label="All modules and lessons">
+  <details><summary>Browse all modules &amp; lessons</summary>
+    <ul class="browse-list"><li><a href="module.html?id=c-flu">AI Fluency</a></li><li><a href="module.html?id=f-la">Linear Algebra</a></li><li><a href="module.html?id=f-calc">Calculus</a></li><li><a href="module.html?id=f-prob">Probability &amp; Statistics</a></li><li><a href="module.html?id=f-opt">Optimization</a></li><li><a href="module.html?id=f-prog">Programming</a></li><li><a href="module.html?id=x-unsup">Unsupervised Learning</a><ul><li><a href="modules/c-ml/pca/index.html">Principal Component Analysis</a></li><li><a href="modules/c-ml/autoencoders/index.html">Autoencoders and VAEs</a></li><li><a href="modules/c-ml/clustering/index.html">Clustering &amp; Density Estimation</a></li></ul></li><li><a href="module.html?id=c-ml">Classical ML Models</a><ul><li><a href="modules/c-ml/knn/index.html">k-Nearest Neighbours</a></li><li><a href="modules/c-ml/decision-trees/index.html">Decision Trees</a></li><li><a href="modules/c-ml/bias-variance-ensembles/index.html">Bias, Variance &amp; Ensembles</a></li><li><a href="modules/c-ml/mle-map-bayesian/index.html">MLE, MAP &amp; Bayesian Prediction</a></li><li><a href="modules/c-ml/gaussian-bayes/index.html">Gaussian Bayes Models</a></li><li><a href="modules/c-ml/svm/index.html">Support Vector Machines</a></li></ul></li><li><a href="module.html?id=x-rl">Reinforcement Learning</a><ul><li><a href="modules/c-ml/reinforcement-learning/index.html">Reinforcement Learning</a></li></ul></li><li><a href="module.html?id=c-nn">Linear to Neural Models</a><ul><li><a href="modules/c-ml/linear-regression/index.html">Linear Regression</a></li><li><a href="modules/c-ml/linear-classification/index.html">Linear Classification</a></li><li><a href="modules/c-ml/logistic-regression/index.html">Logistic Regression</a></li><li><a href="modules/c-ml/neural-networks/index.html">Neural Networks</a></li><li><a href="modules/c-ml/backpropagation/index.html">Backpropagation</a></li></ul></li><li><a href="module.html?id=s-causal">Causal AI</a></li><li><a href="module.html?id=s-xai">Explainable AI</a></li><li><a href="module.html?id=x-rai">AI Ethics</a></li><li><a href="module.html?id=s-nsai">Neuro-symbolic AI</a></li><li><a href="module.html?id=a-vision">Computer Vision</a><ul><li><a href="modules/c-ml/cnn/index.html">Convolutional Neural Networks</a></li><li><a href="modules/c-ml/cnn-part-2/index.html">CNNs in Practice</a></li></ul></li><li><a href="module.html?id=a-nlp">Language Models</a><ul><li><a href="modules/c-ml/language-models/index.html">Language Models</a></li><li><a href="modules/c-ml/sequence-models/index.html">Sequence Models</a></li><li><a href="modules/c-ml/attention-transformers/index.html">Attention and Transformers</a></li></ul></li><li><a href="module.html?id=a-agents">AI Agents</a></li><li><a href="module.html?id=a-robotics">Robotics</a></li><li><a href="module.html?id=a-systems">AI Systems &amp; MLOps</a></li></ul>
+    <p class="browse-more"><a href="modules/c-ml/index.html">ECE 657 &amp; 457B course home</a> &middot; <a href="https://amirhkarimi.com">amirhkarimi.com</a></p>
+  </details>
+</section>
+
 <footer class="site-footer">
   <div class="wrap" id="footer-text">Sequence may evolve based on feedback and emerging technology. &middot; &copy; 2026 Amir-Hossein Karimi</div>
 </footer>
 
 <script src="data.js"></script>
+<script src="lessons.js"></script>
 <script>
 const CARD_W = 150, CARD_H = 64, MINI_W = 122, MINI_H = 52, UNIT_Y = 118, PAD = 20;
 const CARD_H_MOB = 50, MINI_H_MOB = 42;  // mobile: no subtitle
-function isMob() { return window.innerWidth < 640; }
-const MAP_REF_W = 560; // natural map width used for mobile scale calc
+function isMob() { return window.innerWidth < 900; }   // grid layout below this width
+const MAP_REF_W = 1032; // narrowest map width where desktop cards don't overlap; scale below it
 const X_SCALE = 0.74;   // horizontal tightening factor (1 = no change)
 const Y_GAP   = 0.55;   // extra UNIT_Y gaps added above foundations row
+/* Mobile layout: 3-column grid, rows counted bottom-up (col may be fractional) */
+const MOB_LAYOUT = {
+  "c-intro":  { col: 0,   y: 0 },   "c-flu":   { col: 1,   y: 0 },   "x-rai":     { col: 2,   y: 0 },
+  "f-opt":    { col: 0.5, y: 1 },   "f-prog":  { col: 1.5, y: 1 },
+  "f-la":     { col: 0,   y: 2 },   "f-calc":  { col: 1,   y: 2 },   "f-prob":    { col: 2,   y: 2 },
+  "junc-f2c": { col: 1,   y: 2.78 },
+  "c-ml":     { col: 0,   y: 3.55 },
+  "c-nn":     { col: 0,   y: 4.6 }, "x-unsup": { col: 1,   y: 4.6 }, "x-rl":      { col: 2,   y: 4.6 },
+  "a-vision": { col: 0,   y: 5.7 }, "a-nlp":   { col: 1,   y: 5.7 }, "a-robotics":{ col: 2,   y: 5.7 },
+  "a-systems":{ col: 0.5, y: 6.75 },"a-agents":{ col: 1.5, y: 6.75 },
+  "s-causal": { col: 0,   y: 7.9 }, "s-xai":   { col: 1,   y: 7.9 }, "s-nsai":    { col: 2,   y: 7.9 },
+};
+const MOB_UY = 74, MOB_PAD = 4, MOB_GAP = 18, MOB_CH = 54;   // compact cards, ~1.9:1 on phones
+function mobCardW() { return Math.floor(((map.clientWidth || window.innerWidth) - 2 * MOB_PAD - 2 * MOB_GAP) / 3); }
+function layoutIds() { return Object.keys(LAYOUT); }
+/* Centre of a node / junction in map pixels, for either layout */
+function nodeCenter(id, W, H) {
+  if (isMob()) {
+    const p = MOB_LAYOUT[id], nw = mobCardW();
+    return { x: MOB_PAD + p.col * (nw + MOB_GAP) + nw / 2, y: H - MOB_PAD - MOB_CH / 2 - p.y * MOB_UY };
+  }
+  const p = LAYOUT[id];
+  const ax = 50 + (p.x - 50) * X_SCALE;
+  const ay = p.y > 0.9 ? p.y + Y_GAP : p.y;
+  return { x: (ax / 100) * W, y: H - PAD - CARD_H / 2 - ay * UNIT_Y };
+}
 let audience = getAudience();
 let view = "map";
 const map = document.getElementById("map");
 
-function nodeW(m) { return m.mini ? MINI_W : CARD_W; }
-function nodeH(m) { return m.mini ? (isMob() ? MINI_H_MOB : MINI_H) : (isMob() ? CARD_H_MOB : CARD_H); }
+function nodeW(m) { return isMob() ? mobCardW() : (m.mini ? MINI_W : CARD_W); }
+function nodeH(m) { return isMob() ? MOB_CH : (m.mini ? MINI_H : CARD_H); }
 
 /* ---------- build / rebuild nodes (respects current language) ---------- */
 function buildNodes() {
@@ -297,11 +349,14 @@ function buildNodes() {
 }
 
 function mapHeight() {
+  if (isMob()) return Math.max(...Object.values(MOB_LAYOUT).map(p => p.y)) * MOB_UY + MOB_CH + 2 * MOB_PAD;
   const maxY = Math.max(...Object.values(LAYOUT).map(p => p.y > 0.9 ? p.y + Y_GAP : p.y));
   return maxY * UNIT_Y + CARD_H + 2 * PAD;
 }
 
 function positionNodes() {
+  document.body.classList.toggle("grid-mode", isMob());
+  applyScale();   // fix the map width (and scale) before measuring
   const W = map.clientWidth, H = mapHeight();
   map.style.height = H + "px";
 
@@ -310,17 +365,18 @@ function positionNodes() {
     if (!el) continue;
     const m = byId[id];
     const nw = nodeW(m), nh = nodeH(m);
-    const p = LAYOUT[id];
     el.style.width  = nw + "px";
     el.style.height = nh + "px";
-    const ax = 50 + (p.x - 50) * X_SCALE;
-    const ay = p.y > 0.9 ? p.y + Y_GAP : p.y;
-    el.style.left = Math.max(PAD, Math.min((ax / 100) * W - nw / 2, W - nw - PAD)) + "px";
-    el.style.top  = (H - PAD - nh - ay * UNIT_Y) + "px";
+    const c = nodeCenter(id, W, H);
+    const pad = isMob() ? MOB_PAD : PAD;
+    el.style.left = Math.max(pad, Math.min(c.x - nw / 2, W - nw - pad)) + "px";
+    el.style.top  = (c.y - nh / 2) + "px";
   }
 
   // Swimlane labels
   map.querySelectorAll(".swimlane-label").forEach(n => n.remove());
+  document.body.classList.toggle("grid-mode", isMob());
+  if (isMob()) { drawEdges(); updatePlate(); applyScale(); return; }
   const lang = getLang();
   const TL = STRINGS[lang].tier_label;
   const swimlanes = [
@@ -354,7 +410,7 @@ function updatePlate() {
     plate.appendChild(lbl);
     map.appendChild(plate);
   }
-  const pad = 10, padB = 24;
+  const pad = isMob() ? 3 : 10, padB = isMob() ? 20 : 24;
   const ids = ["c-nn", "c-ml"];
   let minL = Infinity, minT = Infinity, maxR = -Infinity, maxB = -Infinity;
   for (const id of ids) {
@@ -376,7 +432,7 @@ function updatePlate() {
 function applyScale() {
   const scroll = document.getElementById("map-scroll");
   const availW = scroll.clientWidth || window.innerWidth;
-  const scale  = Math.min(1, availW / MAP_REF_W);
+  const scale  = isMob() ? 1 : Math.min(1, availW / MAP_REF_W);
   if (scale < 0.99) {
     map.style.transform       = `scale(${scale.toFixed(4)})`;
     map.style.transformOrigin = "top left";
@@ -396,11 +452,7 @@ function applyScale() {
 function edgePoint(id, side) {
   const m = byId[id];
   if (m && m.junction && id in LAYOUT) {
-    const p = LAYOUT[id];
-    const W = map.clientWidth, H = map.clientHeight;
-    const jax = 50 + (p.x - 50) * X_SCALE;
-    const jay = p.y > 0.9 ? p.y + Y_GAP : p.y;
-    return { x: (jax / 100) * W, y: H - PAD - CARD_H / 2 - jay * UNIT_Y };
+    return nodeCenter(id, map.clientWidth, map.clientHeight);
   }
   const el = map.querySelector(`.node[data-id="${id}"]`);
   if (!el) return null;
@@ -437,11 +489,7 @@ function drawEdges() {
   // Draw junction dots on top of edges
   for (const m of MODULES) {
     if (!m.junction || !(m.id in LAYOUT)) continue;
-    const p = LAYOUT[m.id];
-    const jax = 50 + (p.x - 50) * X_SCALE;
-    const jay = p.y > 0.9 ? p.y + Y_GAP : p.y;
-    const cx = (jax / 100) * W;
-    const cy = H - PAD - CARD_H / 2 - jay * UNIT_Y;
+    const { x: cx, y: cy } = nodeCenter(m.id, W, H);
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     circle.setAttribute("cx", cx); circle.setAttribute("cy", cy);
     circle.setAttribute("r", "5");
@@ -457,7 +505,9 @@ function drawEdges() {
 /* ---------- audience ---------- */
 function isActive(id) {
   // Executives don't need the math-reference foundations — but AI Literacy/Fluency stay active
-  if (audience === "executive" && byId[id].tier === "foundations" && byId[id].ref) return false;
+  if (audience === "executive" && id.startsWith("f-")) return false;   // leaders skip the math references
+  // Scholars: the research track — everything past the foundations that students take
+  if (audience === "scholar") return byId[id].aud.includes("scholar");   // scholars: the specializations only
   return byId[id].aud.includes(audience);
 }
 function applyAudience() {
@@ -498,16 +548,7 @@ document.getElementById("audience-pills").addEventListener("click", e => {
   renderPath();
 });
 
-/* ---------- view toggle ---------- */
-document.getElementById("view-pills").addEventListener("click", e => {
-  const btn = e.target.closest(".pill"); if (!btn) return;
-  view = btn.dataset.view;
-  track("view_toggle", { view });
-  document.querySelectorAll("#view-pills .pill").forEach(p => p.classList.toggle("active", p === btn));
-  document.getElementById("map-scroll").style.display = view === "map" ? "block" : "none";
-  document.getElementById("path").style.display = view === "path" ? "block" : "none";
-  if (view === "map") positionNodes(); else renderPath();
-});
+/* ---------- view toggle (disabled for now; map view only) ---------- */
 
 /* ---------- Farsi digit conversion ---------- */
 function toFaDigits(n) {
@@ -555,6 +596,12 @@ function resIcon(r) {
   return RES_ICON[r.type] || RES_ICON.website;
 }
 function openPopup(id) {
+  // Modules with lessons skip the popup and go straight to their lesson list
+  if (window.MODULE_LESSONS && MODULE_LESSONS[id]) {
+    track("module_open", { module_id: id, audience });
+    location.href = "module.html?id=" + id;
+    return;
+  }
   const m = byId[id];
   const lang = getLang();
   const S = STRINGS[lang];
@@ -617,21 +664,9 @@ function applyLang() {
   document.getElementById("hero-title").textContent = S.map_title;
   document.getElementById("hero-subtitle").textContent = S.map_subtitle;
 
-  // Ingredients strip
-  const ingKeys = ["listen","play","build"];
-  const ingIcons = ["\u{1F3A7}","\u{1F3AE}","\u{1F528}"];
-  document.getElementById("ing-strip").innerHTML = ingKeys.map((k,i) =>
-    `<span>${ingIcons[i]} <b>${S.ing[k].name}</b> ${S.ing[k].tag}</span>`).join("");
-
-  // View pills (preserve SVG icon, only update label text)
-  document.querySelectorAll("#view-pills .pill").forEach(p => {
-    const lbl = p.querySelector(".pill-label");
-    if (lbl) lbl.textContent = S.views[p.dataset.view] || lbl.textContent;
-  });
-
   // Tier legend
   const TL = S.tier_label;
-  ["foundations","concepts","applied","specializations"].forEach(t => {
+  ["foundations","concepts","applied","specializations","planned"].forEach(t => {
     const el = document.getElementById("tl-" + t);
     if (el) el.textContent = TL[t] || t;
   });
